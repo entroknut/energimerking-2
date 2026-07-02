@@ -2539,14 +2539,17 @@ function draw(){
 
   // Calibration line
   if(mode==='calibrate'&&calMode==='length'&&calPts.length>0){
+    // calPts er biletkoordinatar — konverter til skjerm for teikning
+    const _cp0=i2s(calPts[0].x,calPts[0].y);
+    const _cp1=calPts.length===2?i2s(calPts[1].x,calPts[1].y):null;
     const _csr=calSnap&&calPts.length<2&&!calSnap._ortho?i2s(calSnap.x,calSnap.y):null;
     // Ortho: bruk calSnap om det er _ortho, elles vanleg
     const _ort=calSnap&&calSnap._ortho&&calPts.length<2?i2s(calSnap.x,calSnap.y):null;
-    const ex=calPts.length===2?calPts[1].x:(_ort?_ort.x:_csr?_csr.x:mouse?mouse.x:calPts[0].x);
-    const ey=calPts.length===2?calPts[1].y:(_ort?_ort.y:_csr?_csr.y:mouse?mouse.y:calPts[0].y);
-    ctx.beginPath();ctx.moveTo(calPts[0].x,calPts[0].y);ctx.lineTo(ex,ey);
+    const ex=_cp1?_cp1.x:(_ort?_ort.x:_csr?_csr.x:mouse?mouse.x:_cp0.x);
+    const ey=_cp1?_cp1.y:(_ort?_ort.y:_csr?_csr.y:mouse?mouse.y:_cp0.y);
+    ctx.beginPath();ctx.moveTo(_cp0.x,_cp0.y);ctx.lineTo(ex,ey);
     ctx.strokeStyle='#f59e0b';ctx.lineWidth=2.5;ctx.setLineDash([6,4]);ctx.stroke();ctx.setLineDash([]);
-    [calPts[0],...(calPts.length===2?[calPts[1]]:[])].forEach(p=>{
+    [_cp0,...(_cp1?[_cp1]:[])].forEach(p=>{
       ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);
       ctx.fillStyle='#d97706';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
     });
@@ -2557,7 +2560,7 @@ function draw(){
       else{ctx.moveTo(_si.x,_si.y-6);ctx.lineTo(_si.x+6,_si.y);ctx.lineTo(_si.x,_si.y+6);ctx.lineTo(_si.x-6,_si.y);ctx.closePath();ctx.strokeStyle='#b86a0a';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='rgba(184,106,10,.15)';ctx.fill();}
     }
     if(mouse&&calPts.length===1){
-      const d=Math.hypot(ex-calPts[0].x,ey-calPts[0].y);
+      const d=Math.hypot(ex-_cp0.x,ey-_cp0.y);
       const imgD=(d/sc).toFixed(0);
       const est=mmPerImgPx?(imgD*mmPerImgPx/1000).toFixed(2)+' m':'';
       const lbl=(shiftHeld?'90° · ':'')+imgD+' px'+(est?' ≈ '+est:'');
@@ -5278,21 +5281,24 @@ cv.addEventListener('click',e=>{
       }
       draw();return;
     }
-    // Lengde-kalibrering med ortho-snap
-    let calClickPt;
+    // Lengde-kalibrering med ortho-snap.
+    // calPts lagrast i BILETkoordinatar (som areal-modus) — elles korrumperer
+    // zoom/pan mellom første og andre klikk kalibreringa stille.
+    let calImgPt;
     if(shiftHeld&&calPts.length>0){
       const prevS=i2s(calPts[calPts.length-1].x,calPts[calPts.length-1].y);
       const snapped=orthoSnap(sx,sy,prevS);
-      calClickPt={x:snapped.x,y:snapped.y};
+      calImgPt=s2i(snapped.x,snapped.y);
+    } else if(calSnap&&!calSnap._ortho){
+      calImgPt={x:calSnap.x,y:calSnap.y};
     } else {
-      const _csp=calSnap&&!calSnap._ortho?i2s(calSnap.x,calSnap.y):null;
-      calClickPt={x:_csp?_csp.x:sx,y:_csp?_csp.y:sy};
+      calImgPt=s2i(sx,sy);
     }
-    calPts.push({x:calClickPt.x,y:calClickPt.y});calSnap=null;
+    calPts.push(calImgPt);calSnap=null;
     if(calPts.length===2){
-      const d=Math.hypot(calPts[1].x-calPts[0].x,calPts[1].y-calPts[0].y);
-      const imgD=d/sc;pendingCalImgPx=imgD;
-      calPxSpan.textContent=Math.round(d)+'px = '+Math.round(imgD)+' biletpx';
+      const imgD=Math.hypot(calPts[1].x-calPts[0].x,calPts[1].y-calPts[0].y);
+      pendingCalImgPx=imgD;
+      calPxSpan.textContent=Math.round(imgD*sc)+'px = '+Math.round(imgD)+' biletpx';
       if(mmPerImgPx)document.getElementById('calMmInput').value=Math.round(imgD*mmPerImgPx);
       else document.getElementById('calMmInput').value='';
       showCalStep2('length');
@@ -5570,15 +5576,29 @@ if(_aiReject) _aiReject.onclick=()=>{
 
 // ── AI helpers ────────────────────────────────────────────────
 async function callClaude(b64,prompt,maxTok){
+  // API-nøkkel vert lagra lokalt i nettlesaren (localStorage) — vert spurt om ved første bruk
+  let apiKey='';
+  try{apiKey=localStorage.getItem('entroAiKey')||'';}catch(e){}
+  if(!apiKey){
+    apiKey=(window.prompt('AI-analyse krev ein Anthropic API-nøkkel.\nDen vert lagra lokalt i denne nettlesaren.\n\nLim inn nøkkel (sk-ant-…):')||'').trim();
+    if(!apiKey)throw new Error('Ingen API-nøkkel — analyse avbroten.');
+    try{localStorage.setItem('entroAiKey',apiKey);}catch(e){}
+  }
   const resp=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTok||1200,
+    method:'POST',headers:{
+      'Content-Type':'application/json',
+      'x-api-key':apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({model:'claude-sonnet-5',max_tokens:maxTok||1200,
       messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
         {type:'text',text:prompt}
       ]}]})
   });
   const data=await resp.json();
+  if(resp.status===401){try{localStorage.removeItem('entroAiKey');}catch(e){} throw new Error('Ugyldig API-nøkkel — prøv igjen med ny nøkkel.');}
   if(!resp.ok)throw new Error(data.error?.message||resp.status);
   return data.content.map(c=>c.text||'').join('');
 }
@@ -5683,6 +5703,7 @@ function autosave(){
     });
     const proj={version:1,savedAt:new Date().toISOString(),activeFloor,globalNorth,globalMmPerImgPx,_nextFloorId,_nextGroupId,_nextZoneId,floors:serFloors};
     localStorage.setItem(AUTOSAVE_KEY,JSON.stringify(proj));
+    markClean(); // elles re-enkodar autolagringa alle bileta kvart minutt for alltid
   }catch(e){/* localStorage full */}
 }
 
@@ -5720,9 +5741,12 @@ function restoreAutosave(){
       toast.style.opacity='1';toast.style.transform='translateX(-50%) translateY(0)';
     }));
 
-    const dismiss=()=>{
+    const hide=()=>{
       toast.style.opacity='0';toast.style.transform='translateX(-50%) translateY(20px)';
       setTimeout(()=>toast.remove(),300);
+    };
+    const dismiss=()=>{
+      hide();
       localStorage.removeItem(AUTOSAVE_KEY);
     };
 
@@ -5766,8 +5790,8 @@ function restoreAutosave(){
       localStorage.removeItem(AUTOSAVE_KEY);
     };
     document.getElementById('toast-dismiss').onclick=dismiss;
-    // Auto-dismiss after 12 seconds if no action
-    setTimeout(()=>{if(document.getElementById('autosave-toast'))dismiss();},12000);
+    // Auto-lukk etter 12 s utan handling — men BEHALD backupen (berre eksplisitt «Ignorer» slettar)
+    setTimeout(()=>{if(document.getElementById('autosave-toast'))hide();},12000);
     return true;
   }catch(e){return false;}
 }
@@ -6931,6 +6955,9 @@ const BYGKAT_PROFILER = {
   },
 };
 
+// XML-escaping for brukarstyrte strenger — «Bygg & Anlegg» utan escaping gir ugyldig XML som SIMIEN nektar å opne
+function xesc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');}
+
 function buildSXI(proj){
   const {prosjektnamn,adresse,klimasted,byggeaar,kommunenr} = proj;
   const k=KLIMA[klimasted];
@@ -7014,7 +7041,7 @@ function buildSXI(proj){
 
       segs.forEach((seg,si)=>{
         const isSK=sk.has(seg.idx);
-        const nm=sxiLabels[si];
+        const nm=xesc(sxiLabels[si]);
         const ov=lz.segOverrides?.[seg.idx]||{};
         const lenM=ov.lenM??seg.lenM??0;
         const fhM=getHoyde(lz);
@@ -7034,7 +7061,7 @@ function buildSXI(proj){
             const totalGrossA=grpSegs.reduce((s,gs)=>{const gov=lz.segOverrides?.[gs.idx]||{};return s+(gov.areaM2??gs.areaM2??((gov.lenM??gs.lenM??0)*fhM)??0);},0);
             const uSK=lz.uPerSeg?.['seg_'+seg.idx]??0.80;
             const iwId=nextId('partition');
-            const grpName=(isMergedEntry?.name||'Skillekonstruksjon')+flSuffix;
+            const grpName=xesc((isMergedEntry?.name||'Skillekonstruksjon')+flSuffix);
             facXml+=`    <partition id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
           } else {
             const uSK=lz.uPerSeg?.['seg_'+seg.idx]??0.80;
@@ -7059,7 +7086,7 @@ function buildSXI(proj){
             grpSegs.forEach(gs=>{
               (lz.windows||[]).filter(w=>w.segIdx===gs.idx).forEach(w=>{
                 const uW=w.type==='dor'?(w.uVerdi??lz.uDor??uDor):(w.uVerdi??lz.uVindu??uVindu);
-                const wName=(w.name||(w.type==='dor'?'Dør':'Vindauge'))+flSuffix;
+                const wName=xesc((w.name||(w.type==='dor'?'Dør':'Vindauge'))+flSuffix);
                 if(w.type==='dor'){
                   const dId=nextId('door');
                   const dH=Math.max(0.1,(w.hoyMm||2100)/1000);
@@ -7075,7 +7102,7 @@ function buildSXI(proj){
               });
             });
             const faceId=nextId('facade');
-            facXml+=`    <facade id="${faceId}" name="${yvMergedGroup.name+flSuffix}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${effectiveU}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" exposed="no" ext_absorption_coeff="0.80" direction="${meanAz}" horizon_sector1="9.0" horizon_sector2="9.0" horizon_sector3="9.0" horizon_sector4="9.0">\n${openingsXml}    </facade>\n`;
+            facXml+=`    <facade id="${faceId}" name="${xesc(yvMergedGroup.name+flSuffix)}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${effectiveU}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" exposed="no" ext_absorption_coeff="0.80" direction="${meanAz}" horizon_sector1="9.0" horizon_sector2="9.0" horizon_sector3="9.0" horizon_sector4="9.0">\n${openingsXml}    </facade>\n`;
             return;
           }
           const effectiveU=lz.uPerSeg?.['seg_'+seg.idx]??uVegg;
@@ -7085,7 +7112,7 @@ function buildSXI(proj){
           let openingsXml='';
           wins.forEach(w=>{
             const uW=w.type==='dor'?(w.uVerdi??lz.uDor??uDor):(w.uVerdi??lz.uVindu??uVindu);
-            const wName=(w.name||(w.type==='dor'?'Dør':'Vindauge'))+flSuffix;
+            const wName=xesc((w.name||(w.type==='dor'?'Dør':'Vindauge'))+flSuffix);
             if(w.type==='dor'){
               const dId=nextId('door');
               const dH=Math.max(0.1,(w.hoyMm||2100)/1000);
@@ -7111,7 +7138,7 @@ function buildSXI(proj){
         const dirDeg=Math.round(gseg.normalAz||0);
         const effectiveUGavl=lz.uPerSeg?.['seg_'+gf.segIdx]??uVegg;
         const gavlId=nextId('facade');
-        const gavlName=(gf.dir||gseg.dir||'Gavl')+' gavl'+flSuffix;
+        const gavlName=xesc((gf.dir||gseg.dir||'Gavl')+' gavl'+flSuffix);
         facXml+=`    <facade id="${gavlId}" name="${gavlName}" comment="" area="${gf.area.toFixed(2)}" uvalue="${effectiveUGavl}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" exposed="no" ext_absorption_coeff="0.80" direction="${dirDeg}" horizon_sector1="9.0" horizon_sector2="9.0" horizon_sector3="9.0" horizon_sector4="9.0"></facade>\n`;
       });
     });
@@ -7145,7 +7172,7 @@ function buildSXI(proj){
             const skraaA=tvDeg>0?flatA/Math.cos(tvDeg*Math.PI/180):flatA;
             const inclination=tvDeg>0?tvDeg.toFixed(1):'0';
             const dir=(((tf.retning??180)+360)%360).toFixed(0);
-            const tfName=(tf.name||('Takflate '+(tfi+1)))+flSuf2;
+            const tfName=xesc((tf.name||('Takflate '+(tfi+1)))+flSuf2);
             takXml+=`    <roof id="${thisTakId}" name="${tfName}" comment="" area="${skraaA.toFixed(2)}" uvalue="${uTak}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" exposed="no" ext_absorption_coeff="0.80" direction="${dir}" inclination="${inclination}" horizon_sector_n="9.0" horizon_sector_ne="9.0" horizon_sector_e="9.0" horizon_sector_se="9.0" horizon_sector_s="9.0" horizon_sector_sw="9.0" horizon_sector_w="9.0" horizon_sector_nw="9.0"></roof>\n`;
           });
         } else {
@@ -7176,7 +7203,7 @@ function buildSXI(proj){
     const bra=totalBra.toFixed(2);
     const vol=totalVol.toFixed(1);
     const zId=thisZoneId;
-    zonesXml+=`  <zone id="${zId}" name="${z.name}" comment="" building_type="${BT}" building_subtype="${BST}" area="${bra}" volume="${vol}" n50="${n50}" furniture="Middels møblert" thermal_cap_furniture="4.00" shielding="moderat" facades="flere" thermal_bridge_type="normalisert" norm_thermal_bridge="${kuldebro}" working_days="${WDAYS}" working_days_en="${WDAYS_EN}" working_days_jan="${btCfg.working_days_jan}" working_days_feb="${btCfg.working_days_feb}" working_days_mar="${btCfg.working_days_mar}" working_days_apr="${btCfg.working_days_apr}" working_days_may="${btCfg.working_days_may}" working_days_jun="${btCfg.working_days_jun}" working_days_jul="${btCfg.working_days_jul}" working_days_aug="${btCfg.working_days_aug}" working_days_sep="${btCfg.working_days_sep}" working_days_oct="${btCfg.working_days_oct}" working_days_nov="${btCfg.working_days_nov}" working_days_dec="${btCfg.working_days_dec}">
+    zonesXml+=`  <zone id="${zId}" name="${xesc(z.name)}" comment="" building_type="${BT}" building_subtype="${BST}" area="${bra}" volume="${vol}" n50="${n50}" furniture="Middels møblert" thermal_cap_furniture="4.00" shielding="moderat" facades="flere" thermal_bridge_type="normalisert" norm_thermal_bridge="${kuldebro}" working_days="${WDAYS}" working_days_en="${WDAYS_EN}" working_days_jan="${btCfg.working_days_jan}" working_days_feb="${btCfg.working_days_feb}" working_days_mar="${btCfg.working_days_mar}" working_days_apr="${btCfg.working_days_apr}" working_days_may="${btCfg.working_days_may}" working_days_jun="${btCfg.working_days_jun}" working_days_jul="${btCfg.working_days_jul}" working_days_aug="${btCfg.working_days_aug}" working_days_sep="${btCfg.working_days_sep}" working_days_oct="${btCfg.working_days_oct}" working_days_nov="${btCfg.working_days_nov}" working_days_dec="${btCfg.working_days_dec}">
 ${facXml}${takXml}${gulvXml}    <ventilation id="${nextId('cav')}" name="CAV - konstant luftvolum 1" comment="" sfp_input="prosent" sfp_100="${sfp}" sfp_80="${sfp80}" sfp_60="${sfp60}" sfp_40="${sfp40}" sfp_20="${sfp20}" position_supply_fan="etter" position_extract_fan="etter" supply_temp="19.00" summer_scheme="no" supply_temp_summer="17.00" first_summer_month="mai" last_summer_month="august" heating_coil="yes" heating_coil_cap="30.00" heating_coil_efficiency="0.98" heating_coil_type="lokal" distr_heating_id="" heating_coil_spp="0.50" heating_coil_supply_temp="45.00" heating_coil_return_temp="30.00" cooling_coil="${bpCfg.vent_cooling_coil}" cooling_coil_cap="${bpCfg.vent_cooling_coil_cap}" cooling_coil_efficiency="2.00" cooling_coil_type="lokal" distr_cooling_id="" cooling_coil_spp="0.50" cooling_coil_supply_temp="10.00" cooling_coil_return_temp="15.00" heat_exchanger="yes" exchanger_efficiency_input="prosent" efficiency_exchanger="0.80" efficiency_exchanger_100="0.79" efficiency_exchanger_80="0.81" efficiency_exchanger_60="0.83" efficiency_exchanger_40="0.81" efficiency_exchanger_20="0.76" frost_protection="no" frost_protect_temp="-10.00" hygroscopic_exchanger="no" humidity_efficiency="0.60" contamination_risk="no" night_cooling="no" start_time_night_cooling="23.00" end_time_night_cooling="06.00" room_temp_night_cooling="22.00" ext_temp_night_cooling="20.00" max_room_temp_night_cooling="24.00" min_room_temp_night_cooling="18.00" min_supply_temp_night_cooling="12.00" night_cooling_holiday="no" reduced_airflow="no" reduced_airflow_temp="-15.00" heating_coil_distr_description="forenklet" heating_coil_specific_length_pipes="0.20" heating_coil_uvalue_pipes="0.20" heating_coil_share_heated_room="50.00" heating_coil_temp_unheated_room="10.00" cooling_coil_distr_description="forenklet" cooling_coil_specific_length_pipes="0.20" cooling_coil_uvalue_pipes="0.20" cooling_coil_share_heated_room="50.00" cooling_coil_temp_unheated_room="10.00" type="balansert" supply_air="${bpCfg.vent_supply_air}" extract_air="${bpCfg.vent_extract_air}" supply_temp_type="konstant" max_supply_temp="19.00" min_supply_temp="16.00" high_extract_temp="24.00" low_extract_temp="21.00" usage_holiday="${bpCfg.vent_usage_holiday}" supply_airflow_night_cooling="1.20" extract_airflow_night_cooling="1.20" supply_airflow_reduced="${bpCfg.vent_supply_reduced}" extract_airflow_reduced="${bpCfg.vent_extract_reduced}" norm_airflow="no" norm_air_on="${bpCfg.vent_norm_on}" norm_air_off="${bpCfg.vent_norm_off}" norm_sfp_on="1.50" norm_sfp_off="1.50" cooling_coil_water_flow="variable" heating_coil_water_flow="variable" frost_protection_type="preheat">
       <usage_ventilation name="${bpCfg.uv_name}" ${bpCfg.uv_pct}></usage_ventilation>
     </ventilation>
@@ -7231,7 +7258,7 @@ ${incl}
   }).join('\n');
 
   const sxi=`<?xml version="1.0" encoding="utf-8"?>
-<simien_project id="project#1" name="${prosjektnamn}" comment="" person="Knut H. Nedkvitne" user="Knut Nedkvitne" company="Entro AS" version="8.1.0.15">
+<simien_project id="project#1" name="${xesc(prosjektnamn)}" comment="${xesc(adresse)}" person="Knut H. Nedkvitne" user="Knut Nedkvitne" company="Entro AS" version="8.1.0.15">
 ${klimaBlock(k,klimasted)}
   <input_documentation25></input_documentation25>
   <global_vars conv_share_lighting_gain="0.30" conv_share_equipment_gain="0.50" conv_share_person_gain="0.50" conv_share_solar_gain="0.50" heat_gain_pr_person="95" conv_thermal_transfer_coeff_wall="2.50" conv_thermal_transfer_coeff_ceiling="2.00" conv_thermal_transfer_coeff_floor="3.00" thermal_cond_acc_layer="20.00" bypass_cooling_coil="0.25" int_res_window_pane="0.13" air_velocity="0.15" distance_from_window="0.60" turbulence_intensity="25.00" el_energy_cost="1.50" export_energy_cost="1.00" el_co2_emission="130.00" min_cold_water_temp="6.00" max_cold_water_temp="13.00" transmissivity_jan="0.88" transmissivity_jul="0.71" co2_consentration="400.00" el_price="constant" primary_energy_factor_el="1.00" primary_energy_factor_bio_gas="0.45" primary_energy_factor_bio_solid="0.45" primary_energy_factor_district_heating="0.45" primary_energy_factor_district_cooling="0.45" primary_energy_factor_other="1.00" power_tariff="no" primary_energy_factor_fossil_oil="1.00" primary_energy_factor_fossil_gas="1.00" primary_energy_factor_fossil_solid="1.00" primary_energy_factor_bio_oil="0.45" weight_factor_el="1.00" weight_factor_fossil_oil="1.00" weight_factor_fossil_gas="1.00" weight_factor_fossil_solid="1.00" weight_factor_bio_oil="0.45" weight_factor_bio_gas="0.45" weight_factor_bio_solid="0.45" weight_factor_district_heating="0.45" weight_factor_district_cooling="0.45" weight_factor_other="1.00" weight_factor_el_export="0.00" el_export_co2_emission="65.00" primary_energy_factor_el_export="0.00">
