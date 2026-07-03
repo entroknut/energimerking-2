@@ -1028,9 +1028,16 @@ function renderFloorTabs(){
       del.title='Slett etasje';
       del.onclick=e=>{
         e.stopPropagation();
-        if(!confirm('Slett "'+f.name+'" og alle sonene i denne etasjen?')){return;}
+        if(!confirm('Slett "'+f.name+'" og alle sonene i denne etasjen?\n\nKan angrast med Ctrl+Z.')){return;}
+        snapshot();
         floors.splice(fi,1);
+        // Slettar vi ei etasje FØR den aktive, forskyvast indeksen — juster
+        if(fi<activeFloor)activeFloor--;
         if(activeFloor>=floors.length)activeFloor=floors.length-1;
+        // Fjern groupId frå soner som mista koplingspartnarane sine
+        const _gidCount={};
+        floors.forEach(fl=>fl.zones.forEach(z=>{if(z.groupId)_gidCount[z.groupId]=(_gidCount[z.groupId]||0)+1;}));
+        floors.forEach(fl=>fl.zones.forEach(z=>{if(z.groupId&&_gidCount[z.groupId]<2)delete z.groupId;}));
         syncFloorState();renderFloorTabs();updateResults();renderTable();draw();
       };
       tab.appendChild(del);
@@ -3116,9 +3123,11 @@ function snapScreenToSegment(sx,sy){
 
 document.getElementById('winOk').onclick=()=>{
   if(!pendingWin)return;
-  const w=parseInt(document.getElementById('winW').value)||1200;
-  const h=parseInt(document.getElementById('winH').value)||1200;
-  const n=parseInt(document.getElementById('winN').value)||1;
+  // Negative/ugyldige verdiar fell tilbake til standard
+  const _posI=(id,dflt)=>{const v=parseInt(document.getElementById(id).value);return v>0?v:dflt;};
+  const w=_posI('winW',1200);
+  const h=_posI('winH',1200);
+  const n=_posI('winN',1);
   const type=document.getElementById('winType').value;
   zones[pendingWin.zi].windows=zones[pendingWin.zi].windows||[];
   snapshot();
@@ -3128,7 +3137,7 @@ document.getElementById('winOk').onclick=()=>{
   const _wname=(document.getElementById('winName').value||'').trim()||_autoN;
   const _brystCb=document.getElementById('winBrystCb');
   const _brystVal=parseInt(document.getElementById('winBryst').value);
-  const _brystMm=(type!=='dor'&&_brystCb.checked&&!isNaN(_brystVal))?_brystVal:null;
+  const _brystMm=(type!=='dor'&&_brystCb.checked&&!isNaN(_brystVal))?Math.max(0,_brystVal):null;
   _existW.push({segIdx:pendingWin.segIdx,dir:pendingWin.dir,t0:pendingWin.t0,t1:pendingWin.t1,breddeMm:w,hoyMm:h,antal:n,type,name:_wname,brystningMm:_brystMm});
   pendingWin=null;winPts=[];
   winOverlay.classList.remove('show');
@@ -4481,15 +4490,15 @@ function renderTable(){
   });
   wrap.querySelectorAll('[data-wb]').forEach(inp=>{
     const [_fi,_zi,_wi]=inp.dataset.wb.split(',').map(Number);
-    inp.onchange=()=>{const w=floors[_fi].zones[_zi].windows[_wi];w.breddeMm=parseInt(inp.value)||w.breddeMm;updateResults();renderTable();draw();};
+    inp.onchange=()=>{const w=floors[_fi].zones[_zi].windows[_wi];const v=parseInt(inp.value);w.breddeMm=v>0?v:w.breddeMm;updateResults();renderTable();draw();};
   });
   wrap.querySelectorAll('[data-wh]').forEach(inp=>{
     const [_fi,_zi,_wi]=inp.dataset.wh.split(',').map(Number);
-    inp.onchange=()=>{const w=floors[_fi].zones[_zi].windows[_wi];w.hoyMm=parseInt(inp.value)||w.hoyMm;updateResults();renderTable();draw();};
+    inp.onchange=()=>{const w=floors[_fi].zones[_zi].windows[_wi];const v=parseInt(inp.value);w.hoyMm=v>0?v:w.hoyMm;updateResults();renderTable();draw();};
   });
   wrap.querySelectorAll('[data-wn]').forEach(inp=>{
     const [_fi,_zi,_wi]=inp.dataset.wn.split(',').map(Number);
-    inp.onchange=()=>{const w=floors[_fi].zones[_zi].windows[_wi];w.antal=parseInt(inp.value)||1;updateResults();renderTable();draw();};
+    inp.onchange=()=>{const w=floors[_fi].zones[_zi].windows[_wi];const v=parseInt(inp.value);w.antal=v>0?v:1;updateResults();renderTable();draw();};
   });
 }
 
@@ -5154,7 +5163,7 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   save.style.cssText='padding:8px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600';
   save.onclick=()=>{
     const br=parseInt(brI.value),ho=parseInt(hoI.value),ant=parseInt(antI.value);
-    if(!br||!ho||!ant){errEl.textContent='Breidde, høgde og antal må fyllast inn.';errEl.style.display='block';return;}
+    if(!br||br<=0||!ho||ho<=0||!ant||ant<=0){errEl.textContent='Breidde, høgde og antal må vere positive tal.';errEl.style.display='block';return;}
     snapshot();
     w.name=nameI.value.trim()||typeL;
     w.breddeMm=br;w.hoyMm=ho;w.antal=ant;
