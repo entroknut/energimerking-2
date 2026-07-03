@@ -1240,17 +1240,33 @@ function i2sFloor(ix,iy,f){
 
 // ── Scale helpers ─────────────────────────────────────────────
 function imgPxToM(px){return mmPerImgPx===null?null:px*mmPerImgPx/1000;}
-function calcAreaM2(pts){
-  if(!mmPerImgPx||pts.length<3)return null;
+// ── Kalibrering per etasje ────────────────────────────────────
+// mmPerImgPx-aliaset gjeld berre AKTIV etasje. All matematikk som kryssar
+// etasjar (SXI-eksport, BRA-summar, 3D, sidepanel/tabell for alle etasjar)
+// må slå opp skalaen for sona si eiga etasje via desse hjelparane.
+function mppForFloor(f){
+  if(!f)return mmPerImgPx;
+  return f.ownCal?f.mmPerImgPx:(globalMmPerImgPx??f.mmPerImgPx);
+}
+function mppForZone(z){
+  for(const f of floors){if(f.zones.includes(z))return mppForFloor(f);}
+  return mmPerImgPx;
+}
+
+function calcAreaM2(pts,mpp){
+  if(mpp===undefined)mpp=mmPerImgPx;
+  if(!mpp||pts.length<3)return null;
   let a=0;for(let i=0;i<pts.length;i++){const j=(i+1)%pts.length;a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;}
-  return Math.abs(a)/2*(mmPerImgPx/1000)**2;
+  return Math.abs(a)/2*(mpp/1000)**2;
 }
-function calcPerimM(pts){
-  if(!mmPerImgPx)return null;
+function calcPerimM(pts,mpp){
+  if(mpp===undefined)mpp=mmPerImgPx;
+  if(!mpp)return null;
   let p=0;for(let i=0;i<pts.length;i++){const p1=pts[i],p2=pts[(i+1)%pts.length];p+=Math.hypot(p2.x-p1.x,p2.y-p1.y);}
-  return p*mmPerImgPx/1000;
+  return p*mpp/1000;
 }
-function calcSegments(pts,fhM){
+function calcSegments(pts,fhM,mpp){
+  if(mpp===undefined)mpp=mmPerImgPx;
   if(pts.length<2)return null;
   if(fhM==null)fhM=parseFloat(fhI.value)||3.0;
   const nd=parseFloat(northI.value)||0;
@@ -1264,7 +1280,7 @@ function calcSegments(pts,fhM){
   return pts.map((p1,i)=>{
     const p2=pts[(i+1)%pts.length];
     const lenPx=Math.hypot(p2.x-p1.x,p2.y-p1.y);
-    const lenM=mmPerImgPx?lenPx*mmPerImgPx/1000:null;
+    const lenM=mpp?lenPx*mpp/1000:null;
     const areaM2=(lenM!==null)?lenM*fhM:null;
     const wallAngle=Math.atan2(p2.y-p1.y,p2.x-p1.x)*180/Math.PI;
     const normalAngle=wallAngle+normalOffset;
@@ -1365,7 +1381,7 @@ function entroStandard(year){
   return {uVegg,uTak,uGulv,uVindu,uDor,n50,kuldebro};
 }
 
-function getAreaM2(z){return z.areaOverride!=null?z.areaOverride:calcAreaM2(z.pts);}
+function getAreaM2(z){return z.areaOverride!=null?z.areaOverride:calcAreaM2(z.pts,mppForZone(z));}
 // Get all zone instances across floors that share the same groupId
 function getLinkedZones(z){
   if(!z.groupId)return[z];
@@ -1379,7 +1395,7 @@ function getTotalAreaM2(z){
 function getTotalVolum(z){
   return getLinkedZones(z).reduce((s,lz)=>{const v=getVolum(lz);return s+(v||0);},0)||null;
 }
-function getPerimM(z){return z.perimOverride!=null?z.perimOverride:calcPerimM(z.pts);}
+function getPerimM(z){return z.perimOverride!=null?z.perimOverride:calcPerimM(z.pts,mppForZone(z));}
 function getHoyde(z){
   if(z.hoyde!=null)return z.hoyde;
   for(const f of floors){if(f.zones.includes(z))return (f.defaultHoyde!=null?f.defaultHoyde:null)||(parseFloat(fhI.value)||3.0);}
@@ -1477,8 +1493,9 @@ function sanitizeZoneSegRefs(z){
 
 
 function getUtvOmkrets(z){
-  const segs=calcSegments(z.pts,getHoyde(z));
-  if(!segs||!mmPerImgPx)return null;
+  const _mpp=mppForZone(z);
+  const segs=calcSegments(z.pts,getHoyde(z),_mpp);
+  if(!segs||!_mpp)return null;
   const sk=z.skillevegg||new Set();
   return segs.filter(s=>!sk.has(s.idx)).reduce((t,s)=>t+(s.lenM||0),0);
 }
@@ -1647,7 +1664,7 @@ function renderMergeForZone(){
   const z=floors[fi]?.zones[zi];
   if(!z)return;
   if(!z.yvMergedGroups)z.yvMergedGroups=[];
-  const segs=calcSegments(z.pts,getHoyde(z));
+  const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z));
   const sk=z.skillevegg||new Set();
 
   // Eksisterande grupper
@@ -2928,10 +2945,11 @@ function _syncGavlflater(z){
 // Bereknar gavlflater (trekant-fasadar over veggtopp) ut frå sona sine takflater.
 // Returnerer array med {segIdx, profile:[{t,h}], area, lenM} per ytterfasade-segment.
 function _calcGavlflater(z){
-  if(!mmPerImgPx||(z.takflater||[]).length===0)return[];
-  const segs=calcSegments(z.pts,getHoyde(z))||[];
+  const _mpp=mppForZone(z);
+  if(!_mpp||(z.takflater||[]).length===0)return[];
+  const segs=calcSegments(z.pts,getHoyde(z),_mpp)||[];
   const sk=z.skillevegg||new Set();
-  const mpp=mmPerImgPx;
+  const mpp=_mpp;
   // Bestem innadpeikande normal for sona (for å offset testp. litt inni sona)
   let area2=0;
   z.pts.forEach((p1,i)=>{const p2=z.pts[(i+1)%z.pts.length];area2+=p1.x*p2.y-p2.x*p1.y;});
@@ -2956,7 +2974,9 @@ function _calcGavlflater(z){
         if(!pointInPolygon({x:testX,y:testY},tf.pts))return;
         const tanV=Math.tan((tf.vinkel||0)*Math.PI/180);
         if(tanV<0.001)return;
-        const retRad=tf.retning*Math.PI/180;
+        // tf.retning er kompass-asimut; legg til nord-rotasjonen for å få bilderetning
+        // (calcSegments trekkjer nd frå — dette er inversen)
+        const retRad=((tf.retning||0)+(parseFloat(northI.value)||0))*Math.PI/180;
         const ux=-Math.sin(retRad),uz=Math.cos(retRad);
         let minProj=Infinity;
         tf.pts.forEach(p=>{
@@ -3159,7 +3179,7 @@ function updateResults(){
         // Global fargeindeks: sum av alle soner på tidlegare etasjar + zi
         ci=(floors.slice(0,fi).reduce((s,fl)=>s+fl.zones.length,0)+zi)%COLORS.length;
       }
-      const segs=calcSegments(z.pts,getHoyde(z));
+      const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z));
       // Areal og volum alltid per sone — kopla soner summeres berre i SXI/SIMIEN
       const dispArea=getAreaM2(z);
       const dispVolum=getVolum(z);
@@ -3396,7 +3416,7 @@ function updateResults(){
           tfSec.appendChild(tfHdr);
           const RETNING_OPTS_ALL=[{v:0,l:'Nord'},{v:45,l:'Nordaust'},{v:90,l:'Aust'},{v:135,l:'Søraust'},{v:180,l:'Sør'},{v:225,l:'Sørvest'},{v:270,l:'Vest'},{v:315,l:'Nordvest'}];
           // Berre vis retningar som faktisk finst som YV-fasadar i denne sona, + den gjeldande verdien
-          const _tfSegs=calcSegments(z.pts,getHoyde(z))||[];
+          const _tfSegs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
           const _tfSk=z.skillevegg||new Set();
           const _facadeAz=new Set();
           _tfSegs.forEach(s=>{if(!_tfSk.has(s.idx))_facadeAz.add(Math.round(s.normalAz/45)*45%360);});
@@ -3420,7 +3440,7 @@ function updateResults(){
               if(!z.takflater)z.takflater=[];
               z.gavlflater=[];
               // Auto-vel retning frå lengste YV-fasade
-              const _segs=calcSegments(z.pts,getHoyde(z))||[];
+              const _segs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
               const _sk=z.skillevegg||new Set();
               let _longestSeg=null,_maxLen=0;
               _segs.forEach(s=>{if(!_sk.has(s.idx)&&(s.lenPx||0)>_maxLen){_maxLen=s.lenPx;_longestSeg=s;}});
@@ -3913,7 +3933,7 @@ function showCopyWindowMenu(w, srcZone, srcZi, srcFloor, srcFi){
   let added=0;
   floors.forEach((fl,fli)=>{
     fl.zones.forEach((tz,tzi)=>{
-      const tsegs=calcSegments(tz.pts,getHoyde(tz))||[];
+      const tsegs=calcSegments(tz.pts,getHoyde(tz),mppForZone(tz))||[];
       if(!tsegs.length)return;
       const tsk=tz.skillevegg||new Set();
       const yvSegs=tsegs.filter(s=>!tsk.has(s.idx));
@@ -4084,8 +4104,9 @@ function renderTable(){
   const TAK_OPT2=['Tak','Himling mot uoppvarma sone','Himling mot varm sone'];
   const mkOpts=(opts,val)=>opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('');
   floors.forEach((fl,fli)=>{fl.zones.forEach((z,zi)=>{
-    const area=calcAreaM2(z.pts);
-    const perim=calcPerimM(z.pts);
+    const _zm=mppForFloor(fl);
+    const area=calcAreaM2(z.pts,_zm);
+    const perim=calcPerimM(z.pts,_zm);
     const fh=getHoyde(z);
     const areaVal=z.areaOverride!=null?z.areaOverride:(area?area.toFixed(2):'');
     const perimVal=z.perimOverride!=null?z.perimOverride:(perim?perim.toFixed(2):'');
@@ -4180,7 +4201,7 @@ function renderTable(){
   // Fasadar — sone for sone med redigerbare celler
   html+='<div class="ttitle">Fasadar</div>';
   floors.forEach((fl,fli)=>{fl.zones.forEach((z,zi)=>{
-    const segs=calcSegments(z.pts,getHoyde(z));
+    const segs=calcSegments(z.pts,getHoyde(z),mppForFloor(fl));
     if(!segs)return;
     const sk=z.skillevegg||new Set();
     const labels3=getFacadeLabels(z,segs);
@@ -4268,7 +4289,7 @@ function renderTable(){
   // Vindauge og dører
   const allWins=[];
   floors.forEach((fl,fli)=>{fl.zones.forEach((z,zi)=>{
-    const segs=calcSegments(z.pts)||[];
+    const segs=calcSegments(z.pts,null,mppForFloor(fl))||[];
     (z.windows||[]).forEach((w,wi)=>{
       const dir=segs[w.segIdx]?.dir||w.dir;
       const _wfn=floors.length>1?` (${fl.name})`:'';allWins.push({...w,zoneName:z.name+_wfn,zi,wi,dir,fl,fli});
@@ -4699,7 +4720,7 @@ cwrap.addEventListener('contextmenu',e=>{
         menu.style.cssText=`position:fixed;left:${e.clientX}px;top:${e.clientY}px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 30px rgba(13,27,42,.18);z-index:600;min-width:190px;overflow:hidden;font-family:inherit;animation:ctxIn .12s ease;padding:4px`;
         const hdr=document.createElement('div');
         hdr.style.cssText='font-size:11px;font-weight:700;color:var(--text3);padding:6px 12px 5px;letter-spacing:.03em;text-transform:uppercase';
-        const segsForLabel=calcSegments(z.pts,getHoyde(z))||[];
+        const segsForLabel=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
         const segLabel=getFacadeLabels(z,segsForLabel)[segsForLabel.findIndex(s=>s.idx===seg.idx)??0]||seg.dir;
         hdr.textContent=`Fasade: ${segLabel}`;
         menu.appendChild(hdr);
@@ -4739,7 +4760,9 @@ cwrap.addEventListener('contextmenu',e=>{
 
   // ── Høgreklikk på sone (navigate/draw/window-modus) ──
   if(mode==='navigate'||mode==='draw'||mode==='window'){
-    const ip=s2i(sx,sy);
+    // Basispunkt utan etasje-offset — kvar etasje har sitt eige offset-rammeverk,
+    // så punktet må reknast per etasje (elles bommar treffet med offset-differansen)
+    const _bx=(sx-offX)/sc,_by=(sy-offY)/sc;
     // Find which zone the point is inside
     let foundZ=null,foundZi=-1,foundFi=-1,foundF=null;
     // Check active floor first, then others
@@ -4748,6 +4771,7 @@ cwrap.addEventListener('contextmenu',e=>{
       ...floors.map((f,fi)=>({f,fi})).filter(({fi})=>fi!==activeFloor)
     ];
     outer: for(const {f,fi} of allFloorsOrdered){
+      const ip={x:_bx-(f.floorDxImg||0),y:_by-(f.floorDyImg||0)};
       for(let zi=0;zi<f.zones.length;zi++){
         const z=f.zones[zi];
         if(z.pts.length<3)continue;
@@ -7027,7 +7051,7 @@ function buildSXI(proj){
     let facXml='';
 
     instances.forEach(lz=>{
-      const segs=calcSegments(lz.pts,getHoyde(lz));
+      const segs=calcSegments(lz.pts,getHoyde(lz),mppForZone(lz));
       if(!segs)return;
       const sk=lz.skillevegg||new Set();
       const sxiLabels=getFacadeLabels(lz,segs);
@@ -7167,7 +7191,7 @@ function buildSXI(proj){
           lz.takflater.forEach((tf,tfi)=>{
             if((tf.pts||[]).length<3)return;
             const thisTakId=nextId('roof');
-            const flatA=calcAreaM2(tf.pts)??0;
+            const flatA=calcAreaM2(tf.pts,mppForZone(lz))??0;
             const tvDeg=Math.max(0,tf.vinkel||0);
             const skraaA=tvDeg>0?flatA/Math.cos(tvDeg*Math.PI/180):flatA;
             const inclination=tvDeg>0?tvDeg.toFixed(1):'0';
@@ -7526,13 +7550,14 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     (()=>{
       const groundFloor=floors[0];
       const gImg=groundFloor?.bgImg;
-      if(gImg&&mmPerImgPx){
+      const _gm=mppForFloor(groundFloor);
+      if(gImg&&_gm){
         // Kalkuler storleik i meter
-        const gW=gImg.width*mmPerImgPx/1000;
-        const gH=gImg.height*mmPerImgPx/1000;
+        const gW=gImg.width*_gm/1000;
+        const gH=gImg.height*_gm/1000;
         // Offset for denne etasjen
-        const fdxM=(groundFloor.floorDxImg||0)*mmPerImgPx/1000;
-        const fdyM=(groundFloor.floorDyImg||0)*mmPerImgPx/1000;
+        const fdxM=(groundFloor.floorDxImg||0)*_gm/1000;
+        const fdyM=(groundFloor.floorDyImg||0)*_gm/1000;
         // Lag CanvasTexture frå bgImg
         const tc=document.createElement('canvas');
         tc.width=gImg.width;tc.height=gImg.height;
@@ -7569,9 +7594,10 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
 
     // World centre
     let allPts=[];
-    floors.forEach(f=>f.zones.forEach(z=>{
-      if(mmPerImgPx)z.pts.forEach(p=>allPts.push({x:p.x*mmPerImgPx/1000,z:p.y*mmPerImgPx/1000}));
-    }));
+    floors.forEach(f=>{
+      const _fm=mppForFloor(f);
+      if(_fm)f.zones.forEach(z=>z.pts.forEach(p=>allPts.push({x:p.x*_fm/1000,z:p.y*_fm/1000})));
+    });
     let mnX=Infinity,mxX=-Infinity,mnZ=Infinity,mxZ=-Infinity;
     allPts.forEach(p=>{mnX=Math.min(mnX,p.x);mxX=Math.max(mxX,p.x);mnZ=Math.min(mnZ,p.z);mxZ=Math.max(mxZ,p.z);});
     if(!isFinite(mnX)){mnX=0;mxX=20;mnZ=0;mxZ=20;}
@@ -7687,16 +7713,17 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
         const him=getHimling(z);
 
         // Legg til etasje-offset — floorDxImg er i biletpikslar, direkte til meter
-        const fdxM=(f.floorDxImg||0)*(mmPerImgPx||10)/1000;
-        const fdyM=(f.floorDyImg||0)*(mmPerImgPx||10)/1000;
-        const toM=p=>({x:(mmPerImgPx?p.x*mmPerImgPx/1000:p.x/10)-cx+fdxM,z:(mmPerImgPx?p.y*mmPerImgPx/1000:p.y/10)-cz+fdyM});
+        const _fm=mppForFloor(f);
+        const fdxM=(f.floorDxImg||0)*(_fm||10)/1000;
+        const fdyM=(f.floorDyImg||0)*(_fm||10)/1000;
+        const toM=p=>({x:(_fm?p.x*_fm/1000:p.x/10)-cx+fdxM,z:(_fm?p.y*_fm/1000:p.y/10)-cz+fdyM});
         const ptsM=z.pts.map(toM);
 
         // (Ingen golv-slab — unngår skugge-artefakt)
 
         // Walls per segment
         const sk=z.skillevegg||new Set();
-        const segs=calcSegments(z.pts,fh)||[];
+        const segs=calcSegments(z.pts,fh,_fm)||[];
         const wins=z.windows||[];
 
         segs.forEach((seg)=>{
@@ -7780,8 +7807,9 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
             const tfPos=tfGeo2d.attributes.position;
             const n=tfPos.count;
             // retning = nedretning (dit vatn renn). Oppoverbakke = retning+180°.
-            // I 3D-modellen: x=aust(+), z=sør(+). Korrekt formel: ux=-sin(retning), uz=cos(retning)
-            const _retRad=tf.retning*Math.PI/180;
+            // 3D-aksane følgjer BILETET (x=bilet-x, z=bilet-y), ikkje kompasset —
+            // legg til nord-rotasjonen slik at kompass-retninga vert bilderetning
+            const _retRad=((tf.retning||0)+(parseFloat(northI.value)||0))*Math.PI/180;
             const ux=-Math.sin(_retRad),uz=Math.cos(_retRad);
             const tanV=Math.tan(Math.max(0,(tf.vinkel||0))*Math.PI/180);
             let minProj=Infinity;
@@ -8095,7 +8123,7 @@ function renderFasadeView(){
   // Collect all YV segments across all zones, grouped by direction
   const byDir={};
   yvZones.forEach(({z,fi,f})=>{
-    const segs=calcSegments(z.pts,getHoyde(z))||[];
+    const segs=calcSegments(z.pts,getHoyde(z),mppForFloor(f))||[];
     const sk=z.skillevegg||new Set();
     const labels=getFacadeLabels(z,segs);
     segs.forEach((seg,si)=>{
