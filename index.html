@@ -3324,102 +3324,93 @@ function _finishKlipp(){
 // detektor i eit lite vindauge rundt peikaren, så snapping verkar òg før
 // nokon soner finst — t.d. under kalibrering og kontrollmåling.
 let snapEnabled=true;
-let _snapCv=null,_snapCtx=null,_snapBlocked=false;
+let _snapBlocked=false;
+let _lineCv=null,_lineCtx=null;
+let LINE_MIN_FRAC=0.35; // kor stor del av vindauget ei linje må dekkje
 const SNAP_R={point:15,corner:15,imgcorner:13,edge:9};
-let CORNER_Q_MIN=0.08; // 0–0.25; høgare = strengare krav til «hjørneform»
 
-function imgCornerSnap(sx,sy){
+// Veggkryss-snap: ser etter LANGE rette strekar i eit vindauge og snappar til
+// krysset mellom dei. På skanna arkitektteikningar er veggane tynne (1–2 px),
+// men dei går tvers gjennom vindauget — medan tekst, møblar og målelinjer gir
+// korte strekar. Difor treffer dette veggane og overser resten, der ein rein
+// hjørnedetektor lett låser seg til næraste bokstav.
+function imgLineSnap(sx,sy){
   if(!snapEnabled||!bgImg||_snapBlocked)return null;
   const iw=bgImg.width||bgImg.naturalWidth,ih=bgImg.height||bgImg.naturalHeight;
   if(!iw||!ih)return null;
-  // Søkjeradius er fast på SKJERMEN. Utsnittet vert analysert i native
-  // oppløysing så lenge det får plass i eit vindauge på ANALYSE_MAX px;
-  // først når det er større skalerer vi ned. Ei A0-PDF vist i «tilpass til
-  // skjerm» (~10% zoom) treng eit stort utsnitt, og skalerer vi det ned til
-  // skjermoppløysing forsvinn veggstrekane heilt.
-  const ANALYSE_MAX=49;
-  const Rimg=Math.max(8,Math.round(SNAP_R.imgcorner/sc)); // radius i biletpikslar
-  const src=Rimg*2+1;                                     // kjeldeutsnitt
-  const W=Math.max(17,Math.min(ANALYSE_MAX,src)|1);       // analysevindauge (odde)
+  const Rimg=Math.max(10,Math.round(SNAP_R.imgcorner/sc));
+  const src=Rimg*2+1;
+  const W=Math.max(21,Math.min(81,src)|1);
   const ip=s2i(sx,sy);
   const x0=Math.round(ip.x)-Rimg,y0=Math.round(ip.y)-Rimg;
-  if(x0<1||y0<1||x0+src>=iw||y0+src>=ih)return null;
-  if(!_snapCv){
-    _snapCv=document.createElement('canvas');_snapCv.width=_snapCv.height=95;
-    _snapCtx=_snapCv.getContext('2d',{willReadFrequently:true});
+  if(x0<0||y0<0||x0+src>=iw||y0+src>=ih)return null;
+  if(!_lineCv){
+    _lineCv=document.createElement('canvas');_lineCv.width=_lineCv.height=81;
+    _lineCtx=_lineCv.getContext('2d',{willReadFrequently:true});
   }
   let d;
   try{
-    _snapCtx.fillStyle='#fff';_snapCtx.fillRect(0,0,W,W);
-    _snapCtx.drawImage(bgImg,x0,y0,src,src,0,0,W,W);
-    d=_snapCtx.getImageData(0,0,W,W).data;
-  }catch(e){_snapBlocked=true;return null;} // t.d. tainted canvas
-  const n=W*W,g0=new Float32Array(n);
-  for(let i=0;i<n;i++)g0[i]=(d[i*4]*0.299+d[i*4+1]*0.587+d[i*4+2]*0.114)/255;
-  // Kontraststrekk: ei blass grå strek på lysegrå botn skal telje like mykje
-  // som svart på kvitt. Utan dette druknar svake PDF-ar under terskelen.
-  let mn=1,mx=0;
-  for(let i=0;i<n;i++){const v=g0[i];if(v<mn)mn=v;if(v>mx)mx=v;}
-  const rng=mx-mn;
-  if(rng<0.05)return null;               // heilt flatt utsnitt
-  const inv=1/rng;
-  for(let i=0;i<n;i++)g0[i]=(g0[i]-mn)*inv;
-  // Lett 3×3-utjamning så oppskalerte/støyete skanningar ikkje gir falske hjørne.
-  // Kopier først heile utsnittet: lèt vi ytterkanten stå som nullar, får vi ei
-  // kunstig svart ramme rundt vindauget — og dermed falske hjørne langs kanten.
-  const g=Float32Array.from(g0);
-  for(let y=1;y<W-1;y++)for(let x=1;x<W-1;x++){
-    const i=y*W+x;
-    g[i]=(g0[i-W-1]+2*g0[i-W]+g0[i-W+1]
-         +2*g0[i-1]+4*g0[i]+2*g0[i+1]
-         +g0[i+W-1]+2*g0[i+W]+g0[i+W+1])/16;
+    _lineCtx.fillStyle='#fff';_lineCtx.fillRect(0,0,W,W);
+    _lineCtx.drawImage(bgImg,x0,y0,src,src,0,0,W,W);
+    d=_lineCtx.getImageData(0,0,W,W).data;
+  }catch(e){_snapBlocked=true;return null;}
+  const n=W*W,g=new Float32Array(n);
+  let mn=255,mx=0;
+  for(let i=0;i<n;i++){
+    const v=d[i*4]*0.299+d[i*4+1]*0.587+d[i*4+2]*0.114;
+    g[i]=v;if(v<mn)mn=v;if(v>mx)mx=v;
   }
-  // Sobel-gradientar
-  const Ix=new Float32Array(n),Iy=new Float32Array(n);
-  for(let y=1;y<W-1;y++)for(let x=1;x<W-1;x++){
-    const i=y*W+x;
-    Ix[i]=(g[i-W+1]+2*g[i+1]+g[i+W+1])-(g[i-W-1]+2*g[i-1]+g[i+W-1]);
-    Iy[i]=(g[i+W-1]+2*g[i+W]+g[i+W+1])-(g[i-W-1]+2*g[i-W]+g[i-W+1]);
+  if(mx-mn<25)return null;                    // for lite kontrast
+  const t=mn+(mx-mn)*0.45;                    // terskel mellom papir og strek
+  // Lengste SAMANHENGANDE strek per rad/kolonne — ikkje totalt tal mørke
+  // pikslar. Ei tekstlinje har like mange mørke pikslar som ein vegg, men
+  // oppstykka i bokstavar; ein vegg er ubroten. Små hol (1 px) vert tolererte
+  // for å tåle skannestøy.
+  const rowC=new Int32Array(W),colC=new Int32Array(W);
+  for(let y=0;y<W;y++){
+    let best=0,cur=0,hol=0;
+    for(let x=0;x<W;x++){
+      if(g[y*W+x]<t){cur++;hol=0;if(cur>best)best=cur;}
+      else if(cur&&hol===0){hol=1;cur++;}
+      else{cur=0;hol=0;}
+    }
+    rowC[y]=best;
   }
-  // Strukturtensor i 5×5-vindauge. Vi lagrar først a/b/c og maks «kantenergi»
-  // (trace), slik at terskelen kan settast i forhold til kor sterke kantane
-  // faktisk er i nettopp dette utsnittet — ikkje som ein fast absoluttverdi.
-  const c=(W-1)/2,Rw=c-2;
-  // Separabel 5×5-summering: først vassrett, så loddrett i kandidatløkka.
-  // Gir same resultat som ei full 5×5-løkke, men 2,5× billigare.
-  const Sxx=new Float32Array(n),Sxy=new Float32Array(n),Syy=new Float32Array(n);
-  for(let y=1;y<W-1;y++)for(let x=3;x<W-3;x++){
-    let a=0,b=0,cc=0;
-    for(let u=-2;u<=2;u++){const j=y*W+x+u;a+=Ix[j]*Ix[j];b+=Ix[j]*Iy[j];cc+=Iy[j]*Iy[j];}
-    const i=y*W+x;Sxx[i]=a;Sxy[i]=b;Syy[i]=cc;
+  for(let x=0;x<W;x++){
+    let best=0,cur=0,hol=0;
+    for(let y=0;y<W;y++){
+      if(g[y*W+x]<t){cur++;hol=0;if(cur>best)best=cur;}
+      else if(cur&&hol===0){hol=1;cur++;}
+      else{cur=0;hol=0;}
+    }
+    colC[x]=best;
   }
-  const cand=[];let maxTr=0;
-  for(let y=3;y<W-3;y++)for(let x=3;x<W-3;x++){
-    const dist=Math.hypot(x-c,y-c);
-    if(dist>Rw)continue;
-    let a=0,b=0,cc=0;
-    for(let v=-2;v<=2;v++){const j=(y+v)*W+x;a+=Sxx[j];b+=Sxy[j];cc+=Syy[j];}
-    const tr=a+cc;
-    if(tr<=0)continue;
-    if(tr>maxTr)maxTr=tr;
-    // Normalisert hjørnemål: det/trace² ligg i 0–0.25 og er uavhengig av
-    // kontrast, så same terskel verkar på svake og sterke teikningar.
-    cand.push({x,y,dist,tr,q:(a*cc-b*b)/(tr*tr)});
+  // Ei linje må dekkje ein god del av vindauget — veggar gjer det, tekst ikkje.
+  // Ved eit hjørne endar begge strekane midt i vindauget, så kravet kan ikkje
+  // vere mykje over halvparten.
+  const need=Math.max(6,Math.round(W*LINE_MIN_FRAC));
+  const c=(W-1)/2;
+  // Finn beste linje: grupper naboradar (2px strek) og vel den nærast midten
+  function finnLinje(cnt){
+    let best=-1,bestScore=-1;
+    for(let i=0;i<W;i++){
+      if(cnt[i]<need)continue;
+      if(i>0&&cnt[i-1]>cnt[i])continue;        // ikkje toppen i gruppa
+      if(i<W-1&&cnt[i+1]>cnt[i])continue;
+      const dist=Math.abs(i-c);
+      const score=cnt[i]/W-0.45*(dist/c);      // lang linje nær midten vinn
+      if(score>bestScore){bestScore=score;best=i;}
+    }
+    return best;
   }
-  if(!maxTr)return null;
-  let best=null,bestScore=0;
-  for(const t of cand){
-    if(t.q<CORNER_Q_MIN)continue;        // må likne eit hjørne, ikkje ein kant
-    if(t.tr<0.18*maxTr)continue;         // må liggje der det faktisk er strekar
-    const score=t.q*(1-0.6*t.dist/Rw);
-    if(score>bestScore){bestScore=score;best=t;}
-  }
-  if(!best)return null;
-  // Tilbake frå analysevindauget til biletkoordinatar
+  const hy=finnLinje(rowC),vx=finnLinje(colC);
+  if(hy<0||vx<0)return null;                   // treng både vassrett og loddrett
   const f=src/W;
-  const gx=x0+best.x*f,gy=y0+best.y*f,sp=i2s(gx,gy);
+  const gx=x0+vx*f+f/2,gy=y0+hy*f+f/2;
+  const sp=i2s(gx,gy);
   return{x:gx,y:gy,type:'imgcorner',sx:sp.x,sy:sp.y};
 }
+
 
 // Samla snap. ownPts = punkta i den pågåande teikninga (høgste prioritet).
 function unifiedSnap(sx,sy,ownPts){
@@ -3439,8 +3430,8 @@ function unifiedSnap(sx,sy,ownPts){
     if(dd<bd){bd=dd;b={x:p.x,y:p.y,type:'corner',sx:sp.x,sy:sp.y};}
   }));
   if(b)return b;
-  const ic=imgCornerSnap(sx,sy);
-  if(ic&&Math.hypot(sx-ic.sx,sy-ic.sy)<=SNAP_R.imgcorner)return ic;
+  const il=imgLineSnap(sx,sy);
+  if(il&&Math.hypot(sx-il.sx,sy-il.sy)<=SNAP_R.imgcorner)return il;
   bd=SNAP_R.edge;b=null;
   zones.forEach(z=>{
     for(let i=0;i<z.pts.length;i++){
