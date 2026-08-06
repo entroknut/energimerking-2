@@ -571,7 +571,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div class="tg">
       <button class="btn on" id="navBtn" title="Naviger — panorér og zoom (Esc)">↖ Naviger</button>
-      <button class="btn" id="drawBtn" title="Teikn sone — klikk hjørner, Shift for 90°, Enter/dobbelklikk for å avslutte (Esc for å avbryte)">⬡ Sone</button>
+      <button class="btn" id="drawBtn" title="Teikn sone — klikk hjørner, Shift for 90°/45°, Enter/dobbelklikk for å avslutte (Esc for å avbryte)">⬡ Sone</button>
       <button class="btn" id="editBtn" title="Rediger sonegeometri — dra hjørner, høgreklikk for å slette (Esc for å avslutte)">⊹ Rediger</button>
       <button class="btn" id="winBtn" title="Legg til vindauge/dør — klikk på ein fasade (Ctrl+C/V for å kopiere)">▭ Vindauge/dør</button>
       <button class="btn" id="measureBtn" title="Kontrollmål avstand (påverkar ikkje SXI) — klikk start og slutt, Esc for å avslutte"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="4.5" rx="1"/><path d="M4.5 6v2M7.5 6v3M10.5 6v2"/></svg> Mål</button>
@@ -679,10 +679,34 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
           <button id="model3dPlan" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:rgba(255,255,255,.2);color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s">Planteikning</button>
           <button id="model3dReset" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s">↺ Reset</button>
           <button id="model3dMapBtn" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s;display:flex;align-items:center;gap:4px">🗺 Kart <span style="font-size:9px;font-weight:700;background:#f59e0b;color:#fff;padding:1px 4px;border-radius:3px;letter-spacing:.3px;vertical-align:middle">BETA</span></button>
+          <div title="Eksploded view — dra etasjane frå kvarandre" style="display:flex;align-items:center;gap:5px;padding:0 4px">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#4b5563" stroke-width="1.5" stroke-linejoin="round"><rect x="3" y="1.5" width="10" height="3.4"/><rect x="3" y="6.3" width="10" height="3.4"/><rect x="3" y="11.1" width="10" height="3.4"/></svg>
+            <input type="range" id="explodeSlider" min="0" max="10" step="1" value="0" style="width:74px;accent-color:#1d4f4f;cursor:pointer">
+          </div>
+          <button id="model3dSunBtn" title="Solsimulering — vis korleis sola treff bygget gjennom året" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s;display:flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="3.2"/><path d="M8 1.2v1.8M8 13v1.8M1.2 8H3M13 8h1.8M3.2 3.2l1.3 1.3M11.5 11.5l1.3 1.3M12.8 3.2l-1.3 1.3M4.5 11.5l-1.3 1.3"/></svg> Sol</button>
+          <button id="model3dShotBtn" title="Last ned 3D-visninga som PNG-bilete" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s;display:flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.5v9M4.5 7 8 10.5 11.5 7"/><path d="M2 11.5v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"/></svg> PNG</button>
           <button id="model3dClose" style="padding:4px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;background:#1d4f4f;color:#fff;cursor:pointer;font-family:inherit;transition:all .12s">✕ Lukk</button>
         </div>
       </div>
       <canvas id="canvas3d" style="flex:1;display:block;width:100%;height:100%"></canvas>
+      <div id="sunPanel" style="display:none;position:absolute;top:56px;right:14px;background:rgba(255,255,255,.96);border:1px solid #e5e7eb;border-radius:12px;padding:12px 16px;box-shadow:0 4px 16px rgba(0,0,0,.10);width:260px;backdrop-filter:blur(8px);z-index:5">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;color:#1f2937">Solsimulering</span>
+          <span id="sunReadout" style="font-size:10.5px;color:#9ca3af;font-variant-numeric:tabular-nums"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:11px;color:#4b5563;width:48px;flex-shrink:0">Månad</span>
+          <input type="range" id="sunMonth" min="1" max="12" step="1" value="6" style="flex:1;accent-color:#1d4f4f;cursor:pointer">
+          <span id="sunMonthLbl" style="font-size:11px;color:#1f2937;font-weight:600;width:28px;text-align:right">jun</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#4b5563;width:48px;flex-shrink:0">Klokka</span>
+          <input type="range" id="sunHour" min="3" max="22" step="0.5" value="12" style="flex:1;accent-color:#1d4f4f;cursor:pointer">
+          <span id="sunHourLbl" style="font-size:11px;color:#1f2937;font-weight:600;width:28px;text-align:right">12:00</span>
+        </div>
+        <div id="sunPlaceNote" style="font-size:10px;color:#9ca3af;margin-top:8px"></div>
+      </div>
+      <div id="pick3dInfo" style="display:none;position:absolute;background:rgba(255,255,255,.97);border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-width:250px;z-index:6;font-size:11.5px;line-height:1.7;color:#374151"></div>
       <div id="model3dLegend" style="position:absolute;bottom:14px;left:14px;display:flex;flex-wrap:wrap;gap:5px;max-width:60%"></div>
       <div id="model3dInfo" style="position:absolute;bottom:14px;right:14px;font-size:11px;color:#9ca3af;text-align:right;line-height:1.8"></div>
     </div>
@@ -1591,9 +1615,9 @@ const calBtn=document.getElementById('calBtn');
 
 const HINTS={
   navigate:'Scroll for zoom · klikk+dra for å flytte rundt',
-  draw:'Klikk hjørner · Shift for 90° · dobbelklikk eller klikk startpunkt for å avslutte · Esc for å avbryte',
+  draw:'Klikk hjørner · Shift for 90°/45° · scroll for zoom, midtknapp/Alt+dra for å flytte · dobbelklikk eller klikk startpunkt for å avslutte · Esc for å avbryte',
   edit:'Dra hjørner · Shift+dra inni sone = flytt sona · klikk + for å leggje til · høgreklikk for å slette · Esc for å avslutte',
-  calibrate:'Lengde: klikk start → klikk slutt  ·  Areal: klikk på ei sone du kjenner arealet til',
+  calibrate:'Lengde: klikk start → klikk slutt · Areal: klikk på ei sone · Shift for 90°/45° · scroll for zoom, midtknapp/Alt+dra for å flytte',
   window:'Klikk éin ende av vindauget/døra på fasaden, så den andre enden',
   measure:'Klikk startpunkt → klikk endepunkt for å kontrollmåle. Klikk igjen for ny måling. Esc for å avslutte.',
   'tegn-takflate':'Klikk hjørner for å teikne takflate-polygon. Klikk på startpunktet for å lukke. Esc for å avbryte.',
@@ -2411,7 +2435,9 @@ function draw(){
     if(shiftHeld&&curPts.length>0&&lineEndX!==null){
       ctx.font='bold 10px Inter,sans-serif';
       ctx.fillStyle='rgba(59,130,246,.9)';
-      const lbl='90°';
+      const _pv=i2s(curPts[curPts.length-1].x,curPts[curPts.length-1].y);
+      const _sa=orthoSnapAngle(lineEndX,lineEndY,_pv);
+      const lbl=(_sa!=null?_sa:0)+'°';
       const tw=ctx.measureText(lbl).width+8;
       ctx.beginPath();ctx.roundRect(lineEndX+8,lineEndY-9,tw,16,3);ctx.fill();
       ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';
@@ -2587,7 +2613,8 @@ function draw(){
       const d=Math.hypot(ex-_cp0.x,ey-_cp0.y);
       const imgD=(d/sc).toFixed(0);
       const est=mmPerImgPx?(imgD*mmPerImgPx/1000).toFixed(2)+' m':'';
-      const lbl=(shiftHeld?'90° · ':'')+imgD+' px'+(est?' ≈ '+est:'');
+      const _csa=shiftHeld?orthoSnapAngle(ex,ey,_cp0):null;
+      const lbl=(_csa!=null?_csa+'° · ':'')+imgD+' px'+(est?' ≈ '+est:'');
       ctx.font='11px Inter,sans-serif';const tw=ctx.measureText(lbl).width+12;
       ctx.fillStyle='rgba(217,119,6,.9)';ctx.beginPath();ctx.roundRect(ex+8,ey-11,tw,18,4);ctx.fill();
       ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(lbl,ex+14,ey);
@@ -2764,7 +2791,7 @@ document.getElementById('calChooseLen').onclick=()=>{
   calOverlay.classList.remove('show');
   calPts=[];
   setMode('calibrate');
-  hintText.textContent='Klikk startpunkt → klikk endepunkt på ei kjend lengde';
+  hintText.textContent='Klikk startpunkt → klikk endepunkt på ei kjend lengde · Shift for 90°/45° · scroll for zoom, midtknapp/Alt+dra for å flytte';
   draw();
 };
 
@@ -4534,12 +4561,25 @@ document.addEventListener('keydown',e=>{if(e.key==='Shift')shiftHeld=true;});
 document.addEventListener('keyup',e=>{if(e.key==='Shift')shiftHeld=false;});
 
 // Returner snappa skjermkoordinat ved ortho-modus (hald Shift)
+// Låser retninga frå førre punkt til næraste 45°-akse (vassrett, loddrett
+// eller diagonal). Punktet vert projisert på aksen slik at det held seg så
+// nær musepeikaren som mogleg.
 function orthoSnap(sx, sy, prevScreenPt){
   if(!shiftHeld||!prevScreenPt)return{x:sx,y:sy};
   const dx=sx-prevScreenPt.x, dy=sy-prevScreenPt.y;
-  // Snap til næraste 90° akse
-  if(Math.abs(dx)>=Math.abs(dy)) return{x:sx,y:prevScreenPt.y}; // horisontal
-  else return{x:prevScreenPt.x,y:sy};                            // vertikal
+  if(Math.hypot(dx,dy)<1)return{x:sx,y:sy};
+  const step=Math.PI/4;
+  const ang=Math.round(Math.atan2(dy,dx)/step)*step;
+  const proj=Math.max(0,dx*Math.cos(ang)+dy*Math.sin(ang));
+  return{x:prevScreenPt.x+Math.cos(ang)*proj,y:prevScreenPt.y+Math.sin(ang)*proj};
+}
+// Kva akse snappinga låser til, i grader mot vassrett (0/45/90/135) — for etikett
+function orthoSnapAngle(sx, sy, prevScreenPt){
+  if(!prevScreenPt)return null;
+  const dx=sx-prevScreenPt.x, dy=sy-prevScreenPt.y;
+  if(Math.hypot(dx,dy)<1)return null;
+  const deg=Math.round(Math.atan2(dy,dx)*180/Math.PI/45)*45;
+  return ((deg%180)+180)%180;
 }
 
 // ── Canvas interaction ─────────────────────────────────────────
@@ -6090,7 +6130,7 @@ setTimeout(()=>restoreAutosave(),300);
       ['',''],
       ['Teikning av sone',''],
       ['Klikk','Legg til hjørne'],
-      ['Shift + klikk','Lås til 90° (horisontal/vertikal)'],
+      ['Shift + klikk','Lås til 90°/45° (vassrett, loddrett, diagonal)'],
       ['Dobbelklikk / klikk startpunkt','Fullfør sone'],
       ['Backspace / Delete','Fjern siste punkt'],
       ['',''],
@@ -6111,7 +6151,7 @@ setTimeout(()=>restoreAutosave(),300);
       ['Backspace / Delete over vindauge','Slett vindauge/dør'],
       ['',''],
       ['Kalibrering',''],
-      ['Shift under teikning','Lås til 90°'],
+      ['Shift under teikning','Lås til 90°/45°'],
       ['Klikk på sone (arealmodus)','Bruk sona sitt areal til kalibrering'],
       ['Dobbelklikk / klikk startpunkt (arealmodus)','Fullfør polygon'],
       ['',''],
@@ -7481,6 +7521,11 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
   let isWire=false;
   let orb=false,pan=false,lastM={x:0,y:0};
   let sph={theta:0.7,phi:1.05,radius:60};
+  // Solsimulering / eksploded view / opningsanimasjon / klikk-info
+  let _sunOn=false,_sunMonth=6,_sunHour=12;
+  let _explodeGap=0;
+  let _growT0=0;
+  let _picked=null,_downPos=null;
   let tgt={x:0,y:0,z:0};
   const OV=document.getElementById('model3dOverlay');
   const CV=document.getElementById('canvas3d');
@@ -7506,6 +7551,8 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     _showPlan=true;
     document.getElementById('model3dPlan').style.background='rgba(255,255,255,.2)';
     try{build();}catch(e){console.error('3D build error:',e);}
+    // Byggje-animasjon — modellen veks opp frå grunnen
+    if(scene3){scene3.scale.y=0.001;_growT0=performance.now();}
     start();
   };
   document.getElementById('model3dClose').onclick=()=>{OV.style.display='none';stop();};
@@ -7528,6 +7575,7 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
   };
 
   function build(){
+    _clearPick(); // gamal scene vert kasta — fjern highlight/infoboks
     const W=CV.clientWidth||800,H=CV.clientHeight||500;
     if(!renderer3){
       renderer3=new THREE.WebGLRenderer({canvas:CV,antialias:true,alpha:false});
@@ -7545,15 +7593,21 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     scene3.fog=new THREE.Fog(getBg3D(),150,400);
     camera3=new THREE.PerspectiveCamera(42,W/H,0.1,800);
 
-    // Lights
-    scene3.add(new THREE.AmbientLight(0xffffff,1.4));
+    // Lights — refs lagrast i userData slik at solsimuleringa kan styre dei
+    const amb=new THREE.AmbientLight(0xffffff,1.4);scene3.add(amb);
     const sun=new THREE.DirectionalLight(0xfff8f0,1.6);
     sun.position.set(50,90,40);sun.castShadow=true;
     sun.shadow.mapSize.set(2048,2048);
     sun.shadow.camera.left=-100;sun.shadow.camera.right=100;sun.shadow.camera.top=100;sun.shadow.camera.bottom=-100;
     scene3.add(sun);
     const fill=new THREE.DirectionalLight(0xe8f4f2,0.7);fill.position.set(-40,30,-30);scene3.add(fill);
-    scene3.add(new THREE.HemisphereLight(0xdbeafe,0xd1fae5,0.6));
+    const hemi=new THREE.HemisphereLight(0xdbeafe,0xd1fae5,0.6);scene3.add(hemi);
+    scene3.userData.amb=amb;scene3.userData.sun=sun;scene3.userData.fill=fill;scene3.userData.hemi=hemi;
+
+    // Skuggefangar — usynleg plan som tek imot skuggar oppå planteikninga
+    const shadowCatcher=new THREE.Mesh(new THREE.PlaneGeometry(500,500),new THREE.ShadowMaterial({opacity:0.22}));
+    shadowCatcher.rotation.x=-Math.PI/2;shadowCatcher.position.y=0.002;shadowCatcher.receiveShadow=true;
+    scene3.add(shadowCatcher);
 
     // Ground — planteikning på nedste etasje som bakkeplan
     (()=>{
@@ -7701,9 +7755,10 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     }
 
     // Stack floors — bruk etasjens defaultHoyde som stakkingshøgde
+    // (_explodeGap > 0 dreg etasjane frå kvarandre — eksploded view)
     let cumY=0;
-    const floorBaseY=floors.map(f=>{
-      const by=cumY;
+    const floorBaseY=floors.map((f,fi)=>{
+      const by=cumY+fi*_explodeGap;
       cumY+=f.defaultHoyde??Math.max(...f.zones.map(z=>getHoyde(z)),3);
       return by;
     });
@@ -7753,7 +7808,19 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
           const wall=new THREE.Mesh(wallGeo,wallMat);
           wall.position.set((p1.x+p2.x)/2,baseY+fh/2,(p1.z+p2.z)/2);
           wall.rotation.y=-ang;wall.castShadow=true;wall.receiveShadow=true;
-          wall.userData.w=true;scene3.add(wall);
+          wall.userData.w=true;
+          // Klikk-info for denne veggen
+          wall.userData.pick={
+            title:z.name+' — '+(isSK?'skiljevegg':'fasade '+seg.dir),
+            rows:[
+              ['Etasje',f.name],
+              ['Lengd',seg.lenM!=null?seg.lenM.toFixed(2)+' m':'ikkje kalibrert'],
+              ['Bruttoareal',seg.areaM2!=null?seg.areaM2.toFixed(2)+' m²':'—'],
+              ['Vindauge/dører',String(segWins.reduce((s,w)=>s+(w.antal||1),0))],
+              ['U-vegg',(z.uVegg??entroStandard(z.byggeaar)?.uVegg)!=null?((z.uVegg??entroStandard(z.byggeaar).uVegg).toFixed(2)+' W/m²K'+(z.uVegg!=null?' (manuell)':'')):'—']
+            ]
+          };
+          scene3.add(wall);
 
           // Windows/doors
           const nx_=-dz/segLen,nz_=dx/segLen;
@@ -7836,7 +7903,17 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
             const tfColor=TF3D_PAL[tfi%TF3D_PAL.length];
             const tfMat=new THREE.MeshLambertMaterial({color:tfColor,side:THREE.DoubleSide,transparent:true,opacity:0.82});
             const tfMesh=new THREE.Mesh(tfNewGeo,tfMat);
-            tfMesh.userData.w=true;scene3.add(tfMesh);
+            tfMesh.userData.w=true;
+            tfMesh.userData.pick={
+              title:z.name+' — '+(tf.name||('Takflate '+(tfi+1))),
+              rows:[
+                ['Etasje',f.name],
+                ['Takvinkel',(tf.vinkel||0)+'°'],
+                ['Fallretning',(tf.retning??180)+'°'],
+                ['U-tak',(z.uTak??entroStandard(z.byggeaar)?.uTak)!=null?((z.uTak??entroStandard(z.byggeaar).uTak).toFixed(2)+' W/m²K'):'—']
+              ]
+            };
+            scene3.add(tfMesh);
             const edgePts3=tfPtsM.map(p=>{const proj=p.x*ux+p.z*uz;return new THREE.Vector3(p.x,baseY+fh+Math.max(0,(proj-minProj))*tanV,p.z);});
             edgePts3.push(edgePts3[0].clone());
             scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePts3),new THREE.LineBasicMaterial({color:tfColor,linewidth:1})));
@@ -7980,11 +8057,142 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
       `${floors.length} etasje${floors.length>1?'r':''}&nbsp;·&nbsp;${nZ} sone${nZ>1?'r':''}&nbsp;·&nbsp;<strong>${totalA.toFixed(0)} m² BRA</strong>`;
 
     recenter();
+    _applySun();
+  }
+
+  // ── Solsimulering ───────────────────────────────────────────
+  // Standard solposisjonsformlar: deklinasjon + timevinkel → høgd/asimut
+  function _solarPos(latDeg,dayOfYear,hour){
+    const rad=Math.PI/180;
+    const decl=23.44*Math.sin(2*Math.PI*(284+dayOfYear)/365);
+    const H=(hour-12)*15;
+    const lat=latDeg*rad,d=decl*rad,h=H*rad;
+    const sinAlt=Math.sin(lat)*Math.sin(d)+Math.cos(lat)*Math.cos(d)*Math.cos(h);
+    const alt=Math.asin(Math.max(-1,Math.min(1,sinAlt)));
+    const cosAz=(Math.sin(d)-sinAlt*Math.sin(lat))/((Math.cos(alt)*Math.cos(lat))||1e-9);
+    let az=Math.acos(Math.max(-1,Math.min(1,cosAz)))/rad;
+    if(H>0)az=360-az;
+    return{altDeg:alt/rad,azDeg:az};
+  }
+  const _bg3=()=>document.documentElement.getAttribute('data-theme')==='dark'?0x0f172a:0xf0f2f5;
+  const _MND=['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+  const _DOY=[15,46,74,105,135,166,196,227,258,288,319,349];
+
+  function _applySun(){
+    if(!scene3||!renderer3)return;
+    const u=scene3.userData;
+    if(!u.sun)return;
+    if(u.sunDisc){scene3.remove(u.sunDisc);u.sunDisc=null;}
+    if(!_sunOn){
+      // Tilbake til standardlys
+      u.sun.position.set(50,90,40);u.sun.intensity=1.6;u.sun.color.setHex(0xfff8f0);
+      u.amb.intensity=1.4;u.hemi.intensity=0.6;u.fill.intensity=0.7;
+      renderer3.setClearColor(_bg3());if(scene3.fog)scene3.fog.color.setHex(_bg3());
+      return;
+    }
+    const kl=document.getElementById('sxi_klima')?.value;
+    const lat=parseFloat((typeof KLIMA!=='undefined'&&KLIMA[kl])?.lat)||60.4;
+    const sp=_solarPos(lat,_DOY[_sunMonth-1],_sunHour);
+    const nd=parseFloat(northI.value)||0;
+    const ro=document.getElementById('sunReadout');
+    const note=document.getElementById('sunPlaceNote');
+    if(note)note.textContent='Klimastad: '+(kl||'Bergen')+' ('+lat.toFixed(1)+'°N) · nord '+Math.round(nd)+'° · vel klimastad i eksportdialogen';
+    if(sp.altDeg<=0){
+      // Natt — dus, blå scene
+      u.sun.intensity=0.05;
+      u.amb.intensity=0.55;u.hemi.intensity=0.2;u.fill.intensity=0.15;
+      renderer3.setClearColor(0x1c2740);if(scene3.fog)scene3.fog.color.setHex(0x1c2740);
+      if(ro)ro.textContent='Under horisonten';
+      return;
+    }
+    // Kompass-asimut → bilde-/sceneretning (same konvensjon som calcSegments, invers)
+    const imgAng=(sp.azDeg+nd-90)*Math.PI/180;
+    const altRad=sp.altDeg*Math.PI/180,R=140;
+    u.sun.position.set(R*Math.cos(altRad)*Math.cos(imgAng),R*Math.sin(altRad),R*Math.cos(altRad)*Math.sin(imgAng));
+    u.sun.intensity=1.7*Math.min(1,Math.max(0.25,Math.sin(altRad)*1.6+0.2));
+    u.sun.color.setHex(sp.altDeg<8?0xffb066:sp.altDeg<20?0xffd9a0:0xfff8f0);
+    u.amb.intensity=0.9+0.5*Math.min(1,Math.sin(altRad)*2);
+    u.hemi.intensity=0.6;u.fill.intensity=0.4;
+    renderer3.setClearColor(_bg3());if(scene3.fog)scene3.fog.color.setHex(_bg3());
+    // Soldisk for orientering
+    const disc=new THREE.Mesh(new THREE.SphereGeometry(3,16,16),new THREE.MeshBasicMaterial({color:0xffdd66}));
+    disc.position.copy(u.sun.position);
+    scene3.add(disc);u.sunDisc=disc;
+    if(ro)ro.textContent='Asimut '+Math.round(sp.azDeg)+'° · høgd '+Math.round(sp.altDeg)+'°';
+  }
+
+  function _syncSunUI(){
+    const p=document.getElementById('sunPanel');
+    const b=document.getElementById('model3dSunBtn');
+    if(p)p.style.display=_sunOn?'block':'none';
+    if(b)b.style.background=_sunOn?'rgba(255,255,255,.2)':'#fff';
+    const ml=document.getElementById('sunMonthLbl'),hl=document.getElementById('sunHourLbl');
+    if(ml)ml.textContent=_MND[_sunMonth-1];
+    if(hl)hl.textContent=(Math.floor(_sunHour))+':'+(_sunHour%1?'30':'00');
+  }
+  document.getElementById('model3dSunBtn').onclick=()=>{_sunOn=!_sunOn;_syncSunUI();_applySun();};
+  document.getElementById('sunMonth').oninput=function(){_sunMonth=parseInt(this.value);_syncSunUI();_applySun();};
+  document.getElementById('sunHour').oninput=function(){_sunHour=parseFloat(this.value);_syncSunUI();_applySun();};
+
+  // ── Eksploded view — throttla rebuild ───────────────────────
+  let _explTimer=null;
+  document.getElementById('explodeSlider').oninput=function(){
+    _explodeGap=parseFloat(this.value)*0.8;
+    if(_explTimer)return;
+    _explTimer=setTimeout(()=>{
+      _explTimer=null;
+      if(OV.style.display==='flex'&&window._rebuild3D)window._rebuild3D();
+    },90);
+  };
+
+  // ── PNG-eksport ─────────────────────────────────────────────
+  document.getElementById('model3dShotBtn').onclick=()=>{
+    if(!renderer3||!scene3||!camera3)return;
+    renderer3.render(scene3,camera3); // fersk render — buffer må vere fylt i same tick
+    const a=document.createElement('a');
+    a.download='SXI_3D_'+new Date().toISOString().slice(0,10)+'.png';
+    a.href=renderer3.domElement.toDataURL('image/png');
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  };
+
+  // ── Klikkbar 3D — raycast → infoboks ───────────────────────
+  const _ray=new THREE.Raycaster();
+  function _clearPick(){
+    if(_picked){_picked.material.emissive?.setHex(0x000000);_picked=null;}
+    const box=document.getElementById('pick3dInfo');
+    if(box)box.style.display='none';
+  }
+  function _pick3D(e){
+    if(!scene3||!camera3)return;
+    const r=CV.getBoundingClientRect();
+    const ndc={x:((e.clientX-r.left)/r.width)*2-1,y:-((e.clientY-r.top)/r.height)*2+1};
+    _ray.setFromCamera(ndc,camera3);
+    const hits=_ray.intersectObjects(scene3.children,true).filter(h=>h.object.isMesh&&h.object.userData.pick);
+    _clearPick();
+    if(!hits.length)return;
+    const obj=hits[0].object;
+    _picked=obj;
+    obj.material.emissive?.setHex(0x2a5550);
+    const p=obj.userData.pick;
+    const box=document.getElementById('pick3dInfo');
+    box.innerHTML='<div style="font-weight:700;color:#1f2937;margin-bottom:4px">'+p.title+'</div>'
+      +p.rows.map(([k,v])=>'<div style="display:flex;justify-content:space-between;gap:14px"><span style="color:#9ca3af">'+k+'</span><span style="font-weight:600">'+v+'</span></div>').join('');
+    const ovR=OV.getBoundingClientRect();
+    box.style.display='block';
+    let bx=e.clientX-ovR.left+14,by=e.clientY-ovR.top+14;
+    box.style.left=bx+'px';box.style.top=by+'px';
+    const br=box.getBoundingClientRect();
+    if(br.right>ovR.right-8)box.style.left=(bx-br.width-28)+'px';
+    if(br.bottom>ovR.bottom-8)box.style.top=(by-br.height-28)+'px';
   }
 
   function recenter(){
     if(!scene3)return;
-    const box=new THREE.Box3().setFromObject(scene3);
+    // Berre bygningsmeshar (userData.w) — elles blæs skuggefangar/soldisk/grid
+    // opp bounding-boksen og kameraet hamnar altfor langt ute
+    const box=new THREE.Box3();let _has=false;
+    scene3.traverse(o=>{if(o.isMesh&&o.userData.w){box.expandByObject(o);_has=true;}});
+    if(!_has)box.setFromObject(scene3);
     if(box.isEmpty()){tgt={x:0,y:0,z:0};sph.radius=40;}
     else{
       const c=box.getCenter(new THREE.Vector3());
@@ -8010,7 +8218,14 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
   // Orbit controls
   CV.addEventListener('mousedown',e=>{
     if(e.shiftKey)pan=true;else orb=true;
-    lastM={x:e.clientX,y:e.clientY};e.preventDefault();
+    lastM={x:e.clientX,y:e.clientY};
+    _downPos={x:e.clientX,y:e.clientY};
+    e.preventDefault();
+  });
+  // Klikk (utan drag) → vis info om vegg/takflate
+  CV.addEventListener('mouseup',e=>{
+    if(_downPos&&Math.hypot(e.clientX-_downPos.x,e.clientY-_downPos.y)<5)_pick3D(e);
+    _downPos=null;
   });
 
   
@@ -8051,6 +8266,11 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
       const w=CV.clientWidth,h=CV.clientHeight;
       if(renderer3.domElement.width!==w||renderer3.domElement.height!==h){
         renderer3.setSize(w,h,false);camera3.aspect=w/h;camera3.updateProjectionMatrix();
+      }
+      if(_growT0){
+        const t=(performance.now()-_growT0)/900;
+        if(t>=1){scene3.scale.y=1;_growT0=0;}
+        else scene3.scale.y=Math.max(0.001,1-Math.pow(1-t,3)); // ease-out cubic
       }
       renderer3.render(scene3,camera3);
     })();
