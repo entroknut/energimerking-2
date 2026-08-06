@@ -574,7 +574,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <button class="btn" id="drawBtn" title="Teikn sone — klikk hjørner, Shift for 90°/45°, Enter/dobbelklikk for å avslutte (Esc for å avbryte)">⬡ Sone</button>
       <button class="btn" id="editBtn" title="Rediger sonegeometri — dra hjørner, høgreklikk for å slette (Esc for å avslutte)">⊹ Rediger</button>
       <button class="btn" id="winBtn" title="Legg til vindauge/dør — klikk på ein fasade (Ctrl+C/V for å kopiere)">▭ Vindauge/dør</button>
-      <button class="btn" id="measureBtn" title="Kontrollmål avstand (påverkar ikkje SXI) — klikk start og slutt, Esc for å avslutte"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="4.5" rx="1"/><path d="M4.5 6v2M7.5 6v3M10.5 6v2"/></svg> Mål</button>
+      <button class="btn" id="measureBtn" title="Kontrollmål avstand (påverkar ikkje SXI) — klikk start og slutt, Shift for 90°/45°, Esc for å avslutte"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="4.5" rx="1"/><path d="M4.5 6v2M7.5 6v3M10.5 6v2"/></svg> Mål</button>
     </div>
     <div class="tg">
       <button class="btn" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ Slå saman fasadar</button>
@@ -969,6 +969,7 @@ let pendingWin=null;
 // Measure tool state
 let measurePts=[];   // [{x,y}] in image coords — max 2 (start + end)
 let measureResults=[];// [{p1,p2,dist}] completed measurements this session
+let measureSnap=null; // {x,y} i biletkoordinatar når Shift låser retninga
 
 // ── Floor state ───────────────────────────────────────────────
 // Each floor: {id, name, bgImg, pdfDoc, pdfPage, totalPages, mmPerImgPx, sc, offX, offY, zones}
@@ -1734,14 +1735,14 @@ const HINTS={
   edit:'Dra hjørner · Shift+dra inni sone = flytt sona · klikk + for å leggje til · høgreklikk for å slette · Esc for å avslutte',
   calibrate:'Lengde: klikk start → klikk slutt · Areal: klikk på ei sone · Shift for 90°/45° · scroll for zoom, midtknapp/Alt+dra for å flytte',
   window:'Klikk éin ende av vindauget/døra på fasaden, så den andre enden',
-  measure:'Klikk startpunkt → klikk endepunkt for å kontrollmåle. Klikk igjen for ny måling. Esc for å avslutte.',
+  measure:'Klikk startpunkt → klikk endepunkt for å kontrollmåle · Shift for 90°/45° · klikk igjen for ny måling · Esc for å avslutte',
   'tegn-takflate':'Klikk hjørner for å teikne takflate-polygon. Klikk på startpunktet for å lukke. Esc for å avbryte.',
   'klipp-takflate':'Klikk for å legge til punkt på klippelja · Enter eller dobbelklikk for å klippe · Esc for å avbryte',
 };
 const MODELABELS={navigate:'Naviger',draw:'Tegn sone',edit:'Rediger',calibrate:'Kalibrer',window:'Vindauge/dør',measure:'Kontrollmål','tegn-takflate':'Teikn takflate','klipp-takflate':'Klipp takflate'};
 
 function setMode(m){
-  mode=m;drawSnap=null;calSnap=null;
+  mode=m;drawSnap=null;calSnap=null;measureSnap=null;
   navBtn.classList.toggle('on',m==='navigate');
   drawBtn.classList.toggle('on',m==='draw');
   editBtn.classList.toggle('on',m==='edit');
@@ -2774,14 +2775,17 @@ function draw(){
     });
     if(mode==='measure'&&measurePts.length>0){
       const sp0=i2s(measurePts[0].x,measurePts[0].y);
-      const ex=mouse?mouse.x:sp0.x,ey=mouse?mouse.y:sp0.y;
+      // Bruk det Shift-låste punktet om det finst, elles musa
+      const _ms=measureSnap?i2s(measureSnap.x,measureSnap.y):null;
+      const ex=_ms?_ms.x:(mouse?mouse.x:sp0.x),ey=_ms?_ms.y:(mouse?mouse.y:sp0.y);
       ctx.beginPath();ctx.moveTo(sp0.x,sp0.y);ctx.lineTo(ex,ey);
       ctx.strokeStyle='#dc2626';ctx.lineWidth=2;ctx.setLineDash([6,3]);ctx.stroke();ctx.setLineDash([]);
       ctx.beginPath();ctx.arc(sp0.x,sp0.y,5,0,Math.PI*2);ctx.fillStyle='#dc2626';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
       if(mouse&&mmPerImgPx){
         const dPx=Math.hypot((ex-sp0.x)/sc,(ey-sp0.y)/sc);
         const dMm=dPx*mmPerImgPx;
-        const lbl=dMm<1000?dMm.toFixed(0)+' mm':(dMm/1000).toFixed(3)+' m';
+        const _msa=shiftHeld?orthoSnapAngle(ex,ey,sp0):null;
+        const lbl=(_msa!=null?_msa+'° · ':'')+(dMm<1000?dMm.toFixed(0)+' mm':(dMm/1000).toFixed(3)+' m');
         ctx.font='bold 12px Inter,sans-serif';
         const tw=ctx.measureText(lbl).width+14;
         ctx.fillStyle='rgba(220,38,38,0.92)';ctx.beginPath();ctx.roundRect(ex+10,ey-12,tw,20,5);ctx.fill();
@@ -4854,6 +4858,15 @@ cwrap.addEventListener('mousemove',e=>{
       calSnap={x:s2i(snapped.x,snapped.y).x,y:s2i(snapped.x,snapped.y).y,_ortho:true};
     }
   }
+  if(mode==='measure'){
+    // Shift låser målelinja til 90°/45° frå startpunktet
+    measureSnap=null;
+    if(shiftHeld&&measurePts.length>0){
+      const prevS=i2s(measurePts[0].x,measurePts[0].y);
+      const snapped=orthoSnap(mouse.x,mouse.y,prevS);
+      measureSnap=s2i(snapped.x,snapped.y);
+    }
+  } else measureSnap=null;
   if(mode==='klipp-takflate')klippSnap=_snapKlippPt(mouse.x,mouse.y);
   else klippSnap=null;
   draw();
@@ -5471,10 +5484,16 @@ cv.addEventListener('click',e=>{
 
   // ── Måleverktøy ──
   if(mode==='measure'){
-    const ip=s2i(sx,sy);
+    let ip=s2i(sx,sy);
+    // Shift låser til 90°/45° frå startpunktet
+    if(shiftHeld&&measurePts.length>0){
+      const prevS=i2s(measurePts[0].x,measurePts[0].y);
+      const snapped=orthoSnap(sx,sy,prevS);
+      ip=s2i(snapped.x,snapped.y);
+    }
     if(measurePts.length===0){
       measurePts=[ip];
-      hintText.textContent='Klikk endepunkt for å fullføre måling.';
+      hintText.textContent='Klikk endepunkt for å fullføre måling · Shift for 90°/45°';
     } else {
       const p1=measurePts[0],p2=ip;
       const dPx=Math.hypot(p2.x-p1.x,p2.y-p1.y);
@@ -5798,7 +5817,7 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();return;
   }
   if(e.key==='Escape'){
-    if(mode==='measure'){measurePts=[];measureResults=[];setMode('navigate');draw();return;}
+    if(mode==='measure'){measurePts=[];measureResults=[];measureSnap=null;setMode('navigate');draw();return;}
     if(mode==='edit'){setMode('navigate');editZoneIdx=null;draw();}
     else if(mode==='draw'){curPts=[];setMode('navigate');draw();}
     else if(mode==='window'){winPts=[];winSnapPreview=null;setMode('navigate');draw();}
