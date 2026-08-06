@@ -574,6 +574,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <button class="btn" id="drawBtn" title="Teikn sone — klikk hjørner, Shift for 90°/45°, Enter/dobbelklikk for å avslutte (Esc for å avbryte)">⬡ Sone</button>
       <button class="btn" id="editBtn" title="Rediger sonegeometri — dra hjørner, høgreklikk for å slette (Esc for å avslutte)">⊹ Rediger</button>
       <button class="btn" id="winBtn" title="Legg til vindauge/dør — klikk på ein fasade (Ctrl+C/V for å kopiere)">▭ Vindauge/dør</button>
+      <button class="btn on" id="snapBtn" title="Snap til hjørne — låser punktet til hjørne i planteikninga og på eksisterande soner. Slå av om det snappar til feil stad.">⌖ Snap</button>
       <button class="btn" id="measureBtn" title="Kontrollmål avstand (påverkar ikkje SXI) — klikk start og slutt, Shift for 90°/45°, Esc for å avslutte"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="4.5" rx="1"/><path d="M4.5 6v2M7.5 6v3M10.5 6v2"/></svg> Mål</button>
     </div>
     <div class="tg">
@@ -969,7 +970,8 @@ let pendingWin=null;
 // Measure tool state
 let measurePts=[];   // [{x,y}] in image coords — max 2 (start + end)
 let measureResults=[];// [{p1,p2,dist}] completed measurements this session
-let measureSnap=null; // {x,y} i biletkoordinatar når Shift låser retninga
+let measureSnap=null;    // {x,y} i biletkoordinatar — Shift-låst eller snappa punkt
+let measureGeoSnap=null; // snap-treffet med type, for markøren
 
 // ── Floor state ───────────────────────────────────────────────
 // Each floor: {id, name, bgImg, pdfDoc, pdfPage, totalPages, mmPerImgPx, sc, offX, offY, zones}
@@ -1742,7 +1744,7 @@ const HINTS={
 const MODELABELS={navigate:'Naviger',draw:'Tegn sone',edit:'Rediger',calibrate:'Kalibrer',window:'Vindauge/dør',measure:'Kontrollmål','tegn-takflate':'Teikn takflate','klipp-takflate':'Klipp takflate'};
 
 function setMode(m){
-  mode=m;drawSnap=null;calSnap=null;measureSnap=null;
+  mode=m;drawSnap=null;calSnap=null;measureSnap=null;measureGeoSnap=null;
   navBtn.classList.toggle('on',m==='navigate');
   drawBtn.classList.toggle('on',m==='draw');
   editBtn.classList.toggle('on',m==='edit');
@@ -1764,6 +1766,13 @@ editBtn.onclick=()=>{
 winBtn.onclick=()=>{
   if(!zones.length){hintText.textContent='Teikn ei sone først.';return;}
   setMode('window');winPts=[];winSnapPreview=null;draw();
+};
+document.getElementById('snapBtn').onclick=function(){
+  snapEnabled=!snapEnabled;
+  this.classList.toggle('on',snapEnabled);
+  drawSnap=null;calSnap=null;measureGeoSnap=null;
+  hintText.textContent=snapEnabled?'Snap til hjørne er på.':'Snap til hjørne er av — punkta hamnar akkurat der du klikkar.';
+  draw();
 };
 const measureBtn=document.getElementById('measureBtn');
 measureBtn.onclick=()=>{
@@ -2592,21 +2601,9 @@ function draw(){
       }
     }
     // Snap indicator
-    if(drawSnap){
-      const sp=i2s(drawSnap.x,drawSnap.y);
-      ctx.beginPath();
-      if(drawSnap.type==='corner'){
-        const r=7;
-        ctx.rect(sp.x-r,sp.y-r,r*2,r*2);
-        ctx.strokeStyle='#1a7a6e';ctx.lineWidth=2;ctx.stroke();
-        ctx.fillStyle='rgba(26,122,110,.15)';ctx.fill();
-      } else {
-        const r=6;
-        ctx.moveTo(sp.x,sp.y-r);ctx.lineTo(sp.x+r,sp.y);
-        ctx.lineTo(sp.x,sp.y+r);ctx.lineTo(sp.x-r,sp.y);ctx.closePath();
-        ctx.strokeStyle='#7c3aed';ctx.lineWidth=2;ctx.stroke();
-        ctx.fillStyle='rgba(124,58,237,.15)';ctx.fill();
-      }
+    if(drawSnap&&!drawSnap._ortho){
+      drawSnapMarker(i2s(drawSnap.x,drawSnap.y),drawSnap.type,
+        drawSnap.type==='imgcorner'?'rgb(219,39,119)':drawSnap.type==='edge'?'rgb(124,58,237)':'rgb(26,122,110)');
     }
     curPts.forEach((p,i)=>{
       const pp=i2s(p.x,p.y);
@@ -2744,8 +2741,7 @@ function draw(){
     if(calSnap&&calPts.length<2&&!calSnap._ortho){
       const _si=i2s(calSnap.x,calSnap.y);
       ctx.beginPath();
-      if(calSnap.type==='corner'){const _r=7;ctx.rect(_si.x-_r,_si.y-_r,_r*2,_r*2);ctx.strokeStyle='#d97706';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='rgba(217,119,6,.15)';ctx.fill();}
-      else{ctx.moveTo(_si.x,_si.y-6);ctx.lineTo(_si.x+6,_si.y);ctx.lineTo(_si.x,_si.y+6);ctx.lineTo(_si.x-6,_si.y);ctx.closePath();ctx.strokeStyle='#b86a0a';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='rgba(184,106,10,.15)';ctx.fill();}
+      drawSnapMarker(_si,calSnap.type,calSnap.type==='imgcorner'?'rgb(219,39,119)':calSnap.type==='edge'?'rgb(184,106,10)':'rgb(217,119,6)');
     }
     if(mouse&&calPts.length===1){
       const d=Math.hypot(ex-_cp0.x,ey-_cp0.y);
@@ -2791,6 +2787,11 @@ function draw(){
         ctx.fillStyle='rgba(220,38,38,0.92)';ctx.beginPath();ctx.roundRect(ex+10,ey-12,tw,20,5);ctx.fill();
         ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(lbl,ex+17,ey);
       }
+    }
+    // Snap-markør — også før første klikk
+    if(mode==='measure'&&measureGeoSnap){
+      drawSnapMarker(i2s(measureGeoSnap.x,measureGeoSnap.y),measureGeoSnap.type,
+        measureGeoSnap.type==='imgcorner'?'rgb(219,39,119)':measureGeoSnap.type==='edge'?'rgb(153,27,27)':'rgb(220,38,38)');
     }
   }
 
@@ -3317,33 +3318,127 @@ function _finishKlipp(){
 
 // ── Window management ─────────────────────────────────────────
 // Snap for draw mode: corners (green square) or edges (purple diamond)
-const DRAW_SNAP_R=14;
-function snapDrawPoint(sx,sy){
-  let bestD=DRAW_SNAP_R,best=null;
-  zones.forEach(z=>{
-    z.pts.forEach(p=>{
-      const sp=i2s(p.x,p.y);
-      const d=Math.hypot(sx-sp.x,sy-sp.y);
-      if(d<bestD){bestD=d;best={x:p.x,y:p.y,type:'corner',sx:sp.x,sy:sp.y};}
+// ── Snapping ─────────────────────────────────────────────────
+// Prioritert: eigne punkt under teikning → sonehjørne → hjørne i sjølve
+// planteikninga → sonekant. Hjørne i teikninga vert funne med ein Harris-
+// detektor i eit lite vindauge rundt peikaren, så snapping verkar òg før
+// nokon soner finst — t.d. under kalibrering og kontrollmåling.
+let snapEnabled=true;
+let _snapCv=null,_snapCtx=null,_snapBlocked=false;
+const SNAP_R={point:15,corner:15,imgcorner:13,edge:9};
+const HARRIS_MIN=0.55; // terskel for å godta eit hjørne i teikninga
+
+function imgCornerSnap(sx,sy){
+  if(!snapEnabled||!bgImg||_snapBlocked)return null;
+  const iw=bgImg.width||bgImg.naturalWidth,ih=bgImg.height||bgImg.naturalHeight;
+  if(!iw||!ih)return null;
+  // Søkjeradius er fast på SKJERMEN. Vindauget vert alltid analysert i
+  // skjermoppløysing (aldri over native), så kostnaden er konstant same
+  // kor langt ut du har zooma — og nedskaleringa dempar samstundes støy.
+  const Rimg=Math.max(8,Math.round(SNAP_R.imgcorner/sc)); // radius i biletpikslar
+  const src=Rimg*2+1;                                     // kjeldeutsnitt
+  const k=Math.min(1,sc);
+  const W=Math.max(17,Math.round(src*k)|1);               // analysevindauge (odde)
+  const ip=s2i(sx,sy);
+  const x0=Math.round(ip.x)-Rimg,y0=Math.round(ip.y)-Rimg;
+  if(x0<1||y0<1||x0+src>=iw||y0+src>=ih)return null;
+  if(!_snapCv){
+    _snapCv=document.createElement('canvas');_snapCv.width=_snapCv.height=95;
+    _snapCtx=_snapCv.getContext('2d',{willReadFrequently:true});
+  }
+  let d;
+  try{
+    _snapCtx.fillStyle='#fff';_snapCtx.fillRect(0,0,W,W);
+    _snapCtx.drawImage(bgImg,x0,y0,src,src,0,0,W,W);
+    d=_snapCtx.getImageData(0,0,W,W).data;
+  }catch(e){_snapBlocked=true;return null;} // t.d. tainted canvas
+  const n=W*W,g=new Float32Array(n);
+  for(let i=0;i<n;i++)g[i]=(d[i*4]*0.299+d[i*4+1]*0.587+d[i*4+2]*0.114)/255;
+  // Sobel-gradientar
+  const Ix=new Float32Array(n),Iy=new Float32Array(n);
+  for(let y=1;y<W-1;y++)for(let x=1;x<W-1;x++){
+    const i=y*W+x;
+    Ix[i]=(g[i-W+1]+2*g[i+1]+g[i+W+1])-(g[i-W-1]+2*g[i-1]+g[i+W-1]);
+    Iy[i]=(g[i+W-1]+2*g[i+W]+g[i+W+1])-(g[i-W-1]+2*g[i-W]+g[i-W+1]);
+  }
+  // Harris-respons i 5×5-vindauge, vekta mot peikaren
+  let best=null,bestScore=0;
+  const kH=0.06,c=(W-1)/2,Rw=c-2;
+  for(let y=3;y<W-3;y++)for(let x=3;x<W-3;x++){
+    const dist=Math.hypot(x-c,y-c);
+    if(dist>Rw)continue;
+    let a=0,b=0,cc=0;
+    for(let v=-2;v<=2;v++){
+      const row=(y+v)*W+x;
+      for(let u=-2;u<=2;u++){const j=row+u;a+=Ix[j]*Ix[j];b+=Ix[j]*Iy[j];cc+=Iy[j]*Iy[j];}
+    }
+    const resp=(a*cc-b*b)-kH*(a+cc)*(a+cc);
+    if(resp<=HARRIS_MIN)continue;
+    const score=resp*(1-0.6*dist/Rw);
+    if(score>bestScore){bestScore=score;best={x,y};}
+  }
+  if(!best)return null;
+  // Tilbake frå analysevindauget til biletkoordinatar
+  const f=src/W;
+  const gx=x0+best.x*f,gy=y0+best.y*f,sp=i2s(gx,gy);
+  return{x:gx,y:gy,type:'imgcorner',sx:sp.x,sy:sp.y};
+}
+
+// Samla snap. ownPts = punkta i den pågåande teikninga (høgste prioritet).
+function unifiedSnap(sx,sy,ownPts){
+  if(!snapEnabled)return null;
+  let bd,b;
+  if(ownPts&&ownPts.length){
+    bd=SNAP_R.point;b=null;
+    ownPts.forEach(p=>{
+      const sp=i2s(p.x,p.y),dd=Math.hypot(sx-sp.x,sy-sp.y);
+      if(dd<bd){bd=dd;b={x:p.x,y:p.y,type:'point',sx:sp.x,sy:sp.y};}
     });
+    if(b)return b;
+  }
+  bd=SNAP_R.corner;b=null;
+  zones.forEach(z=>z.pts.forEach(p=>{
+    const sp=i2s(p.x,p.y),dd=Math.hypot(sx-sp.x,sy-sp.y);
+    if(dd<bd){bd=dd;b={x:p.x,y:p.y,type:'corner',sx:sp.x,sy:sp.y};}
+  }));
+  if(b)return b;
+  const ic=imgCornerSnap(sx,sy);
+  if(ic&&Math.hypot(sx-ic.sx,sy-ic.sy)<=SNAP_R.imgcorner)return ic;
+  bd=SNAP_R.edge;b=null;
+  zones.forEach(z=>{
     for(let i=0;i<z.pts.length;i++){
       const p1=z.pts[i],p2=z.pts[(i+1)%z.pts.length];
       const s1=i2s(p1.x,p1.y),s2=i2s(p2.x,p2.y);
-      const dx=s2.x-s1.x,dy=s2.y-s1.y;
-      const len=Math.hypot(dx,dy);if(len<1)continue;
+      const dx=s2.x-s1.x,dy=s2.y-s1.y,len=Math.hypot(dx,dy);
+      if(len<1)continue;
       const t=((sx-s1.x)*dx+(sy-s1.y)*dy)/(len*len);
       if(t<=0||t>=1)continue;
-      const projX=s1.x+t*dx,projY=s1.y+t*dy;
-      const d=Math.hypot(sx-projX,sy-projY);
-      if(d<bestD){
-        bestD=d;
-        const ip=s2i(projX,projY);
-        best={x:ip.x,y:ip.y,type:'edge',sx:projX,sy:projY};
-      }
+      const px=s1.x+t*dx,py=s1.y+t*dy,dd=Math.hypot(sx-px,sy-py);
+      if(dd<bd){bd=dd;const ipp=s2i(px,py);b={x:ipp.x,y:ipp.y,type:'edge',sx:px,sy:py};}
     }
   });
-  return best;
+  return b;
 }
+// Teiknar snap-markøren. Form etter type, farge etter modus.
+function drawSnapMarker(sp,type,col){
+  ctx.save();
+  ctx.strokeStyle=col;ctx.lineWidth=2;ctx.fillStyle=col.replace('rgb','rgba').replace(')',',.15)');
+  if(type==='corner'||type==='point'){
+    const r=7;ctx.beginPath();ctx.rect(sp.x-r,sp.y-r,r*2,r*2);ctx.stroke();ctx.fill();
+  } else if(type==='imgcorner'){
+    ctx.beginPath();ctx.arc(sp.x,sp.y,7,0,Math.PI*2);ctx.stroke();ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(sp.x-10,sp.y);ctx.lineTo(sp.x-3,sp.y);ctx.moveTo(sp.x+3,sp.y);ctx.lineTo(sp.x+10,sp.y);
+    ctx.moveTo(sp.x,sp.y-10);ctx.lineTo(sp.x,sp.y-3);ctx.moveTo(sp.x,sp.y+3);ctx.lineTo(sp.x,sp.y+10);
+    ctx.lineWidth=1.5;ctx.stroke();
+  } else {
+    const r=6;ctx.beginPath();
+    ctx.moveTo(sp.x,sp.y-r);ctx.lineTo(sp.x+r,sp.y);ctx.lineTo(sp.x,sp.y+r);ctx.lineTo(sp.x-r,sp.y);
+    ctx.closePath();ctx.stroke();ctx.fill();
+  }
+  ctx.restore();
+}
+
 
 // Find the closest segment to a screen point, and the projected t (0-1) along it
 function snapToSegment(sx,sy){
@@ -4833,8 +4928,8 @@ cwrap.addEventListener('mousemove',e=>{
   }
   // Snap to existing geometry in draw mode
   if(mode==='draw'){
-    drawSnap=zones.length>0?snapDrawPoint(mouse.x,mouse.y):null;
-    // Shift ortho override — snappar til 90° frå førre punkt
+    drawSnap=unifiedSnap(mouse.x,mouse.y,curPts);
+    // Shift ortho override — snappar til 90°/45° frå førre punkt
     if(shiftHeld&&curPts.length>0&&!drawSnap){
       const prev=i2s(curPts[curPts.length-1].x,curPts[curPts.length-1].y);
       const snapped=orthoSnap(mouse.x,mouse.y,prev);
@@ -4842,7 +4937,7 @@ cwrap.addEventListener('mousemove',e=>{
     }
   }
   if(mode==='tegn-takflate'){
-    drawSnap=zones.length>0?snapDrawPoint(mouse.x,mouse.y):null;
+    drawSnap=unifiedSnap(mouse.x,mouse.y,takflatePts);
     if(shiftHeld&&takflatePts.length>0&&!drawSnap){
       const prev=i2s(takflatePts[takflatePts.length-1].x,takflatePts[takflatePts.length-1].y);
       const snapped=orthoSnap(mouse.x,mouse.y,prev);
@@ -4850,7 +4945,7 @@ cwrap.addEventListener('mousemove',e=>{
     }
   }
   if(mode==='calibrate'){
-    calSnap=zones.length>0?snapDrawPoint(mouse.x,mouse.y):null;
+    calSnap=unifiedSnap(mouse.x,mouse.y,calPts);
     // Shift ortho for lengdemodus og arealmodus
     if(shiftHeld&&calPts.length>0&&!calSnap){
       const prevS=i2s(calPts[calPts.length-1].x,calPts[calPts.length-1].y);
@@ -4859,14 +4954,15 @@ cwrap.addEventListener('mousemove',e=>{
     }
   }
   if(mode==='measure'){
-    // Shift låser målelinja til 90°/45° frå startpunktet
-    measureSnap=null;
-    if(shiftHeld&&measurePts.length>0){
+    // Geometri-snap først; Shift låser til 90°/45° når ingen snap er nær
+    measureSnap=null;measureGeoSnap=unifiedSnap(mouse.x,mouse.y,measurePts);
+    if(measureGeoSnap)measureSnap={x:measureGeoSnap.x,y:measureGeoSnap.y};
+    else if(shiftHeld&&measurePts.length>0){
       const prevS=i2s(measurePts[0].x,measurePts[0].y);
       const snapped=orthoSnap(mouse.x,mouse.y,prevS);
       measureSnap=s2i(snapped.x,snapped.y);
     }
-  } else measureSnap=null;
+  } else {measureSnap=null;measureGeoSnap=null;}
   if(mode==='klipp-takflate')klippSnap=_snapKlippPt(mouse.x,mouse.y);
   else klippSnap=null;
   draw();
@@ -5485,8 +5581,10 @@ cv.addEventListener('click',e=>{
   // ── Måleverktøy ──
   if(mode==='measure'){
     let ip=s2i(sx,sy);
-    // Shift låser til 90°/45° frå startpunktet
-    if(shiftHeld&&measurePts.length>0){
+    // Snap til hjørne/kant har forrang; elles låser Shift til 90°/45°
+    const _gs=unifiedSnap(sx,sy,measurePts);
+    if(_gs)ip={x:_gs.x,y:_gs.y};
+    else if(shiftHeld&&measurePts.length>0){
       const prevS=i2s(measurePts[0].x,measurePts[0].y);
       const snapped=orthoSnap(sx,sy,prevS);
       ip=s2i(snapped.x,snapped.y);
