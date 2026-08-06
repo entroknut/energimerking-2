@@ -734,6 +734,13 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
                 <div style="font-size:11px;color:var(--text3);margin-top:2px">Klikk på ei sone du kjenner arealet til</div>
               </div>
             </button>
+            <button id="calChooseScale" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid var(--border2);border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:all .12s">
+              <span style="font-size:22px">📐</span>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--text)">Kjend målestokk</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px" id="calScaleSubtitle">Vel 1:100, 1:200 osv. — ingen klikking på teikninga</div>
+              </div>
+            </button>
           </div>
           <div class="dbtns" style="margin-top:16px">
             <button class="dcancel" id="calCancel">Avbryt</button>
@@ -760,6 +767,30 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
               <span class="unit">m²</span>
             </div>
             <p id="calAreaHint" style="font-size:11px;color:var(--text3);margin-top:-10px"></p>
+          </div>
+          <!-- Scale mode -->
+          <div id="calModeScale" style="display:none">
+            <div id="calPaperBox" style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);margin-bottom:14px">
+              <span id="calPaperIcon" style="font-size:15px">📄</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:11px;color:var(--text3)">Papirformat på teikninga</div>
+                <div id="calPaperInfo" style="font-size:12.5px;font-weight:600;color:var(--text)">—</div>
+              </div>
+              <select id="calPaperSel" style="padding:5px 8px;font-size:12px;border:1px solid var(--border2);border-radius:6px;background:#fff;color:var(--text);font-family:inherit;cursor:pointer">
+                <option value="auto">Oppdaga</option>
+                <option value="A0">A0</option><option value="A1">A1</option>
+                <option value="A2">A2</option><option value="A3">A3</option>
+                <option value="A4">A4</option>
+              </select>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:7px">Målestokk på teikninga</div>
+            <div id="calScaleBtns" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px"></div>
+            <div class="irow" style="margin-bottom:10px">
+              <label>Eigendefinert</label>
+              <span style="font-size:13px;color:var(--text3);font-weight:600">1:</span>
+              <input type="number" class="big-input" id="calScaleInput" min="1" step="1" placeholder="150" style="flex:1">
+            </div>
+            <div id="calScaleResult" style="font-size:11.5px;color:var(--text3);padding:9px 12px;border-radius:8px;background:var(--accent-dim);border:1px solid var(--border)"></div>
           </div>
           <div class="dbtns">
             <button class="dcancel" id="calBack">← Tilbake</button>
@@ -1089,6 +1120,7 @@ document.getElementById('addFloorBtn').onclick=async()=>{
     id:_nextFloorId++,
     name:'Etasje '+(floors.length+1),
     bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,
+    paperWMm:null,paperHMm:null,paperSource:null,
     mmPerImgPx:null,ownCal:false,defaultHoyde:parseFloat(fhI.value)||3.0,floorDxImg:0,floorDyImg:0,
     sc:1,offX:0,offY:0,zones:[]
   };
@@ -1099,10 +1131,15 @@ document.getElementById('addFloorBtn').onclick=async()=>{
       newFloor.pdfDoc=pdfDoc;newFloor.pdfPage=nextPg;newFloor.totalPages=totalPages;
       newFloor.bgImg=await loadPdfPage_with(pdfDoc,nextPg);
       newFloor.name='Etasje '+(floors.length+1)+' (s.'+nextPg+')';
+      const pm=await pdfSidePapirMm(pdfDoc,nextPg);
+      if(pm){newFloor.paperWMm=pm.w;newFloor.paperHMm=pm.h;newFloor.paperSource='pdf';}
     }
   } else if(choice==='file'){
     const img=await pickFile();
-    if(img){newFloor.bgImg=img.bgImg;newFloor.pdfDoc=img.pdfDoc;newFloor.pdfPage=img.pdfPage;newFloor.totalPages=img.totalPages;}
+    if(img){
+      newFloor.bgImg=img.bgImg;newFloor.pdfDoc=img.pdfDoc;newFloor.pdfPage=img.pdfPage;newFloor.totalPages=img.totalPages;
+      newFloor.paperWMm=img.paperWMm;newFloor.paperHMm=img.paperHMm;newFloor.paperSource=img.paperSource;
+    }
   }
   // choice==='blank': leave as-is
   floors.push(newFloor);
@@ -1211,6 +1248,76 @@ function showAddFloorMenu(){
   });
 }
 
+// ── Papirformat og målestokk-kalibrering ──────────────────────
+// Ei PDF-side har fysisk storleik innebygd (punkt à 1/72"), så papirformatet
+// er eksakt kjent. For rasterbilete prøver vi DPI frå metadata; elles må
+// brukaren velje format sjølv.
+const PAPIR_FORMAT=[
+  {n:'A0',w:841,h:1189},{n:'A1',w:594,h:841},{n:'A2',w:420,h:594},
+  {n:'A3',w:297,h:420},{n:'A4',w:210,h:297},{n:'A5',w:148,h:210},
+  {n:'Letter',w:216,h:279},{n:'Legal',w:216,h:356},
+];
+function papirFormatNamn(wMm,hMm){
+  if(!wMm||!hMm)return null;
+  const a=Math.min(wMm,hMm),b=Math.max(wMm,hMm);
+  for(const f of PAPIR_FORMAT){
+    if(Math.abs(a-f.w)<=4&&Math.abs(b-f.h)<=4)return f.n+(wMm>hMm?' liggjande':' ståande');
+  }
+  return Math.round(wMm)+'×'+Math.round(hMm)+' mm';
+}
+// Papirmål for eit valt format, orientert etter biletet
+function papirMaalFor(namn,imgW,imgH){
+  const f=PAPIR_FORMAT.find(x=>x.n===namn);
+  if(!f)return null;
+  return (imgW>=imgH)?{w:f.h,h:f.w}:{w:f.w,h:f.h};
+}
+// Les fysisk oppløysing frå PNG (pHYs) eller JPEG (JFIF). Returnerer DPI eller null.
+async function lesBiletDpi(file){
+  try{
+    const buf=new Uint8Array(await file.slice(0,65536).arrayBuffer());
+    if(buf[0]===0x89&&buf[1]===0x50&&buf[2]===0x4E&&buf[3]===0x47){
+      let p=8;
+      while(p+12<=buf.length){
+        const len=((buf[p]<<24)|(buf[p+1]<<16)|(buf[p+2]<<8)|buf[p+3])>>>0;
+        const typ=String.fromCharCode(buf[p+4],buf[p+5],buf[p+6],buf[p+7]);
+        if(typ==='pHYs'){
+          const d=p+8;
+          const ppuX=((buf[d]<<24)|(buf[d+1]<<16)|(buf[d+2]<<8)|buf[d+3])>>>0;
+          return (buf[d+8]===1&&ppuX>0)?ppuX*0.0254:null; // pikslar per meter → DPI
+        }
+        if(typ==='IDAT'||typ==='IEND')return null;
+        p+=12+len;
+      }
+      return null;
+    }
+    if(buf[0]===0xFF&&buf[1]===0xD8){
+      let p=2;
+      while(p+4<buf.length&&buf[p]===0xFF){
+        const marker=buf[p+1],len=(buf[p+2]<<8)|buf[p+3];
+        if(marker===0xE0){
+          const d=p+4;
+          if(String.fromCharCode(buf[d],buf[d+1],buf[d+2],buf[d+3])==='JFIF'){
+            const unit=buf[d+7],xd=(buf[d+8]<<8)|buf[d+9];
+            if(xd>0){if(unit===1)return xd;if(unit===2)return xd*2.54;}
+          }
+          return null;
+        }
+        if(marker===0xDA||marker===0xD9)return null;
+        p+=2+len;
+      }
+    }
+  }catch(e){}
+  return null;
+}
+// Papirstorleik for ei PDF-side i mm (uavhengig av renderskala)
+async function pdfSidePapirMm(doc,n){
+  try{
+    const pg=await doc.getPage(n);
+    const vp=pg.getViewport({scale:1});
+    return {w:vp.width*25.4/72,h:vp.height*25.4/72};
+  }catch(e){return null;}
+}
+
 async function loadPdfPage_with(doc,n){
   const page=await doc.getPage(n);
   // Scale 4.0 ≈ 288 DPI for A1 drawings — crisp text and lines
@@ -1237,15 +1344,23 @@ async function pickFile(){
     inp.type='file';inp.accept='.pdf,image/*';
     inp.onchange=async()=>{
       const f=inp.files[0];if(!f){resolve(null);return;}
-      const result={bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1};
+      const result={bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,paperWMm:null,paperHMm:null,paperSource:null};
       if(f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf')){
         const ab=await f.arrayBuffer();
         result.pdfDoc=await pdfjsLib.getDocument({data:ab}).promise;
         result.totalPages=result.pdfDoc.numPages;
         result.bgImg=await loadPdfPage_with(result.pdfDoc,1);
+        const pm=await pdfSidePapirMm(result.pdfDoc,1);
+        if(pm){result.paperWMm=pm.w;result.paperHMm=pm.h;result.paperSource='pdf';}
       } else {
         const url=URL.createObjectURL(f);
         await new Promise(r=>{const img=new Image();img.onload=()=>{result.bgImg=img;r();};img.src=url;});
+        const dpi=await lesBiletDpi(f);
+        if(dpi&&dpi>=50&&dpi<=2400&&result.bgImg){
+          result.paperWMm=result.bgImg.width/dpi*25.4;
+          result.paperHMm=result.bgImg.height/dpi*25.4;
+          result.paperSource='dpi';
+        }
       }
       resolve(result);
     };
@@ -1823,6 +1938,7 @@ function snapshot(){
     // Bilete/PDF lagrast som referansar (Image-objekt er uforanderlege i praksis)
     bgImg:f.bgImg||null,bgImgData:f.bgImgData||null,pdfDoc:f.pdfDoc||null,
     pdfPage:f.pdfPage||1,totalPages:f.totalPages||1,
+    paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
     mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
     sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
     zones:JSON.parse(JSON.stringify(f.zones.map(z=>({
@@ -1845,6 +1961,8 @@ function applyHistoryState(prev){
       bgImgData:pf.bgImgData!==undefined?pf.bgImgData:(cur.bgImgData||null),
       pdfDoc:pf.pdfDoc!==undefined?pf.pdfDoc:(cur.pdfDoc||null),
       pdfPage:pf.pdfPage||cur.pdfPage||1,totalPages:pf.totalPages||cur.totalPages||1,
+      paperWMm:pf.paperWMm??cur.paperWMm??null,paperHMm:pf.paperHMm??cur.paperHMm??null,
+      paperSource:pf.paperSource??cur.paperSource??null,
       mmPerImgPx:pf.mmPerImgPx,ownCal:pf.ownCal||false,defaultHoyde:pf.defaultHoyde??3.0,
       sc:pf.sc,offX:pf.offX,offY:pf.offY,floorDxImg:pf.floorDxImg||0,floorDyImg:pf.floorDyImg||0,
       zones:pf.zones.map(z=>({...z,skillevegg:new Set(z.skillevegg||[])}))
@@ -1867,6 +1985,7 @@ function getCurrentState(){
       id:f.id,name:f.name,
       bgImg:f.bgImg||null,bgImgData:f.bgImgData||null,pdfDoc:f.pdfDoc||null,
       pdfPage:f.pdfPage||1,totalPages:f.totalPages||1,
+      paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
       mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
       sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
       zones:JSON.parse(JSON.stringify(f.zones.map(z=>({...z,skillevegg:Array.from(z.skillevegg||[])}))))
@@ -1949,21 +2068,30 @@ async function loadPdfPage(n){
 }
 async function handleFile(f){
   if(!f)return;
-  const result={bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1};
+  const result={bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,paperWMm:null,paperHMm:null,paperSource:null};
   if(f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf')){
     hintText.textContent='Laster PDF…';
     const ab=await f.arrayBuffer();
     result.pdfDoc=await pdfjsLib.getDocument({data:ab}).promise;
     result.totalPages=result.pdfDoc.numPages;
     result.bgImg=await loadPdfPage_with(result.pdfDoc,1);
+    const pm=await pdfSidePapirMm(result.pdfDoc,1);
+    if(pm){result.paperWMm=pm.w;result.paperHMm=pm.h;result.paperSource='pdf';}
   } else {
     const url=URL.createObjectURL(f);
     await new Promise(r=>{const img=new Image();img.onload=()=>{result.bgImg=img;r();};img.src=url;});
+    const dpi=await lesBiletDpi(f);
+    if(dpi&&dpi>=50&&dpi<=2400&&result.bgImg){
+      result.paperWMm=result.bgImg.width/dpi*25.4;
+      result.paperHMm=result.bgImg.height/dpi*25.4;
+      result.paperSource='dpi';
+    }
   }
   // Load into active floor
   const f2=curFloor();
   f2.bgImg=result.bgImg;f2.pdfDoc=result.pdfDoc;
   f2.pdfPage=result.pdfPage;f2.totalPages=result.totalPages;
+  f2.paperWMm=result.paperWMm;f2.paperHMm=result.paperHMm;f2.paperSource=result.paperSource;
   f2.mmPerImgPx=null;f2.zones=[];
   syncFloorState();
   curPts=[];editZoneIdx=null;draftZones=[];winPts=[];
@@ -1985,8 +2113,17 @@ fi.onchange=async e=>{await handleFile(e.target.files[0]);e.target.value='';};
 dropz.onclick=()=>fi.click();
 cwrap.addEventListener('dragover',e=>e.preventDefault());
 cwrap.addEventListener('drop',async e=>{e.preventDefault();await handleFile(e.dataTransfer.files[0]);});
-document.getElementById('prevPg').onclick=async()=>{if(!pdfDoc||curPage<=1)return;curPage--;pgLbl.textContent=curPage+'/'+totalPages;bgImg=await loadPdfPage(curPage);curFloor().pdfPage=curPage;curFloor().bgImg=bgImg;fitImage();};
-document.getElementById('nextPg').onclick=async()=>{if(!pdfDoc||curPage>=totalPages)return;curPage++;pgLbl.textContent=curPage+'/'+totalPages;bgImg=await loadPdfPage(curPage);curFloor().pdfPage=curPage;curFloor().bgImg=bgImg;fitImage();};
+async function _byttPdfSide(nyPg){
+  curPage=nyPg;pgLbl.textContent=curPage+'/'+totalPages;
+  bgImg=await loadPdfPage(curPage);
+  const f=curFloor();
+  f.pdfPage=curPage;f.bgImg=bgImg;
+  const pm=await pdfSidePapirMm(pdfDoc,curPage);
+  if(pm){f.paperWMm=pm.w;f.paperHMm=pm.h;f.paperSource='pdf';}
+  fitImage();
+}
+document.getElementById('prevPg').onclick=async()=>{if(!pdfDoc||curPage<=1)return;await _byttPdfSide(curPage-1);};
+document.getElementById('nextPg').onclick=async()=>{if(!pdfDoc||curPage>=totalPages)return;await _byttPdfSide(curPage+1);};
 
 // ── Compass ───────────────────────────────────────────────────
 function drawCompass(){
@@ -2770,7 +2907,93 @@ function showCalStep2(mode){
   document.getElementById('calStep2').style.display='';
   document.getElementById('calModeLen').style.display=mode==='length'?'':'none';
   document.getElementById('calModeArea').style.display=mode==='area'?'':'none';
+  document.getElementById('calModeScale').style.display=mode==='scale'?'':'none';
 }
+
+// ── Målestokk-kalibrering ───────────────────────────────────
+const SKALA_VAL=[50,100,200,250,500,1000];
+let valdSkala=100;
+// Papirmål som skal brukast: oppdaga frå fila, eller overstyrt i nedtrekket
+function gjeldandePapir(){
+  const f=curFloor();
+  const sel=document.getElementById('calPaperSel').value;
+  if(sel!=='auto'&&bgImg)return papirMaalFor(sel,bgImg.width,bgImg.height);
+  if(f.paperWMm&&f.paperHMm)return{w:f.paperWMm,h:f.paperHMm};
+  return null;
+}
+function oppdaterSkalaUI(){
+  const f=curFloor();
+  const info=document.getElementById('calPaperInfo');
+  const icon=document.getElementById('calPaperIcon');
+  const res=document.getElementById('calScaleResult');
+  const sel=document.getElementById('calPaperSel');
+  // Papirinfo
+  if(sel.value==='auto'){
+    if(f.paperWMm&&f.paperHMm){
+      const kjelde=f.paperSource==='pdf'?'lese frå PDF-sida':'lese frå biletet si DPI';
+      info.textContent=papirFormatNamn(f.paperWMm,f.paperHMm)+' — '+kjelde;
+      icon.textContent='📄';
+    } else {
+      info.textContent='Ukjent — vel format til høgre';
+      icon.textContent='⚠️';
+    }
+  } else {
+    const p=bgImg?papirMaalFor(sel.value,bgImg.width,bgImg.height):null;
+    info.textContent=p?papirFormatNamn(p.w,p.h)+' — valt manuelt':'—';
+    icon.textContent='📄';
+  }
+  // Knappane
+  document.querySelectorAll('#calScaleBtns [data-skala]').forEach(b=>{
+    const på=parseInt(b.dataset.skala)===valdSkala;
+    b.style.background=på?'var(--accent)':'#fff';
+    b.style.color=på?'#fff':'var(--text2)';
+    b.style.borderColor=på?'transparent':'var(--border2)';
+    b.style.fontWeight=på?'700':'500';
+  });
+  // Resultat
+  const papir=gjeldandePapir();
+  if(!papir||!bgImg||!valdSkala||valdSkala<=0){
+    res.textContent='Vel papirformat og målestokk for å sjå resultatet.';
+    return;
+  }
+  const mmPerPx=(papir.w/bgImg.width)*valdSkala;
+  const breiddeM=bgImg.width*mmPerPx/1000;
+  const høgdeM=bgImg.height*mmPerPx/1000;
+  res.innerHTML='<strong style="color:var(--accent)">1 : '+valdSkala+'</strong> på '+papirFormatNamn(papir.w,papir.h)
+    +' → heile teikninga dekkjer <strong>'+breiddeM.toFixed(1)+' × '+høgdeM.toFixed(1)+' m</strong>';
+}
+// Bygg målestokk-knappane éin gong
+(()=>{
+  const wrap=document.getElementById('calScaleBtns');
+  SKALA_VAL.forEach(s=>{
+    const b=document.createElement('button');
+    b.dataset.skala=s;b.textContent='1:'+s;
+    b.style.cssText='padding:9px 4px;border:1.5px solid var(--border2);border-radius:8px;background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;font-size:12.5px;transition:all .1s';
+    b.onclick=()=>{valdSkala=s;document.getElementById('calScaleInput').value='';oppdaterSkalaUI();};
+    wrap.appendChild(b);
+  });
+  document.getElementById('calScaleInput').oninput=function(){
+    const v=parseInt(this.value);
+    if(v>0)valdSkala=v;
+    oppdaterSkalaUI();
+  };
+  document.getElementById('calPaperSel').onchange=oppdaterSkalaUI;
+})();
+
+document.getElementById('calChooseScale').onclick=()=>{
+  if(!bgImg){hintText.textContent='Last opp ei planteikning først.';return;}
+  calMode='scale';
+  const f=curFloor();
+  // Føreslå format frå fila om vi kjenner det
+  document.getElementById('calPaperSel').value='auto';
+  if(!f.paperWMm&&bgImg){
+    // Ukjent papir: gjett A3 som vanlegaste planteikningsformat
+    document.getElementById('calPaperSel').value='A3';
+  }
+  document.getElementById('calScaleInput').value='';
+  showCalStep2('scale');
+  oppdaterSkalaUI();
+};
 
 calBtn.onclick=()=>{
   calPts=[];pendingCalAreaPx2=0;
@@ -2780,7 +3003,7 @@ calBtn.onclick=()=>{
 };
 
 // Hover-effekt på metodeval-knappane
-['calChooseLen','calChooseArea'].forEach(id=>{
+['calChooseLen','calChooseArea','calChooseScale'].forEach(id=>{
   const btn=document.getElementById(id);
   btn.onmouseenter=()=>{btn.style.borderColor='var(--accent)';btn.style.background='var(--accent-dim)';};
   btn.onmouseleave=()=>{btn.style.borderColor='var(--border2)';btn.style.background='#fff';};
@@ -2811,7 +3034,10 @@ document.getElementById('calBack').onclick=()=>{
 
 document.getElementById('calOk').onclick=()=>{
   let newMmPerImgPx=null;
-  if(calMode==='length'){
+  if(calMode==='scale'){
+    const papir=gjeldandePapir();
+    if(papir&&bgImg&&valdSkala>0) newMmPerImgPx=(papir.w/bgImg.width)*valdSkala;
+  } else if(calMode==='length'){
     const mm=parseFloat(document.getElementById('calMmInput').value);
     if(!isNaN(mm)&&mm>0&&pendingCalImgPx>0) newMmPerImgPx=mm/pendingCalImgPx;
   } else {
@@ -5761,6 +5987,7 @@ function autosave(){
         mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
         sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
         pdfPage:f.pdfPage,totalPages:f.totalPages,
+        paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
         zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]}))
       };
       if(f.bgImg){
@@ -5835,6 +6062,7 @@ function restoreAutosave(){
           floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
           sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
           pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
+          paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
           bgImg:null,pdfDoc:null,
           zones:(f.zones||[]).map(z=>{const nz={...z,skillevegg:new Set(z.skillevegg||[])};sanitizeZoneSegRefs(nz);return nz;})
         };
@@ -6296,6 +6524,7 @@ document.getElementById('saveBtn').onclick=()=>{
       mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
       sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
       pdfPage:f.pdfPage,totalPages:f.totalPages,
+      paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
       zones:f.zones.map(z=>({
         ...z,
         skillevegg:z.skillevegg?Array.from(z.skillevegg):[]
@@ -6351,6 +6580,7 @@ document.getElementById('loadFi').onchange=async function(){
         floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
         sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
         pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
+        paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
         pdfDoc:null,bgImg:null,
         zones:(f.zones||[]).map(z=>{
           const nz={...z,skillevegg:new Set(z.skillevegg||[])};
