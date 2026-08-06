@@ -4149,7 +4149,20 @@ function updateResults(){
       cpBtn.textContent='⬡ Kopier sone';
       cpBtn.onclick=()=>showCopyZoneMenu(z,zi,f,fi);
 
-      btnRow.appendChild(eb);btnRow.appendChild(db);btnRow.appendChild(cpBtn);
+      // Del sone — teikn ei klippelinje tvers gjennom
+      const splitBtn=document.createElement('button');splitBtn.className='card-btn';
+      splitBtn.textContent='✂ Del sone';
+      splitBtn.title='Del sona i to med ei klippelinje — linja vert skiljekonstruksjon i begge';
+      splitBtn.onclick=()=>{
+        if(z.pts.length<3){hintText.textContent='Sona har for få punkt til å delast.';return;}
+        if(fi!==activeFloor){saveFloorState();activeFloor=fi;syncFloorState();renderFloorTabs();}
+        delSoneTarget={z,zi};delSonePts=[];delSoneSnap=null;
+        setMode('del-sone');
+        hintText.textContent='Teikn ei linje tvers gjennom «'+z.name+'» · Shift for 90°/45° · Enter for å dele';
+        draw();
+      };
+
+      btnRow.appendChild(eb);btnRow.appendChild(db);btnRow.appendChild(cpBtn);btnRow.appendChild(splitBtn);
       // Koble soner — alltid synleg, viser status
       const lnBtn=document.createElement('button');
       lnBtn.className='card-btn';
