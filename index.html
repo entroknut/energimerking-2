@@ -3326,19 +3326,21 @@ function _finishKlipp(){
 let snapEnabled=true;
 let _snapCv=null,_snapCtx=null,_snapBlocked=false;
 const SNAP_R={point:15,corner:15,imgcorner:13,edge:9};
-const HARRIS_MIN=0.55; // terskel for å godta eit hjørne i teikninga
+let CORNER_Q_MIN=0.08; // 0–0.25; høgare = strengare krav til «hjørneform»
 
 function imgCornerSnap(sx,sy){
   if(!snapEnabled||!bgImg||_snapBlocked)return null;
   const iw=bgImg.width||bgImg.naturalWidth,ih=bgImg.height||bgImg.naturalHeight;
   if(!iw||!ih)return null;
-  // Søkjeradius er fast på SKJERMEN. Vindauget vert alltid analysert i
-  // skjermoppløysing (aldri over native), så kostnaden er konstant same
-  // kor langt ut du har zooma — og nedskaleringa dempar samstundes støy.
+  // Søkjeradius er fast på SKJERMEN. Utsnittet vert analysert i native
+  // oppløysing så lenge det får plass i eit vindauge på ANALYSE_MAX px;
+  // først når det er større skalerer vi ned. Ei A0-PDF vist i «tilpass til
+  // skjerm» (~10% zoom) treng eit stort utsnitt, og skalerer vi det ned til
+  // skjermoppløysing forsvinn veggstrekane heilt.
+  const ANALYSE_MAX=49;
   const Rimg=Math.max(8,Math.round(SNAP_R.imgcorner/sc)); // radius i biletpikslar
   const src=Rimg*2+1;                                     // kjeldeutsnitt
-  const k=Math.min(1,sc);
-  const W=Math.max(17,Math.round(src*k)|1);               // analysevindauge (odde)
+  const W=Math.max(17,Math.min(ANALYSE_MAX,src)|1);       // analysevindauge (odde)
   const ip=s2i(sx,sy);
   const x0=Math.round(ip.x)-Rimg,y0=Math.round(ip.y)-Rimg;
   if(x0<1||y0<1||x0+src>=iw||y0+src>=ih)return null;
@@ -3352,8 +3354,26 @@ function imgCornerSnap(sx,sy){
     _snapCtx.drawImage(bgImg,x0,y0,src,src,0,0,W,W);
     d=_snapCtx.getImageData(0,0,W,W).data;
   }catch(e){_snapBlocked=true;return null;} // t.d. tainted canvas
-  const n=W*W,g=new Float32Array(n);
-  for(let i=0;i<n;i++)g[i]=(d[i*4]*0.299+d[i*4+1]*0.587+d[i*4+2]*0.114)/255;
+  const n=W*W,g0=new Float32Array(n);
+  for(let i=0;i<n;i++)g0[i]=(d[i*4]*0.299+d[i*4+1]*0.587+d[i*4+2]*0.114)/255;
+  // Kontraststrekk: ei blass grå strek på lysegrå botn skal telje like mykje
+  // som svart på kvitt. Utan dette druknar svake PDF-ar under terskelen.
+  let mn=1,mx=0;
+  for(let i=0;i<n;i++){const v=g0[i];if(v<mn)mn=v;if(v>mx)mx=v;}
+  const rng=mx-mn;
+  if(rng<0.05)return null;               // heilt flatt utsnitt
+  const inv=1/rng;
+  for(let i=0;i<n;i++)g0[i]=(g0[i]-mn)*inv;
+  // Lett 3×3-utjamning så oppskalerte/støyete skanningar ikkje gir falske hjørne.
+  // Kopier først heile utsnittet: lèt vi ytterkanten stå som nullar, får vi ei
+  // kunstig svart ramme rundt vindauget — og dermed falske hjørne langs kanten.
+  const g=Float32Array.from(g0);
+  for(let y=1;y<W-1;y++)for(let x=1;x<W-1;x++){
+    const i=y*W+x;
+    g[i]=(g0[i-W-1]+2*g0[i-W]+g0[i-W+1]
+         +2*g0[i-1]+4*g0[i]+2*g0[i+1]
+         +g0[i+W-1]+2*g0[i+W]+g0[i+W+1])/16;
+  }
   // Sobel-gradientar
   const Ix=new Float32Array(n),Iy=new Float32Array(n);
   for(let y=1;y<W-1;y++)for(let x=1;x<W-1;x++){
@@ -3361,21 +3381,38 @@ function imgCornerSnap(sx,sy){
     Ix[i]=(g[i-W+1]+2*g[i+1]+g[i+W+1])-(g[i-W-1]+2*g[i-1]+g[i+W-1]);
     Iy[i]=(g[i+W-1]+2*g[i+W]+g[i+W+1])-(g[i-W-1]+2*g[i-W]+g[i-W+1]);
   }
-  // Harris-respons i 5×5-vindauge, vekta mot peikaren
-  let best=null,bestScore=0;
-  const kH=0.06,c=(W-1)/2,Rw=c-2;
+  // Strukturtensor i 5×5-vindauge. Vi lagrar først a/b/c og maks «kantenergi»
+  // (trace), slik at terskelen kan settast i forhold til kor sterke kantane
+  // faktisk er i nettopp dette utsnittet — ikkje som ein fast absoluttverdi.
+  const c=(W-1)/2,Rw=c-2;
+  // Separabel 5×5-summering: først vassrett, så loddrett i kandidatløkka.
+  // Gir same resultat som ei full 5×5-løkke, men 2,5× billigare.
+  const Sxx=new Float32Array(n),Sxy=new Float32Array(n),Syy=new Float32Array(n);
+  for(let y=1;y<W-1;y++)for(let x=3;x<W-3;x++){
+    let a=0,b=0,cc=0;
+    for(let u=-2;u<=2;u++){const j=y*W+x+u;a+=Ix[j]*Ix[j];b+=Ix[j]*Iy[j];cc+=Iy[j]*Iy[j];}
+    const i=y*W+x;Sxx[i]=a;Sxy[i]=b;Syy[i]=cc;
+  }
+  const cand=[];let maxTr=0;
   for(let y=3;y<W-3;y++)for(let x=3;x<W-3;x++){
     const dist=Math.hypot(x-c,y-c);
     if(dist>Rw)continue;
     let a=0,b=0,cc=0;
-    for(let v=-2;v<=2;v++){
-      const row=(y+v)*W+x;
-      for(let u=-2;u<=2;u++){const j=row+u;a+=Ix[j]*Ix[j];b+=Ix[j]*Iy[j];cc+=Iy[j]*Iy[j];}
-    }
-    const resp=(a*cc-b*b)-kH*(a+cc)*(a+cc);
-    if(resp<=HARRIS_MIN)continue;
-    const score=resp*(1-0.6*dist/Rw);
-    if(score>bestScore){bestScore=score;best={x,y};}
+    for(let v=-2;v<=2;v++){const j=(y+v)*W+x;a+=Sxx[j];b+=Sxy[j];cc+=Syy[j];}
+    const tr=a+cc;
+    if(tr<=0)continue;
+    if(tr>maxTr)maxTr=tr;
+    // Normalisert hjørnemål: det/trace² ligg i 0–0.25 og er uavhengig av
+    // kontrast, så same terskel verkar på svake og sterke teikningar.
+    cand.push({x,y,dist,tr,q:(a*cc-b*b)/(tr*tr)});
+  }
+  if(!maxTr)return null;
+  let best=null,bestScore=0;
+  for(const t of cand){
+    if(t.q<CORNER_Q_MIN)continue;        // må likne eit hjørne, ikkje ein kant
+    if(t.tr<0.18*maxTr)continue;         // må liggje der det faktisk er strekar
+    const score=t.q*(1-0.6*t.dist/Rw);
+    if(score>bestScore){bestScore=score;best=t;}
   }
   if(!best)return null;
   // Tilbake frå analysevindauget til biletkoordinatar
