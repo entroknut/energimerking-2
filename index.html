@@ -680,10 +680,6 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
           <button id="model3dPlan" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:rgba(255,255,255,.2);color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s">Planteikning</button>
           <button id="model3dReset" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s">↺ Reset</button>
           <button id="model3dMapBtn" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s;display:flex;align-items:center;gap:4px">🗺 Kart <span style="font-size:9px;font-weight:700;background:#f59e0b;color:#fff;padding:1px 4px;border-radius:3px;letter-spacing:.3px;vertical-align:middle">BETA</span></button>
-          <div title="Eksploded view — dra etasjane frå kvarandre" style="display:flex;align-items:center;gap:5px;padding:0 4px">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#4b5563" stroke-width="1.5" stroke-linejoin="round"><rect x="3" y="1.5" width="10" height="3.4"/><rect x="3" y="6.3" width="10" height="3.4"/><rect x="3" y="11.1" width="10" height="3.4"/></svg>
-            <input type="range" id="explodeSlider" min="0" max="10" step="1" value="0" style="width:74px;accent-color:#1d4f4f;cursor:pointer">
-          </div>
           <button id="model3dSunBtn" title="Solsimulering — vis korleis sola treff bygget gjennom året" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s;display:flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="3.2"/><path d="M8 1.2v1.8M8 13v1.8M1.2 8H3M13 8h1.8M3.2 3.2l1.3 1.3M11.5 11.5l1.3 1.3M12.8 3.2l-1.3 1.3M4.5 11.5l-1.3 1.3"/></svg> Sol</button>
           <button id="model3dShotBtn" title="Last ned 3D-visninga som PNG-bilete" style="padding:4px 10px;font-size:11.5px;font-weight:500;border:1px solid #e5e7eb;border-radius:6px;background:#fff;color:#4b5563;cursor:pointer;font-family:inherit;transition:all .12s;display:flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.5v9M4.5 7 8 10.5 11.5 7"/><path d="M2 11.5v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"/></svg> PNG</button>
           <button id="model3dClose" style="padding:4px 12px;font-size:12px;font-weight:600;border:none;border-radius:6px;background:#1d4f4f;color:#fff;cursor:pointer;font-family:inherit;transition:all .12s">✕ Lukk</button>
@@ -7896,9 +7892,8 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
   let isWire=false;
   let orb=false,pan=false,lastM={x:0,y:0};
   let sph={theta:0.7,phi:1.05,radius:60};
-  // Solsimulering / eksploded view / opningsanimasjon / klikk-info
+  // Solsimulering / opningsanimasjon / klikk-info
   let _sunOn=false,_sunMonth=6,_sunHour=12;
-  let _explodeGap=0;
   let _growT0=0;
   let _picked=null,_downPos=null;
   let tgt={x:0,y:0,z:0};
@@ -8130,10 +8125,9 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     }
 
     // Stack floors — bruk etasjens defaultHoyde som stakkingshøgde
-    // (_explodeGap > 0 dreg etasjane frå kvarandre — eksploded view)
     let cumY=0;
-    const floorBaseY=floors.map((f,fi)=>{
-      const by=cumY+fi*_explodeGap;
+    const floorBaseY=floors.map(f=>{
+      const by=cumY;
       cumY+=f.defaultHoyde??Math.max(...f.zones.map(z=>getHoyde(z)),3);
       return by;
     });
@@ -8508,17 +8502,6 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
   document.getElementById('model3dSunBtn').onclick=()=>{_sunOn=!_sunOn;_syncSunUI();_applySun();};
   document.getElementById('sunMonth').oninput=function(){_sunMonth=parseInt(this.value);_syncSunUI();_applySun();};
   document.getElementById('sunHour').oninput=function(){_sunHour=parseFloat(this.value);_syncSunUI();_applySun();};
-
-  // ── Eksploded view — throttla rebuild ───────────────────────
-  let _explTimer=null;
-  document.getElementById('explodeSlider').oninput=function(){
-    _explodeGap=parseFloat(this.value)*0.8;
-    if(_explTimer)return;
-    _explTimer=setTimeout(()=>{
-      _explTimer=null;
-      if(OV.style.display==='flex'&&window._rebuild3D)window._rebuild3D();
-    },90);
-  };
 
   // ── PNG-eksport ─────────────────────────────────────────────
   document.getElementById('model3dShotBtn').onclick=()=>{
