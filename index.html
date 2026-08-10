@@ -2227,10 +2227,15 @@ document.addEventListener('mousemove', e=>{
   if(angle<0)angle+=360;
   if(angle>=360)angle-=360;
   setGlobalNorth(Math.round(angle));
-  updateResults(); renderTable(); draw();
+  // Berre lerretet under draginga — fasaderetningane er synlege der.
+  // Sidepanel og tabell er tunge å byggje, og vert oppdaterte når du slepp.
+  draw();
 });
 document.addEventListener('mouseup', ()=>{
-  if(compassDragging){compassDragging=false;compassCanvas.classList.remove('dragging');}
+  if(compassDragging){
+    compassDragging=false;compassCanvas.classList.remove('dragging');
+    updateResults();renderTable();draw();
+  }
 });
 // Touch support
 compassCanvas.addEventListener('touchstart', e=>{compassDragging=true;e.preventDefault();},{passive:false});
@@ -2242,9 +2247,11 @@ document.addEventListener('touchmove', e=>{
   let angle=Math.atan2(t.clientY-cy,t.clientX-cx)*180/Math.PI+90;
   if(angle<0)angle+=360;if(angle>=360)angle-=360;
   setGlobalNorth(Math.round(angle));
-  updateResults();renderTable();draw();
+  draw();
 },{passive:false});
-document.addEventListener('touchend',()=>{compassDragging=false;});
+document.addEventListener('touchend',()=>{
+  if(compassDragging){compassDragging=false;updateResults();renderTable();draw();}
+});
 
 // ── Draw ──────────────────────────────────────────────────────
 function draw(){
@@ -3660,6 +3667,10 @@ function updateResults(){
   const _spanel=document.getElementById('spanel');
   const _savedScroll=_spanel?_spanel.scrollTop:0;
   zlist.innerHTML='';
+  // Sonekorta vert bygde utanfor dokumentet og sette inn i éin operasjon.
+  // Å leggje dei inn eitt for eitt i live DOM tvingar fram omrekning av
+  // layout for kvart kort, og det dominerer kostnaden ved mange soner.
+  const _zfrag=document.createDocumentFragment();
 
 
   // BRA-sammendrag i etasjefane-baren
@@ -4350,9 +4361,10 @@ function updateResults(){
         cardBody.appendChild(facSection);
       }
 
-      zlist.appendChild(card);
+      _zfrag.appendChild(card);
     });
   });
+  zlist.appendChild(_zfrag);
   // Gjenopprett scroll-posisjon
   if(_spanel)_spanel.scrollTop=_savedScroll;
   // Oppdater collapse-all knapp
@@ -4615,6 +4627,11 @@ function showLinkZoneMenu(z, srcFloor, srcFi){
 // ── Table panel ───────────────────────────────────────────────
 function renderTable(){
   const wrap=document.getElementById('tableWrap');
+  // Tabellfana er skjult som standard, og tabellen er den største DOM-en i
+  // programmet. Å byggje han på nytt ved kvar redigering — for noko ingen
+  // ser — dominerte kostnaden. Fanebytet kallar renderTable() på nytt, så
+  // innhaldet er alltid ferskt når du faktisk opnar fana.
+  if(document.getElementById('tablePanel')?.style.display==='none')return;
   if(!zones.length){wrap.innerHTML='<div class="empty"><div class="empty-icon">⬡</div>Ingen soner enno</div>';return;}
   let html='';
 
@@ -6162,10 +6179,24 @@ document.addEventListener('keydown',e=>{
   }
 });
 
+// Desse feltene fyrer på kvart tastetrykk. Lerretet oppdaterast med ein gong,
+// men sidepanel og tabell — som er dyre å byggje — ventar til du har slutta
+// å skrive. Utan dette kostar «3.5» tre fulle ombyggingar.
+let _tungOppdateringTimer=null;
+function tungOppdateringSnart(){
+  clearTimeout(_tungOppdateringTimer);
+  _tungOppdateringTimer=setTimeout(()=>{updateResults();renderTable();},220);
+}
 [northI,fhI].forEach(el=>el.addEventListener('input',()=>{
   if(el===northI){
     setGlobalNorth(parseFloat(northI.value)||0);
   }
+  draw();
+  tungOppdateringSnart();
+}));
+// Ved blur/Enter oppdaterer vi med ein gong, så verdien aldri står att uvist
+[northI,fhI].forEach(el=>el.addEventListener('change',()=>{
+  clearTimeout(_tungOppdateringTimer);
   updateResults();renderTable();draw();
 }));
 
