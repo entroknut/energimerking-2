@@ -613,7 +613,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v2.5.1</span>
+    <span style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v2.6.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -947,6 +947,24 @@ let dragging=false,dragSt=null,lastOff={x:0,y:0};
 let mouse=null;
 let mmPerImgPx=null;
 let globalMmPerImgPx=null; // kalibrering som gjeld alle etasjar utan eigen kalibrering
+// Bygget si adresse — sett frå kartsøket eller SXI-dialogen, lagra i prosjektfila
+// og brukt som framlegg til filnamn.
+let prosjektAdresse='';
+function adresseTilFilnamn(a){
+  if(!a)return null;
+  // «Bleivassvegen 105 B, 5178 Loddefjord, Norge» → «Bleivassvegen 105 B»
+  const s=String(a).split(',')[0]
+    .replace(/[\\/:*?"<>|]/g,'-')   // teikn som ikkje er lovlege i filnamn
+    .replace(/\s+/g,' ').trim();
+  return s||null;
+}
+// Held adressefelta i kartet og SXI-dialogen i takt med den lagra adressa
+function _syncAdresseFelt(){
+  const m=document.getElementById('mapSearchInput');
+  if(m&&prosjektAdresse&&!m.value)m.value=prosjektAdresse;
+  const s=document.getElementById('sxi_adresse');
+  if(s&&prosjektAdresse&&!s.value)s.value=prosjektAdresse;
+}
 let zones=[],curPts=[],mode='navigate',calPts=[];
 let draftZones=[];
 let editZoneIdx=null,dragCorner=null,dragZone=null; // dragZone={zoneIdx,startIx,startIy,origPts}
@@ -6360,7 +6378,7 @@ function autosave(){
       }
       return obj;
     });
-    const proj={version:1,savedAt:new Date().toISOString(),activeFloor,globalNorth,globalMmPerImgPx,_nextFloorId,_nextGroupId,_nextZoneId,floors:serFloors};
+    const proj={version:1,savedAt:new Date().toISOString(),activeFloor,globalNorth,globalMmPerImgPx,prosjektAdresse,_nextFloorId,_nextGroupId,_nextZoneId,floors:serFloors};
     localStorage.setItem(AUTOSAVE_KEY,JSON.stringify(proj));
     markClean(); // elles re-enkodar autolagringa alle bileta kvart minutt for alltid
   }catch(e){/* localStorage full */}
@@ -6440,6 +6458,8 @@ function restoreAutosave(){
       activeFloor=Math.min(proj.activeFloor??0,floors.length-1);
       globalNorth=proj.globalNorth??0;
       globalMmPerImgPx=proj.globalMmPerImgPx??null;
+    prosjektAdresse=proj.prosjektAdresse||'';
+    _syncAdresseFelt();
       _nextFloorId=proj._nextFloorId??floors.length+1;
       _nextGroupId=proj._nextGroupId??1;
       _nextZoneId=proj._nextZoneId??1;
@@ -6873,7 +6893,7 @@ document.getElementById('rotBtn').onclick=()=>{
 };
 
 // ── Lagre / opne prosjekt ─────────────────────────────────────
-document.getElementById('saveBtn').onclick=()=>{
+document.getElementById('saveBtn').onclick=async()=>{
   saveFloorState();
   // Serialiser floors — bgImg og pdfDoc kan ikkje serialiserast direkte
   // Vi lagrar bgImg som dataURL, men hoppar over pdfDoc (brukaren lastar opp PDF på nytt)
@@ -6906,6 +6926,7 @@ document.getElementById('saveBtn').onclick=()=>{
     activeFloor,
     globalNorth,
     globalMmPerImgPx,
+    prosjektAdresse,
     _nextFloorId,
     _nextGroupId,
     _nextZoneId,
@@ -6913,13 +6934,33 @@ document.getElementById('saveBtn').onclick=()=>{
   };
   const json=JSON.stringify(proj);
   const blob=new Blob([json],{type:'application/json'});
+  // Framlegg til filnamn: bygget si adresse, elles dato
+  const base=adresseTilFilnamn(prosjektAdresse)||('SXI_generatoren_'+new Date().toISOString().slice(0,10));
+  const fname=base+'.entro';
+  // Native lagre-dialog der nettlesaren støttar det, så brukaren vel mappe
+  // og namn sjølv. Elles fell vi tilbake til vanleg nedlasting.
+  if(window.showSaveFilePicker){
+    try{
+      const h=await window.showSaveFilePicker({
+        suggestedName:fname,
+        types:[{description:'SXI-generator prosjekt',accept:{'application/json':['.entro']}}]
+      });
+      const w=await h.createWritable();
+      await w.write(blob);
+      await w.close();
+      hintText.textContent='Lagra som «'+h.name+'».';
+      return;
+    }catch(err){
+      if(err&&err.name==='AbortError')return;   // brukaren avbraut
+      // Andre feil (t.d. blokkert av nettlesaren): fall gjennom til nedlasting
+    }
+  }
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  // Bruk prosjektnamn frå første etasje eller generisk namn
-  const fname='SXI_generatoren_'+new Date().toISOString().slice(0,10)+'.entro';
   a.href=url;a.download=fname;
   document.body.appendChild(a);a.click();
   document.body.removeChild(a);URL.revokeObjectURL(url);
+  hintText.textContent='Lagra som «'+fname+'» i nedlastingsmappa.';
 };
 
 document.getElementById('loadBtn').onclick=()=>document.getElementById('loadFi').click();
@@ -6961,6 +7002,8 @@ document.getElementById('loadFi').onchange=async function(){
     activeFloor=Math.min(proj.activeFloor??0,floors.length-1);
     globalNorth=proj.globalNorth??0;
     globalMmPerImgPx=proj.globalMmPerImgPx??null;
+    prosjektAdresse=proj.prosjektAdresse||'';
+    _syncAdresseFelt();
     _nextFloorId=proj._nextFloorId??floors.length+1;
     _nextGroupId=proj._nextGroupId??1;
       _nextZoneId=proj._nextZoneId??1;
@@ -8000,6 +8043,7 @@ ${zonesXml}${emXml}
     // Pre-fill kommunenr from current klimasted selection
     const kl=document.getElementById('sxi_klima').value;
     document.getElementById('sxi_kommunenr').value=KOMMUNE_NR[kl]||'';
+    _syncAdresseFelt();   // fyll inn adressa frå kartsøket om ho finst
     document.getElementById('sxi_err').style.display='none';
     dlg.style.display='flex';
     setTimeout(()=>document.getElementById('sxi_namn').focus(),50);
@@ -8011,6 +8055,7 @@ ${zonesXml}${emXml}
     const errEl=document.getElementById('sxi_err');
     const namn=document.getElementById('sxi_namn').value.trim();
     const adresse=document.getElementById('sxi_adresse').value.trim();
+    if(adresse&&adresse!==prosjektAdresse){prosjektAdresse=adresse;markDirty();}
     const byggeaar=document.getElementById('sxi_byggeaar').value.trim();
     const klimasted=document.getElementById('sxi_klima').value;
     const kommunenr=document.getElementById('sxi_kommunenr').value.trim();
@@ -9597,6 +9642,8 @@ function printFasadeView(){
   async function selectResult(f){
     const [lng,lat]=f.center;
     inp.value=f.place_name;
+    prosjektAdresse=f.place_name;   // brukt som framlegg til filnamn ved lagring
+    markDirty();
     hideAc();
     if(!map){ initMap(); await new Promise(r=>setTimeout(r,800)); }
     map.flyTo({center:[lng,lat],zoom:16.5,pitch:58,duration:1400});
