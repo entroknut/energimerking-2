@@ -6849,8 +6849,13 @@ function zoomToZone(z){
   const padding=60;
   const newSc=Math.min((r.width-padding*2)/zW,(r.height-padding*2)/zH);
   sc=Math.max(0.05,Math.min(50,newSc));
-  offX=r.width/2-((minX+maxX)/2)*sc;
-  offY=r.height/2-((minY+maxY)/2)*sc;
+  // Sona vert teikna på (ix + floorDxImg)*sc + offX, så etasjens ghost-forskyving
+  // må reknast med — elles zoomar vi til der sona låg før ho vart justert.
+  let zf=curFloor();
+  for(const fl of floors){if(fl.zones.includes(z)){zf=fl;break;}}
+  const fdx=zf.floorDxImg||0,fdy=zf.floorDyImg||0;
+  offX=r.width/2-((minX+maxX)/2+fdx)*sc;
+  offY=r.height/2-((minY+maxY)/2+fdy)*sc;
   saveFloorState();draw();
 }
 
@@ -9410,7 +9415,10 @@ function printFasadeView(){
       const baseH=cumH+elevM;
       const flH=f.defaultHoyde??3;
       cumH+=flH;
-      const fdxPx=f.floorDx??0, fdyPx=f.floorDy??0;
+      // floorDxImg/floorDyImg er offset i BILETpikslar — same eining som z.pts.
+      // Her stod det floorDx/floorDy, som er feltnamn frå før omlegginga og
+      // ikkje finst lenger, så kartet ignorerte ghost-forskyvinga heilt.
+      const fdxPx=f.floorDxImg??0, fdyPx=f.floorDyImg??0;
 
       f.zones.forEach((z,zi)=>{
         if(z.pts.length<3) return;
