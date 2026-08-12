@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 2.0.9 | Single-file HTML applikasjon
+**Versjon:** 2.6.1 | Single-file HTML applikasjon
 
 ---
 
@@ -9,7 +9,64 @@
 
 SXI-generatoren er eit nettbasert oppmålingsverktøy frå Entro AS for energimerking av norske bygg. Brukaren lastar opp ei planteikning, teiknar soner som polygon, og eksporterer ein SXI-fil til SIMIEN (norsk energiberegningsprogram).
 
-**Arkitektur:** Éi enkelt HTML-fil (`index.html`) med all kode inline. Ingen bygg-steg, ingen avhengigheiter utanom Three.js r128 frå CDN.
+**Arkitektur:** Éi enkelt HTML-fil (`index.html`, ~9800 linjer) med all kode inline. Ingen bygg-steg. Eksterne avhengigheiter frå CDN: Three.js r128 (3D), pdf.js 3.11 (PDF), Mapbox GL (kart, inlina i fila).
+
+Fila har **to** inline `<script>`-blokker — syntaks-sjekken må sjekke begge.
+
+---
+
+## Utviklingsworkflow
+
+**Arbeid direkte i denne mappa.** Ingen kopiering til andre stader (den gamle `/home/claude/`-flyten gjeld ikkje lenger).
+
+### Greiner
+
+- `dev` — alt arbeid skjer her
+- `main` — publiserer til GitHub Pages automatisk
+
+Repo: `nedkvitneknut-sketch/energimerking-2`  
+Live: https://nedkvitneknut-sketch.github.io/energimerking-2/
+
+### Syntaks-sjekk etter kvar endring
+
+```bash
+python -c "
+import re, subprocess, tempfile, os
+with open('index.html', encoding='utf-8') as f: html = f.read()
+blocks = re.findall(r'<script>((?:(?!</script>)[\s\S])*)</script>', html)
+for i, js in enumerate(blocks):
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False, encoding='utf-8') as f:
+        f.write(js); fname = f.name
+    r = subprocess.run(['node', '--check', fname], capture_output=True, text=True)
+    print(f'block {i}:', 'OK' if r.returncode==0 else r.stderr[:400])
+    os.unlink(fname)
+"
+```
+
+### Testing i nettlesar
+
+Start lokal server og test mot han — ikkje `file://` (localStorage kan vere sperra):
+
+```bash
+python -m http.server 8742
+```
+
+`.claude/launch.json` finst, så Claude Code kan starte forhandsvisninga direkte.
+
+### Publisering
+
+Brukaren seier eksplisitt frå når noko skal publiserast. Då: bump versjonsnummer i `index.html` (søk `v2.`), commit på `dev`, merge til `main`, push.
+
+**Verifiser alltid live-adressa etterpå** — ikkje meld «publisert» berre fordi pushen gjekk gjennom. GitHub Pages-bygget kan feile (det skjedde 6. august: deploy-steget timeout-a etter 10 min, to gonger på rad, og trong eit tredje forsøk).
+
+```bash
+curl -s "https://nedkvitneknut-sketch.github.io/energimerking-2/index.html?cb=$(date +%s)" | grep -o 'v2\.[0-9]*\.[0-9]*' | head -1
+```
+
+Byggestatus (anonymt API, `gh` er ikkje innlogga):
+```bash
+curl -s "https://api.github.com/repos/nedkvitneknut-sketch/energimerking-2/actions/runs?per_page=3"
+```
 
 ---
 
@@ -18,13 +75,18 @@ SXI-generatoren er eit nettbasert oppmålingsverktøy frå Entro AS for energime
 ```javascript
 floors = [{
   id, name,
-  bgImg,          // Image-objekt (ikkje lagra i JSON — lagrast som JPEG base64)
-  bgImgData,      // base64 JPEG for lagring
+  bgImg,          // Image/ImageBitmap (ikkje i JSON — lagrast som base64)
+  bgImgData,      // base64 for lagring
   pdfDoc, pdfPage, totalPages,
   mmPerImgPx,     // kalibrering per etasje (null = brukar global)
-  ownCal,         // boolean — brukar eigen kalibrering (ikkje global)
+  ownCal,         // boolean — eigen kalibrering i staden for global
   defaultHoyde,   // etasjehøgde i meter (styrar 3D-stakkinga)
   sc, offX, offY, // zoom/pan for canvas
+  floorDxImg,     // ghost-forskyving i BILETpikslar (ikkje skjermpikslar!)
+  floorDyImg,
+  paperWMm,       // papirformat, for målestokk-kalibrering
+  paperHMm,
+  paperSource,    // 'pdf' | 'dpi' | null
   zones: [...]
 }]
 
@@ -32,76 +94,127 @@ zones = [{
   name,
   pts: [{x, y}],  // biletepiksel-koordinatar
   windows: [...],
-  skillevegg: Set([segIdx, ...]),  // veggar som er skiljeveggar
+  skillevegg: Set([segIdx, ...]),   // veggar som er skiljeveggar
+  segOverrides: {segIdx: {...}},    // manuelle lengd/areal per segment
+  skMergedGroups: [{segs:[], name}],// samanslåtte skiljeveggar
+  yvMergedGroups: [{segs:[], name}],// samanslåtte ytterveggar
+  takflater: [{pts, vinkel, retning, name}],
+  gavlflater: [{segIdx, profile, area, lenM, dir}],
   groupId,        // kopling mellom soner (berre SIMIEN-gruppering)
-  bygkat,         // bygningskategori
-  hoyde,          // romhøgde (null = brukar etasjens defaultHoyde)
-  himling,        // himlingshøgde (number eller null)
-  gulvtype, taktype,
-  takvinkel,      // grader (null = flatt)
-  byggeaar,
-  uVegg, uTak, uGulv, uVindu, n50  // manuelle U-verdi-overrides
+  bygkat, hoyde, himling, gulvtype, taktype, takvinkel, byggeaar,
+  areaOverride, perimOverride,
+  uVegg, uTak, uGulv, uVindu, n50
 }]
 
 windows = [{
   type,           // 'vindauge' eller 'dor'
-  name,
-  breddeMm, hoyMm,
-  antal,
-  t0, t1,         // 0-1 relativ posisjon langs segmentet (senter-basert)
+  name, breddeMm, hoyMm, antal,
+  t0, t1,         // 0-1 relativ posisjon langs segmentet
   segIdx,         // indeks i calcSegments()
-  dir,            // 'Nord', 'Sør' osv.
-  uVerdi          // manuell U-verdi (undefined = Entro-standard)
+  dir, uVerdi, brystningMm
 }]
 ```
 
 **Globale variablar:**
 ```javascript
-let globalNorth = 0;           // nord-retning i grader
-let globalMmPerImgPx = null;   // global kalibrering
-let _nextZoneId = 0;           // pre-increment → første sone = 1
-let _nextGroupId = 0;
-let _nextFloorId = 2;
+let globalNorth = 0;
+let globalMmPerImgPx = null;
+let prosjektAdresse = '';      // bygget si adresse — framlegg til filnamn
 let activeFloor = 0;
 let zones = [];                // alias til floors[activeFloor].zones
-let mmPerImgPx = null;         // alias (global eller eigen per etasje)
-let renderer3 = null;          // global — trengst for tema-toggle
-let scene3 = null;
-let camera3 = null;
+let mmPerImgPx = null;         // alias — GJELD BERRE AKTIV ETASJE
+let snapEnabled = true;
 ```
 
 ---
 
-## Viktige funksjonar
+## Kritiske invariantar
+
+Desse har vore kjelde til reelle feil. Bryt dei ikkje.
+
+### 1. Per-etasje kalibrering
+
+`mmPerImgPx` er eit alias som **berre gjeld aktiv etasje**. All rekning som kryssar etasjar (SXI-eksport, BRA-summar, sidepanel, tabell, 3D, fasadevising) må slå opp skalaen for sona si eiga etasje:
 
 ```javascript
-s2i(sx, sy)     // skjermkoord → biletepiksel: {x:(sx-offX)/sc, y:(sy-offY)/sc}
-i2s(ix, iy)     // biletepiksel → skjermkoord: {x:ix*sc+offX, y:iy*sc+offY}
-
-getHoyde(z)     // romhøgde for ei sone — slår opp etasje, brukar defaultHoyde som fallback
-calcSegments(pts, fhM)  // bereknar veggsegment med retning, lengd, areal
-expandWindows(w, segLenM)  // ekspanderer antal>1 til individuelle vindauge med t0/t1
-getAreaM2(z)    // areal i m² (null om ikkje kalibrert)
-getTotalAreaM2(z)  // sum av alle kopla soner
-uniqueWinName(name, existingWindows)  // legg til (2), (3) osv. for duplikat
+mppForFloor(f)   // f.ownCal ? f.mmPerImgPx : (globalMmPerImgPx ?? f.mmPerImgPx)
+mppForZone(z)    // finn sona si etasje og kallar mppForFloor
 ```
 
-**Koordinatsystem:**
-- `pts[].x/y` er alltid i **original biletepiksel** (ikkje nedskalerte)
-- `sc` og `offX/offY` konverterer til skjermkoordinatar
-- `mmPerImgPx` = mm per original biletepiksel
+`calcAreaM2(pts, mpp)`, `calcPerimM(pts, mpp)` og `calcSegments(pts, fhM, mpp)` tek alle ein valfri skala-parameter. Brukar du dei i ei løkke over fleire etasjar, **må** du sende han.
+
+### 2. segIdx-bokføring
+
+Vindauge (`segIdx`), skiljeveggar, `segOverrides` og `skMergedGroups` refererer alle veggsegment via indeks. Når `z.pts` endrar seg, forskyv indeksane seg:
+
+```javascript
+remapSegsAfterInsert(z, i)    // kall ETTER z.pts.splice(i+1,0,pt)
+remapSegsBeforeDelete(z, pi)  // kall FØR z.pts.splice(pi,1) — treng gamle lengder
+sanitizeZoneSegRefs(z)        // rydd ugyldige referansar ved lasting
+```
+
+### 3. Ghost-forskyving
+
+`floorDxImg`/`floorDyImg` er i **biletpikslar**. Dei gamle felta `floorDx`/`floorDy` (skjermpikslar) finst ikkje lenger — dei vert berre lesne ved migrering av gamle `.entro`-filer. All teikning skjer på `(ix + floorDxImg) * sc + offX`, så alt som reknar skjermposisjon må ta med forskyvinga (dette råka både kartet og `zoomToZone`).
+
+### 4. XML-escaping
+
+All brukarstyrt tekst i SXI-eksporten må gjennom `xesc()`. Eit prosjektnamn med `&` gir elles ugyldig XML som SIMIEN nektar å opne.
+
+---
+
+## Snapping
+
+`unifiedSnap(sx, sy, ownPts)` — prioritert rekkjefølgje:
+
+1. Eigne punkt i den pågåande teikninga
+2. Sonehjørne
+3. **Veggkryss i sjølve planteikninga** (`imgLineSnap`)
+4. Sonekant
+
+`imgLineSnap` leitar etter **lange samanhengande strekar** i eit vindauge rundt peikaren og snappar til krysset mellom ein vassrett og ein loddrett. Den måler *lengste ubrotne strek* per rad/kolonne, ikkje talet på mørke pikslar — ei tekstlinje har like mange mørke pikslar som ein vegg, berre oppstykka. Terskel `LINE_MIN_FRAC = 0.35`.
+
+Ein Harris-hjørnedetektor vart prøvd og **forkasta**: på tette skanna teikningar låste den seg like gjerne til bokstavar og møblar som til veggar. Linjekrysset er både meir presist (0,4–3,5 px mot 3–12) og 10–50× raskare.
+
+Krev både vassrett og loddrett strek, så skrå veggar får ikkje snap. Det er med vilje — ingen snap er betre enn feil snap. `⌖ Snap`-knappen slår det av.
+
+`orthoSnap()` låser til næraste 45°-akse når Shift er halden. Verkar i teikning, kalibrering, måling og begge klippeverktøya.
 
 ---
 
 ## Kalibrering
 
-**To metodar:**
+**Tre metodar:**
 1. **Lengde** — klikk start→slutt, tast inn mm
-2. **Areal** — klikk på eksisterande sone (brukar sonens pikselareal)
+2. **Areal** — klikk på eksisterande sone
+3. **Målestokk** — vel 1:100, 1:200 osv. Ingen klikking på teikninga.
 
-**Flyt:** Dialog opnar seg først (vel metode) → teikn på canvas → dialog kjem att for å taste inn verdi
+Målestokk-metoden treng papirformatet, som vert oppdaga automatisk ved opplasting:
+- **PDF:** fysisk sidestorleik frå MediaBox via pdf.js — eksakt
+- **PNG/JPEG:** DPI frå `pHYs`- eller `JFIF`-metadata om det finst
+- **Elles:** brukaren vel format (A0–A4), A3 som framlegg
 
-**Per-etasje kalibrering:** `f.ownCal = true` gjer at etasjen brukar `f.mmPerImgPx` i staden for `globalMmPerImgPx`
+```
+mmPerImgPx = (papirbreidde_mm / biletbreidde_px) * målestokk
+```
+
+**Viktig:** kalibreringspunkta (`calPts`) lagrast i **biletkoordinatar**. Låg dei i skjermkoordinatar, vart skalaen stille feil om brukaren panorerte eller zooma mellom dei to klikka.
+
+---
+
+## Ytelse
+
+Målt med 36 soner. Berre ~2 ms av 110 ms i `updateResults` er rekning — resten er DOM-bygging (~3 ms per sonekort).
+
+Fallgruver som er retta, og som ikkje må innførast på nytt:
+
+- **Kompass-draginga** kalla `updateResults()` + `renderTable()` på kvar musrørsle (110 ms per steg). Teiknar no berre lerretet under draginga; full oppdatering på slepp.
+- **Etg.høgde/Nord-felta** bygde alt på kvart tastetrykk. No strupt via `tungOppdateringSnart()` (220 ms), med straks oppdatering på blur/Enter.
+- **Tabellfana** er skjult som standard. `renderTable()` returnerer med ein gong når `#tablePanel` er skjult; fanebytet renderer.
+
+`draw()` og snapping er raske (1–2 ms per musrørsle) — ikkje bruk tid der.
+
+**Står att:** ei vanleg redigering byggjer alle sonekorta på nytt (~96 ms ved 36 soner). Å fikse det krev at berre det endra kortet vert bygd om. Vurdert, men ikkje gjort — ein mellomlagringsmekanisme kan gi utdaterte tal om ein bommar på eit felt (t.d. `getTotalAreaM2`, som avheng av *andre* soner).
 
 ---
 
@@ -133,10 +246,6 @@ Siste slot MÅ vere `2345-0000`, IKKJE `2345-2400`. Feil her gjer at SIMIEN ikkj
 ```
 
 ### Panelovnar
-```xml
-<new_local_heater_dir_el heater_type="frittstaende" name="Panelovner"
-  capacity="[totalBra*0.05]" convective_share="0.50" ...></new_local_heater_dir_el>
-```
 50 W/m² — `capacity` i kW = `totalBra * 0.05`
 
 ---
@@ -151,21 +260,34 @@ Siste slot MÅ vere `2345-0000`, IKKJE `2345-2400`. Feil her gjer at SIMIEN ikkj
 
 ---
 
-## Autolagring vs. manuell lagring
+## Del sone
 
-**Manuell lagring (.entro):** Full oppløysing PNG — ingen skalering
-**Autolagring (localStorage):** JPEG 85% av `bgImg` slik den er — ingen skalering
+Høgreklikk på ei sone (eller knappen i sidepanelet) → teikn ei linje tvers gjennom → sona vert delt i to. Gjenbruker `_splitPolygonByPolyline` frå takklippen.
 
-Begge lagrar `bgImgData` og brukar same `sc`/`offX`/`offY`. Ingen `bgImgScale` lenger (vart fjerna etter fleire bugg-rundar).
+Segmenta som kjem frå klippelinja vert automatisk skiljekonstruksjon i **begge** dei nye sonene. Kva som er klippelinje avgjerast **geometrisk** (ligg midtpunktet på ein av dei opphavlege veggane?), ikkje via indeksrekning.
+
+Vindauge fordelast til den sona veggen deira hamna i. `takflater`, `gavlflater`, `segOverrides` og samanslåtte grupper vert nullstilte — dei peikar på segmentindeksar som ikkje finst lenger.
+
+---
+
+## Lagring
+
+**Manuell (.entro):** `showSaveFilePicker` der nettlesaren støttar det, så brukaren vel mappe og namn. Framlegg til filnamn er `prosjektAdresse` utan postnummer/poststad. Fallback til vanleg nedlasting.
+
+**Autolagring (localStorage):** JPEG 85%, kvart 60. sekund når `isDirty`. `markClean()` **må** kallast etter lagring — elles re-enkodar den alle bileta i full oppløysing kvart minutt for alltid.
+
+Alle felt som skal overleve må leggjast til **fem** stader: `snapshot()`, `applyHistoryState()`, `getCurrentState()`, `autosave()`/`restoreAutosave()`, og `.entro` lagre/laste.
 
 ---
 
 ## Kjende manglar / ikkje implementert
 
-- Snapping mellom soner på ulike etasjar
 - Import av eksisterande SXI
 - Validering av overlappande soner
-- Offline-modus (Three.js krev CDN)
+- Snap til skrå veggar (krev både vassrett og loddrett strek)
+- PDF-rapport / eksport til rekneark
+- Kopier heile etasjen (må gjerast sone for sone)
+- Offline-modus (Three.js og pdf.js krev CDN)
 
 ---
 
@@ -173,46 +295,27 @@ Begge lagrar `bgImgData` og brukar same `sc`/`offX`/`offY`. Ingen `bgImgScale` l
 
 Aktiverast ved å rotere nord-kompassen **3 fulle runder samanhengande (1080°)**. Kontinuerleg rotasjon — hopp >90° nullstillar teljaren. Deaktiverast ved **1 runde (360°)** i Lumon-modus.
 
-Funksjonen `window._trackNorthRotation(newNorth)` vert kalla frå `setGlobalNorth()`.
+`window._trackNorthRotation(newNorth)` vert kalla frå `setGlobalNorth()`. Kart-modulen definerer same funksjonen på nytt — den **må** kalle vidare til den originale, elles sluttar easter-egget å verke.
 
 ---
 
-## Utviklingsworkflow
-
-```bash
-# Etter kvar endring — syntax-sjekk
-python3 -c "
-import re, subprocess, tempfile, os
-with open('index.html') as f: html = f.read()
-m = re.search(r'<script>([\s\S]*?)</script>\s*</body>', html)
-with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False) as f:
-    f.write(m.group(1)); fname = f.name
-r = subprocess.run(['node', '--check', fname], capture_output=True, text=True)
-print(r.stdout or 'OK'); print(r.stderr or '')
-os.unlink(fname)
-"
-```
-
-**Viktig:** Alltid `cp /mnt/user-data/outputs/index.html /home/claude/index.html` først, arbeid i `/home/claude/`, kopier til `/mnt/user-data/outputs/` når ferdig.
-
----
-
-## Prosjektinstruks til Claude (lim inn i Project Instructions)
+## Prosjektinstruks til Claude
 
 ```
 Eg jobbar med SXI-generatoren, eit nettbasert oppmålingsverktøy (single-file HTML) for
 energimerking av norske bygg. Programmet integrerer med SIMIEN via SXI-eksport.
 
 Programnamn: SXI-generatoren (firmaet heiter Entro AS, ikkje programmet)
-Noverande versjon: 2.0.9
 
 Prinsipp:
 - Sonekopling (groupId) påverkar berre SIMIEN-gruppering, ikkje geometri
-- Global kalibrering som standard, per-etasje som opt-in
+- Global kalibrering som standard, per-etasje som opt-in — men all rekning som
+  kryssar etasjar må bruke mppForZone/mppForFloor, ikkje mmPerImgPx direkte
 - SXI-output må validerast mot referansefiler — SIMIEN er kresen på feltnamn
 - UI-forenkling er foretrekt framfor kompleksitet
 - Alltid syntax-sjekk med node --check etter endringar
-- Arbeid alltid i /home/claude/, lever til /mnt/user-data/outputs/
+- Test i nettlesar mot lokal server før du seier at noko fungerer
+- Verifiser live-adressa etter publisering — ikkje stol på at pushen gjekk
 
 Domene: sone, etasje, takvinkel, kalibrering, fasade, skiljevegg,
 SXI-eksport, himling, bygningskategori, SIMIEN, energimerking
@@ -222,4 +325,11 @@ Viktig bughistorikk:
 - makeProfile(): siste slot = 2345-0000 (IKKJE 2345-2400)
 - findWindowAtScreen() må berre søke i aktiv etasje
 - bgImgScale er fjerna — autolagring og manuell lagring er no identiske
+- Himling mot varm sone: type="himling" (IKKJE "vegg") — feil type gjorde at SIMIEN hang seg opp
+- Alle partition-element: construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" (referanseverdi frå Test1000.sxi)
+- SXI-versjon: "8.1.0.15" (ikkje "8.0.34.3") — oppdater ved kvar ny SIMIEN-versjon
+- himling/gulv-partisjonar: bruk nextId('partition') — IKKJE nextId('roof')/nextId('floor'). SIMIEN brukar ID-prefiksen til å slå opp elementtype, og roof#/floor# prefiks på ein <partition> gjer at SIMIEN heng ved sletting
+- calPts må lagrast i biletkoordinatar, ikkje skjermkoordinatar
+- floorDx/floorDy finst ikkje lenger — bruk floorDxImg/floorDyImg (biletpikslar)
+- Utjamningsfilter må kopiere kanten av vindauget, ikkje la han stå som nullar
 ```
