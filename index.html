@@ -315,6 +315,19 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .zcard.collapsed .zcard-body{display:none}
 .zcard-chevron{margin-left:auto;flex-shrink:0;width:16px;height:16px;color:var(--text3);transition:transform .18s;display:flex;align-items:center;justify-content:center}
 .zcard.collapsed .zcard-chevron{transform:rotate(-90deg)}
+/* Kollapsbar underseksjon i sonekortet (vindauge/dører) */
+.sub-hdr{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+  font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;
+  letter-spacing:.05em;margin-bottom:5px;border-radius:4px;padding:2px 3px;
+  margin-left:-3px;margin-right:-3px;transition:background .12s}
+.sub-hdr:hover{background:var(--surface3);color:var(--text2)}
+.sub-chevron{flex-shrink:0;width:12px;height:12px;display:flex;align-items:center;
+  justify-content:center;transition:transform .18s}
+.sub-sec.collapsed .sub-chevron{transform:rotate(-90deg)}
+.sub-sec.collapsed .sub-body{display:none}
+.sub-count{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums;
+  background:var(--surface3);color:var(--text2);border-radius:999px;padding:1px 7px;
+  letter-spacing:0;text-transform:none;font-size:10px}
 .zname-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .zdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .zname-input{font-size:13px;font-weight:600;border:none;background:transparent;color:var(--text);outline:none;width:100%;cursor:text;font-family:inherit}
@@ -613,7 +626,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.0.0</span>
+    <span style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.0.1</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -1579,6 +1592,9 @@ function getVolum(z){const a=getAreaM2(z);return a!=null?a*getHimling(z):null;}
 // <cellar>-element både golvet og alle ytterveggane i sona (SIMIEN
 // reknar oppfyllinga mot terreng sjølv). Skiljeveggar mot andre soner
 // vert framleis eksporterte som <partition>, og taket/himlinga som før.
+// Vindaugelister lengre enn dette startar samanslegne i sonekortet
+const WINLIST_AUTO_COLLAPSE=8;
+
 const KJELLER_GULV='Kjeller (golv + yttervegg)';
 const KJELLER_VEGGTJUKN=0.30;   // m — fast inntil vidare
 function isKjeller(z){return (z.gulvtype||'Gulv på grunn')===KJELLER_GULV;}
@@ -4247,11 +4263,35 @@ function updateResults(){
       if(segs&&(z.windows||[]).length>0){
         const winSummary=document.createElement('div');
         winSummary.style.cssText='margin-top:8px;padding-top:8px;border-top:1px solid var(--border)';
+
+        // Kollapsbar liste — ei sone kan ha titals vindauge, og då sprengjer
+        // kortet sidepanelet. Lange lister startar samanslegne; valet til
+        // brukaren vert hugsa per sone på tvers av dei hyppige rebuildane.
+        const winKey=`w_${fi}_${zi}`;
+        if(!window._winlistCollapsed)window._winlistCollapsed={};
+        const nWin=z.windows.length;
+        if(window._winlistCollapsed[winKey]===undefined)
+          window._winlistCollapsed[winKey]=nWin>WINLIST_AUTO_COLLAPSE;
+        const winCollapsed=!!window._winlistCollapsed[winKey];
+        winSummary.className='sub-sec'+(winCollapsed?' collapsed':'');
+
         const winHdr=document.createElement('div');
-        winHdr.style.cssText='font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px';
-        winHdr.textContent='Vindauge og dører';
+        winHdr.className='sub-hdr';
+        winHdr.title='Klikk for å slå saman/utvide lista';
+        const winChev=document.createElement('span');winChev.className='sub-chevron';
+        winChev.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,4 6,8 10,4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        const winTxt=document.createElement('span');winTxt.textContent='Vindauge og dører';
+        const winCnt=document.createElement('span');winCnt.className='sub-count';
+        const _nStk=z.windows.reduce((s,w)=>s+(w.antal||1),0);
+        winCnt.textContent=nWin+(_nStk!==nWin?' · '+_nStk+' stk':'');
+        winHdr.appendChild(winChev);winHdr.appendChild(winTxt);winHdr.appendChild(winCnt);
+        winHdr.onclick=()=>{
+          const nyState=!window._winlistCollapsed[winKey];
+          window._winlistCollapsed[winKey]=nyState;
+          winSummary.classList.toggle('collapsed',nyState);
+        };
         winSummary.appendChild(winHdr);
-        const wl=document.createElement('div');wl.className='win-list';
+        const wl=document.createElement('div');wl.className='win-list sub-body';
         z.windows.forEach((w,wi)=>{
           const wc=document.createElement('div');wc.className='win-card';
           const dir=segs?segs[w.segIdx]?.dir||w.dir:w.dir;
@@ -5348,7 +5388,15 @@ cwrap.addEventListener('mousemove',e=>{
   draw();
 });
 cwrap.addEventListener('mouseleave',()=>{mouse=null;dragging=false;draw();});
+// #cwrap inneheld ikkje berre teiknelerretet, men òg 3D-overlayet, kartpanelet
+// og kompasset. Peikarhendingar derifrå bobler opp hit, og handterarane under
+// kallar preventDefault() — det drep native drag-kontrollar som <input
+// type="range"> (sol-slidarane og opasitets-slideren) og tekstmerking i
+// søkefeltet. Berre hendingar som startar på sjølve lerretet skal styre planen.
+const paaLerretet=e=>e.target===cv;
+
 cwrap.addEventListener('wheel',e=>{
+  if(!paaLerretet(e))return;
   e.preventDefault();
   const r=cv.getBoundingClientRect();
   const mx=e.clientX-r.left,my=e.clientY-r.top;
@@ -5415,6 +5463,7 @@ cwrap.addEventListener('mousemove',e=>{
   }
 });
 cwrap.addEventListener('mousedown',e=>{
+  if(!paaLerretet(e))return;
   if(e.button===1||(e.button===0&&e.altKey)||(e.button===0&&mode==='navigate'&&!hoveredWin)){
     dragging=true;const r=cv.getBoundingClientRect();
     dragSt={x:e.clientX-r.left,y:e.clientY-r.top};lastOff={x:offX,y:offY};e.preventDefault();return;
@@ -5458,6 +5507,7 @@ cwrap.addEventListener('mouseup',()=>{
   if(dragWin){updateResults();renderTable();dragWin=null;cv.style.cursor='grab';}
 });
 cwrap.addEventListener('contextmenu',e=>{
+  if(!paaLerretet(e))return;
   e.preventDefault();
 
   const r=cv.getBoundingClientRect();
@@ -8943,10 +8993,13 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     const imgAng=(sp.azDeg+nd-90)*Math.PI/180;
     const altRad=sp.altDeg*Math.PI/180,R=140;
     u.sun.position.set(R*Math.cos(altRad)*Math.cos(imgAng),R*Math.sin(altRad),R*Math.cos(altRad)*Math.sin(imgAng));
-    u.sun.intensity=1.7*Math.min(1,Math.max(0.25,Math.sin(altRad)*1.6+0.2));
+    u.sun.intensity=2.6*Math.min(1,Math.max(0.25,Math.sin(altRad)*1.6+0.2));
     u.sun.color.setHex(sp.altDeg<8?0xffb066:sp.altDeg<20?0xffd9a0:0xfff8f0);
-    u.amb.intensity=0.9+0.5*Math.min(1,Math.sin(altRad)*2);
-    u.hemi.intensity=0.6;u.fill.intensity=0.4;
+    // Standardlyset har amb 1.4 + hemi 0.6 + fill 0.7 = meir diffust lys enn
+    // sola gir. Då endrar biletet seg knapt naar ein drar i slideren, og
+    // skuggane druknar. I solmodus må retningslyset dominere.
+    u.amb.intensity=0.30+0.20*Math.min(1,Math.sin(altRad)*2);
+    u.hemi.intensity=0.18;u.fill.intensity=0.10;
     renderer3.setClearColor(_bg3());if(scene3.fog)scene3.fog.color.setHex(_bg3());
     // Soldisk for orientering
     const disc=new THREE.Mesh(new THREE.SphereGeometry(3,16,16),new THREE.MeshBasicMaterial({color:0xffdd66}));
@@ -9584,22 +9637,32 @@ function printFasadeView(){
 
   // ── Bygg GeoJSON frå floors + vindauge ───────────────────────
   function buildGeoJSON(){
-    const mpp = window.mmPerImgPx ?? mmPerImgPx;
-    if(!mpp) return {type:'FeatureCollection',features:[]};
+    // mmPerImgPx gjeld berre aktiv etasje. Kartet teiknar alle etasjane, så
+    // kvar etasje må bruke sin eigen skala — elles vert etasjar med eiga
+    // kalibrering feil plasserte og feil dimensjonerte.
+    const mppRef = mppForFloor(floors[0]) ?? (window.mmPerImgPx ?? mmPerImgPx);
+    if(!mppRef) return {type:'FeatureCollection',features:[]};
 
     const northDeg = parseFloat(document.getElementById('northI').value)||0;
     const cosN = Math.cos(northDeg*Math.PI/180);
     const sinN = Math.sin(northDeg*Math.PI/180);
 
-    let allX=[],allY=[];
-    floors.forEach(f=>f.zones.forEach(z=>z.pts.forEach(p=>{allX.push(p.x);allY.push(p.y);})));
-    if(!allX.length) return {type:'FeatureCollection',features:[]};
-    const cxPx=(Math.min(...allX)+Math.max(...allX))/2;
-    const cyPx=(Math.min(...allY)+Math.max(...allY))/2;
+    // Sentrum reknast i METER, ikkje pikslar — pikselkoordinatar frå etasjar
+    // med ulik skala kan ikkje samanliknast direkte (same grep som i 3D-visinga).
+    let allXm=[],allYm=[];
+    floors.forEach(f=>{
+      const fm=mppForFloor(f)??mppRef;
+      f.zones.forEach(z=>z.pts.forEach(p=>{
+        allXm.push((p.x+(f.floorDxImg??0))*fm/1000);
+        allYm.push((p.y+(f.floorDyImg??0))*fm/1000);
+      }));
+    });
+    if(!allXm.length) return {type:'FeatureCollection',features:[]};
+    const cxM=(Math.min(...allXm)+Math.max(...allXm))/2;
+    const cyM=(Math.min(...allYm)+Math.max(...allYm))/2;
 
-    function pxToLL(px,py,fdxPx,fdyPx){
-      const dxPx=(px+fdxPx)-cxPx, dyPx=(py+fdyPx)-cyPx;
-      const dxM=dxPx*mpp/1000, dyM=dyPx*mpp/1000;
+    function pxToLL(px,py,fdxPx,fdyPx,mppF){
+      const dxM=(px+fdxPx)*mppF/1000-cxM, dyM=(py+fdyPx)*mppF/1000-cyM;
       const rx= dxM*cosN+dyM*sinN;
       const ry=-dxM*sinN+dyM*cosN;
       const {dLat,dLng}=mToLL(rx,ry,mapLat);
@@ -9616,12 +9679,13 @@ function printFasadeView(){
       // Her stod det floorDx/floorDy, som er feltnamn frå før omlegginga og
       // ikkje finst lenger, så kartet ignorerte ghost-forskyvinga heilt.
       const fdxPx=f.floorDxImg??0, fdyPx=f.floorDyImg??0;
+      const mppF=mppForFloor(f)??mppRef;
 
       f.zones.forEach((z,zi)=>{
         if(z.pts.length<3) return;
         const ci=(floors.slice(0,fi).reduce((s,fl)=>s+fl.zones.length,0)+zi)%COLORS.length;
         const col=COLORS[ci];
-        const ring=z.pts.map(p=>pxToLL(p.x,p.y,fdxPx,fdyPx));
+        const ring=z.pts.map(p=>pxToLL(p.x,p.y,fdxPx,fdyPx,mppF));
         ring.push(ring[0]);
         features.push({
           type:'Feature',
@@ -9630,13 +9694,13 @@ function printFasadeView(){
         });
 
         // Vindauge + dører
-        const segs=calcSegments(z.pts,flH)||[];
+        const segs=calcSegments(z.pts,flH,mppF)||[];
         const sk=z.skillevegg||new Set();
         (z.windows||[]).forEach(w=>{
           const seg=segs.find(s=>s.idx===w.segIdx);
           if(!seg||sk.has(seg.idx)) return;
           const segLenPx=Math.hypot(seg.p2.x-seg.p1.x,seg.p2.y-seg.p1.y);
-          const segLenM=segLenPx*mpp/1000;
+          const segLenM=segLenPx*mppF/1000;
           if(segLenM<0.05) return;
           const dxSPx=seg.p2.x-seg.p1.x, dySPx=seg.p2.y-seg.p1.y;
           const lenPx2=Math.hypot(dxSPx,dySPx)||1;
@@ -9653,14 +9717,14 @@ function printFasadeView(){
             function wPt(t){
               const px=seg.p1.x+dxSPx*t+nxPx*lenPx2*(push/(segLenM));
               const py=seg.p1.y+dySPx*t+nyPx*lenPx2*(push/(segLenM));
-              return pxToLL(px,py,fdxPx,fdyPx);
+              return pxToLL(px,py,fdxPx,fdyPx,mppF);
             }
             // Litt innover for tjukkelse
             function wPtIn(t){
               const ins=0.15;
               const px=seg.p1.x+dxSPx*t+nxPx*lenPx2*(ins/(segLenM));
               const py=seg.p1.y+dySPx*t+nyPx*lenPx2*(ins/(segLenM));
-              return pxToLL(px,py,fdxPx,fdyPx);
+              return pxToLL(px,py,fdxPx,fdyPx,mppF);
             }
             const winRing=[wPt(tL),wPt(tR),wPtIn(tR),wPtIn(tL),wPt(tL)];
             features.push({
