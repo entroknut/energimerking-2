@@ -613,7 +613,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v2.6.0</span>
+    <span style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v2.6.1</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -6849,8 +6849,13 @@ function zoomToZone(z){
   const padding=60;
   const newSc=Math.min((r.width-padding*2)/zW,(r.height-padding*2)/zH);
   sc=Math.max(0.05,Math.min(50,newSc));
-  offX=r.width/2-((minX+maxX)/2)*sc;
-  offY=r.height/2-((minY+maxY)/2)*sc;
+  // Sona vert teikna på (ix + floorDxImg)*sc + offX, så etasjens ghost-forskyving
+  // må reknast med — elles zoomar vi til der sona låg før ho vart justert.
+  let zf=curFloor();
+  for(const fl of floors){if(fl.zones.includes(z)){zf=fl;break;}}
+  const fdx=zf.floorDxImg||0,fdy=zf.floorDyImg||0;
+  offX=r.width/2-((minX+maxX)/2+fdx)*sc;
+  offY=r.height/2-((minY+maxY)/2+fdy)*sc;
   saveFloorState();draw();
 }
 
@@ -9410,7 +9415,10 @@ function printFasadeView(){
       const baseH=cumH+elevM;
       const flH=f.defaultHoyde??3;
       cumH+=flH;
-      const fdxPx=f.floorDx??0, fdyPx=f.floorDy??0;
+      // floorDxImg/floorDyImg er offset i BILETpikslar — same eining som z.pts.
+      // Her stod det floorDx/floorDy, som er feltnamn frå før omlegginga og
+      // ikkje finst lenger, så kartet ignorerte ghost-forskyvinga heilt.
+      const fdxPx=f.floorDxImg??0, fdyPx=f.floorDyImg??0;
 
       f.zones.forEach((z,zi)=>{
         if(z.pts.length<3) return;
