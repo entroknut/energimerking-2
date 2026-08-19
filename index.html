@@ -589,6 +589,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <button class="btn" id="winBtn" title="Legg til vindauge/dør — klikk på ein fasade (Ctrl+C/V for å kopiere)">▭ Vindauge/dør</button>
       <button class="btn on" id="snapBtn" title="Snap til hjørne — låser punktet til hjørne i planteikninga og på eksisterande soner. Slå av om det snappar til feil stad.">⌖ Snap</button>
       <button class="btn" id="measureBtn" title="Kontrollmål avstand (påverkar ikkje SXI) — klikk start og slutt, Shift for 90°/45°, Esc for å avslutte"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="4.5" rx="1"/><path d="M4.5 6v2M7.5 6v3M10.5 6v2"/></svg> Mål</button>
+      <button class="btn on" id="measShowBtn" style="display:none" title="Vis eller skjul lagra mål. Måla følgjer etasjen og blir lagra med prosjektet — høgreklikk på ei målelinje for å slette henne."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="1.9"/></svg> Mål (<span class="mcount">0</span>)</button>
     </div>
     <div class="tg">
       <button class="btn" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ Slå saman fasadar</button>
@@ -626,7 +627,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.0.2</span>
+    <span style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.1.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -998,7 +999,11 @@ let calSnap=null;
 let pendingWin=null;
 // Measure tool state
 let measurePts=[];   // [{x,y}] in image coords — max 2 (start + end)
-let measureResults=[];// [{p1,p2,dist}] completed measurements this session
+// measureResults er eit ALIAS til curFloor().measurements — måla høyrer til etasjen
+// og lever vidare til brukaren slettar dei. Ikkje tildel [] direkte; det bryt aliaset.
+let measureResults=[];// [{p1,p2}] i biletkoordinatar for aktiv etasje
+let showMeasurements=true; // av/på for lagra mål
+let hoveredMeasure=null;   // {m,idx} — målelinja under peikaren
 let measureSnap=null;    // {x,y} i biletkoordinatar — Shift-låst eller snappa punkt
 let measureGeoSnap=null; // snap-treffet med type, for markøren
 
@@ -1006,7 +1011,7 @@ let measureGeoSnap=null; // snap-treffet med type, for markøren
 // Each floor: {id, name, bgImg, pdfDoc, pdfPage, totalPages, mmPerImgPx, sc, offX, offY, zones}
 // northAngle is GLOBAL — shared across all floors
 let globalNorth=0;
-let floors=[{id:1,name:'Etasje 1',bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,mmPerImgPx:null,ownCal:false,defaultHoyde:3.0,sc:1,offX:0,offY:0,floorDxImg:0,floorDyImg:0,zones:[]}];
+let floors=[{id:1,name:'Etasje 1',bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,mmPerImgPx:null,ownCal:false,defaultHoyde:3.0,sc:1,offX:0,offY:0,floorDxImg:0,floorDyImg:0,zones:[],measurements:measureResults}];
 let ghostMode=false; // vis nabeetasje som ghostbilde
 let activeFloor=0;
 let _nextFloorId=2;
@@ -1029,6 +1034,8 @@ function syncFloorState(){
   // Bruk eigen kalibrering om ownCal=true, elles global
   mmPerImgPx=f.ownCal?f.mmPerImgPx:(globalMmPerImgPx??f.mmPerImgPx);
   zones=f.zones;
+  if(!f.measurements)f.measurements=[];
+  measureResults=f.measurements;
   pdfDoc=f.pdfDoc;curPage=f.pdfPage;totalPages=f.totalPages;
   northI.value=globalNorth;
   const _nl=document.getElementById('northLabel');if(_nl)_nl.textContent=globalNorth+'°';
@@ -1036,6 +1043,8 @@ function syncFloorState(){
   if(f.defaultHoyde==null)f.defaultHoyde=parseFloat(fhI.value)||3.0;
   fhI.value=f.defaultHoyde;
   updateScaleBadge();
+  hoveredMeasure=null;
+  updateMeasureUI();
 }
 function saveFloorState(){
   const f=curFloor();
@@ -1044,6 +1053,7 @@ function saveFloorState(){
   // Lagre berre tilbake til etasjen om den har eigen kalibrering
   if(f.ownCal)f.mmPerImgPx=mmPerImgPx;
   f.zones=zones;
+  f.measurements=measureResults;
   f.pdfDoc=pdfDoc;f.pdfPage=curPage;f.totalPages=totalPages;
 }
 
@@ -1154,7 +1164,7 @@ document.getElementById('addFloorBtn').onclick=async()=>{
     bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,
     paperWMm:null,paperHMm:null,paperSource:null,
     mmPerImgPx:null,ownCal:false,defaultHoyde:parseFloat(fhI.value)||3.0,floorDxImg:0,floorDyImg:0,
-    sc:1,offX:0,offY:0,zones:[]
+    sc:1,offX:0,offY:0,zones:[],measurements:[]
   };
   if(choice==='pdf-page'&&pdfDoc){
     // Pick next page from current PDF
@@ -1852,7 +1862,7 @@ const HINTS={
   edit:'Dra hjørner · Shift+dra inni sone = flytt sona · klikk + for å leggje til · høgreklikk for å slette · Esc for å avslutte',
   calibrate:'Lengde: klikk start → klikk slutt · Areal: klikk på ei sone · Shift for 90°/45° · scroll for zoom, midtknapp/Alt+dra for å flytte',
   window:'Klikk éin ende av vindauget/døra på fasaden, så den andre enden',
-  measure:'Klikk startpunkt → klikk endepunkt for å kontrollmåle · Shift for 90°/45° · klikk igjen for ny måling · Esc for å avslutte',
+  measure:'Klikk startpunkt → klikk endepunkt for å kontrollmåle · Shift for 90°/45° · måla blir lagra · høgreklikk på eit mål for å slette · Esc for å avslutte',
   'tegn-takflate':'Klikk hjørner for å teikne takflate-polygon. Klikk på startpunktet for å lukke. Esc for å avbryte.',
   'klipp-takflate':'Klikk for å legge til punkt på klippelja · Shift for 90°/45° · Enter eller dobbelklikk for å klippe · Esc for å avbryte',
   'del-sone':'Teikn ei linje tvers gjennom sona · Shift for 90°/45° · Enter eller dobbelklikk for å dele · Esc for å avbryte',
@@ -1871,7 +1881,7 @@ function setMode(m){
   cv.style.cursor=m==='navigate'?'grab':m==='draw'||m==='calibrate'||m==='window'||m==='measure'||m==='tegn-takflate'||m==='klipp-takflate'||m==='del-sone'?'crosshair':'default';
   modeLabel.textContent=MODELABELS[m]||m;
   hintText.textContent=HINTS[m]||'';
-  if(m!=='measure'){measurePts=[];measureResults=[];}
+  if(m!=='measure')measurePts=[];
 }
 
 navBtn.onclick=()=>{setMode('navigate');editZoneIdx=null;curPts=[];calPts=[];draw();};
@@ -1894,8 +1904,23 @@ document.getElementById('snapBtn').onclick=function(){
 const measureBtn=document.getElementById('measureBtn');
 measureBtn.onclick=()=>{
   if(!mmPerImgPx){hintText.textContent='Kalibrer skalaen først for å måle avstandar.';return;}
-  setMode('measure');measurePts=[];draw();
+  setMode('measure');measurePts=[];showMeasurements=true;updateMeasureUI();draw();
 };
+// Vis/skjul lagra mål
+document.getElementById('measShowBtn').onclick=()=>{
+  showMeasurements=!showMeasurements;
+  updateMeasureUI();
+  hintText.textContent=showMeasurements?'Mål er synlege.':'Mål er skjulte — dei er framleis lagra.';
+  draw();
+};
+function updateMeasureUI(){
+  const b=document.getElementById('measShowBtn');if(!b)return;
+  const cnt=(measureResults||[]).length;
+  b.style.display=cnt?'':'none';
+  b.classList.toggle('on',showMeasurements);
+  const c=b.querySelector('.mcount');if(c)c.textContent=cnt;
+  if(!cnt)hoveredMeasure=null;
+}
 // ── Slå saman fasadar — dialog ────────────────────────────────
 const mergeBtn=document.getElementById('mergeBtn');
 const mergeOverlay=document.getElementById('mergeOverlay');
@@ -2068,6 +2093,7 @@ function snapshot(){
     paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
     mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
     sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
+    measurements:normMaal(f.measurements),
     zones:JSON.parse(JSON.stringify(f.zones.map(z=>({
       ...z,skillevegg:Array.from(z.skillevegg||[])
     }))))
@@ -2092,6 +2118,7 @@ function applyHistoryState(prev){
       paperSource:pf.paperSource??cur.paperSource??null,
       mmPerImgPx:pf.mmPerImgPx,ownCal:pf.ownCal||false,defaultHoyde:pf.defaultHoyde??3.0,
       sc:pf.sc,offX:pf.offX,offY:pf.offY,floorDxImg:pf.floorDxImg||0,floorDyImg:pf.floorDyImg||0,
+      measurements:normMaal(pf.measurements!==undefined?pf.measurements:cur.measurements),
       zones:pf.zones.map(z=>({...z,skillevegg:new Set(z.skillevegg||[])}))
     };
   });
@@ -2115,6 +2142,7 @@ function getCurrentState(){
       paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
       mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
       sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
+      measurements:normMaal(f.measurements),
       zones:JSON.parse(JSON.stringify(f.zones.map(z=>({...z,skillevegg:Array.from(z.skillevegg||[])}))))
     })),
     activeFloor,globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId
@@ -2369,6 +2397,137 @@ document.addEventListener('touchmove', e=>{
 document.addEventListener('touchend',()=>{
   if(compassDragging){compassDragging=false;updateResults();renderTable();draw();}
 });
+
+// ── Måleverktøy — hjelpefunksjonar ────────────────────────────
+// Måla ligg i biletkoordinatar på etasjen. Lengda reknast på nytt ved kvar
+// teikning, slik at ei omkalibrering slår gjennom på gamle mål òg.
+function normMaal(arr){
+  return (arr||[]).filter(m=>m&&m.p1&&m.p2&&isFinite(m.p1.x)&&isFinite(m.p1.y)&&isFinite(m.p2.x)&&isFinite(m.p2.y))
+                  .map(m=>({p1:{x:m.p1.x,y:m.p1.y},p2:{x:m.p2.x,y:m.p2.y}}));
+}
+function fmtMaal(mm){
+  if(mm==null||!isFinite(mm))return '';
+  return mm<1000?Math.round(mm)+' mm':(mm/1000).toFixed(3).replace('.',',')+' m';
+}
+function measureLenMm(m){
+  const mpp=mppForFloor(curFloor());
+  if(!mpp)return null;
+  return Math.hypot(m.p2.x-m.p1.x,m.p2.y-m.p1.y)*mpp;
+}
+// Målsettingslinje i teknisk stil: hjelpestrekar på tvers, piler i begge endar
+// og etiketten liggjande langs linja i eit opphald midt på.
+function drawDimension(s1,s2,label,opts){
+  const o=opts||{};
+  const col=o.color||'#dc2626';
+  const dx=s2.x-s1.x,dy=s2.y-s1.y,len=Math.hypot(dx,dy);
+  if(len<2)return;
+  const ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
+  const lw=o.hot?2:1.3;
+  ctx.save();
+  ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=lw;ctx.lineCap='butt';
+  // Hjelpestrekar på tvers av endepunkta
+  const tick=o.hot?9:7;
+  ctx.beginPath();
+  ctx.moveTo(s1.x-nx*tick,s1.y-ny*tick);ctx.lineTo(s1.x+nx*tick,s1.y+ny*tick);
+  ctx.moveTo(s2.x-nx*tick,s2.y-ny*tick);ctx.lineTo(s2.x+nx*tick,s2.y+ny*tick);
+  ctx.stroke();
+  // Etikett — plassert i eit opphald midt på linja når det er plass
+  ctx.font='600 11.5px Inter,sans-serif';
+  const tw=label?ctx.measureText(label).width:0;
+  const gap=label&&len>tw+34?tw+12:0;
+  const mx=(s1.x+s2.x)/2,my=(s1.y+s2.y)/2;
+  ctx.beginPath();
+  if(gap){
+    ctx.moveTo(s1.x,s1.y);ctx.lineTo(mx-ux*gap/2,my-uy*gap/2);
+    ctx.moveTo(mx+ux*gap/2,my+uy*gap/2);ctx.lineTo(s2.x,s2.y);
+  } else {
+    ctx.moveTo(s1.x,s1.y);ctx.lineTo(s2.x,s2.y);
+  }
+  ctx.stroke();
+  // Piler — utover mot kvar ende, slik som på ei måleskisse
+  if(len>26){
+    const al=9,aw=3.2;
+    [[s1,-1],[s2,1]].forEach(([p,sg])=>{
+      ctx.beginPath();
+      ctx.moveTo(p.x,p.y);
+      ctx.lineTo(p.x-sg*ux*al+nx*aw,p.y-sg*uy*al+ny*aw);
+      ctx.lineTo(p.x-sg*ux*al-nx*aw,p.y-sg*uy*al-ny*aw);
+      ctx.closePath();ctx.fill();
+    });
+  }
+  if(label){
+    let ang=Math.atan2(dy,dx);
+    if(ang>Math.PI/2||ang<-Math.PI/2)ang+=Math.PI;  // aldri opp-ned
+    ctx.translate(mx,my);ctx.rotate(ang);
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    if(gap){
+      // Opphaldet er alt der — berre ein lett bakgrunn for lesbarheit
+      ctx.fillStyle='rgba(255,255,255,.82)';
+      ctx.beginPath();ctx.roundRect(-tw/2-5,-8,tw+10,16,3);ctx.fill();
+    } else {
+      ctx.translate(0,-11);
+      ctx.fillStyle='rgba(255,255,255,.9)';
+      ctx.beginPath();ctx.roundRect(-tw/2-5,-8,tw+10,16,3);ctx.fill();
+      ctx.strokeStyle=col;ctx.lineWidth=1;ctx.stroke();
+    }
+    ctx.fillStyle=col;
+    ctx.fillText(label,0,.5);
+  }
+  ctx.restore();
+}
+function showMeasureContextMenu(px,py,hitM){
+  document.querySelectorAll('.ctx-menu').forEach(m=>m.remove());
+  const menu=document.createElement('div');
+  menu.className='ctx-menu';
+  menu.style.cssText=`position:fixed;left:${px}px;top:${py}px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 30px rgba(13,27,42,.18);z-index:600;min-width:190px;overflow:hidden;font-family:inherit;animation:ctxIn .12s ease;padding:4px`;
+  const hdr=document.createElement('div');
+  hdr.style.cssText='font-size:11px;font-weight:700;color:var(--text3);padding:6px 12px 5px;letter-spacing:.03em;text-transform:uppercase';
+  const dMm=measureLenMm(hitM.m);
+  hdr.textContent='Mål: '+(dMm!=null?fmtMaal(dMm):'ukalibrert');
+  menu.appendChild(hdr);
+  const close=ev=>{if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('mousedown',close);}};
+  const mkBtn=(icon,txt,fn)=>{
+    const b=document.createElement('button');
+    b.className='ctx-menu-item';
+    b.innerHTML=`<span style="font-size:14px;width:18px;text-align:center;flex-shrink:0">${icon}</span><span>${txt}</span>`;
+    b.onclick=()=>{menu.remove();document.removeEventListener('mousedown',close);fn();};
+    menu.appendChild(b);
+  };
+  mkBtn('🗑','Slett dette målet',()=>slettMaal(hitM.idx));
+  if(measureResults.length>1)mkBtn('🧹',`Slett alle mål (${measureResults.length})`,()=>slettAlleMaal());
+  mkBtn('👁','Skjul alle mål',()=>{showMeasurements=false;hoveredMeasure=null;updateMeasureUI();draw();hintText.textContent='Mål er skjulte — dei er framleis lagra.';});
+  document.body.appendChild(menu);
+  const rect=menu.getBoundingClientRect();
+  if(rect.right>window.innerWidth)menu.style.left=(px-rect.width)+'px';
+  if(rect.bottom>window.innerHeight)menu.style.top=(py-rect.height)+'px';
+  setTimeout(()=>document.addEventListener('mousedown',close),10);
+}
+// Finn målelinja under peikaren (skjermkoordinatar)
+function findMeasureAtScreen(sx,sy){
+  if(!showMeasurements||!measureResults||!measureResults.length)return null;
+  let best=null,bestD=9;
+  measureResults.forEach((m,idx)=>{
+    const a=i2s(m.p1.x,m.p1.y),b=i2s(m.p2.x,m.p2.y);
+    const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+    if(l2<1)return;
+    const t=Math.max(0,Math.min(1,((sx-a.x)*dx+(sy-a.y)*dy)/l2));
+    const d=Math.hypot(sx-(a.x+dx*t),sy-(a.y+dy*t));
+    if(d<bestD){bestD=d;best={m,idx};}
+  });
+  return best;
+}
+function slettMaal(idx){
+  snapshot();
+  measureResults.splice(idx,1);
+  hoveredMeasure=null;updateMeasureUI();draw();
+  hintText.textContent='Målet er sletta.';
+}
+function slettAlleMaal(){
+  snapshot();
+  measureResults.length=0;
+  hoveredMeasure=null;updateMeasureUI();draw();
+  hintText.textContent='Alle mål på denne etasjen er sletta.';
+}
 
 // ── Draw ──────────────────────────────────────────────────────
 function draw(){
@@ -2782,7 +2941,7 @@ function draw(){
       });
     }
     // Snap indicator: crosshair on nearest segment point
-    const preview=winSnapPreview||(mouse?snapScreenToSegment(mouse.x,mouse.y):null);
+    const preview=mouse?snapScreenToSegment(mouse.x,mouse.y):winSnapPreview;
     if(preview&&preview.snap){
       ctx.beginPath();ctx.arc(preview.x,preview.y,6,0,Math.PI*2);
       ctx.strokeStyle='#0891b2';ctx.lineWidth=2;ctx.stroke();
@@ -2793,14 +2952,17 @@ function draw(){
     }
     // First point placed — draw line from it to current snap
     if(winPts.length===1){
+      // winPts held BILETkoordinatar — skjermposisjonen reknast på nytt kvar teikning,
+      // slik at punktet blir liggjande på veggen sjølv om ein panorerer eller zoomar.
+      const w0=i2s(winPts[0].ix,winPts[0].iy);
       const snap2=preview&&preview.snap?preview:null;
-      const ex=snap2?snap2.x:mouse?mouse.x:winPts[0].x;
-      const ey=snap2?snap2.y:mouse?mouse.y:winPts[0].y;
+      const ex=snap2?snap2.x:mouse?mouse.x:w0.x;
+      const ey=snap2?snap2.y:mouse?mouse.y:w0.y;
       // Draw along the segment direction if both points snap to same seg
-      ctx.beginPath();ctx.moveTo(winPts[0].x,winPts[0].y);ctx.lineTo(ex,ey);
+      ctx.beginPath();ctx.moveTo(w0.x,w0.y);ctx.lineTo(ex,ey);
       ctx.strokeStyle='#0891b2';ctx.lineWidth=4;ctx.lineCap='round';ctx.stroke();ctx.lineCap='butt';
       // Endpoint dots
-      ctx.beginPath();ctx.arc(winPts[0].x,winPts[0].y,6,0,Math.PI*2);
+      ctx.beginPath();ctx.arc(w0.x,w0.y,6,0,Math.PI*2);
       ctx.fillStyle='#0891b2';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
       if(snap2){
         ctx.beginPath();ctx.arc(ex,ey,6,0,Math.PI*2);
@@ -2808,15 +2970,15 @@ function draw(){
       }
       // Live mm readout
       if(snap2&&mmPerImgPx){
-        const p1i=winPts[0].snap?{x:winPts[0].snap.cx,y:winPts[0].snap.cy}:s2i(winPts[0].x,winPts[0].y);
+        const p1i={x:winPts[0].ix,y:winPts[0].iy};
         const p2i={x:snap2.snap.cx,y:snap2.snap.cy};
         const distMm=Math.hypot(p2i.x-p1i.x,p2i.y-p1i.y)*mmPerImgPx;
         const lbl=Math.round(distMm)+' mm';
         ctx.font='bold 12px Inter,sans-serif';
         const tw=ctx.measureText(lbl).width+14;
-        ctx.fillStyle='rgba(8,145,178,.9)';ctx.beginPath();ctx.roundRect((winPts[0].x+ex)/2-tw/2,(winPts[0].y+ey)/2-13,tw,20,4);ctx.fill();
+        ctx.fillStyle='rgba(8,145,178,.9)';ctx.beginPath();ctx.roundRect((w0.x+ex)/2-tw/2,(w0.y+ey)/2-13,tw,20,4);ctx.fill();
         ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.fillText(lbl,(winPts[0].x+ex)/2,(winPts[0].y+ey)/2);
+        ctx.fillText(lbl,(w0.x+ex)/2,(w0.y+ey)/2);
       }
     }
   }
@@ -2886,18 +3048,12 @@ function draw(){
   }
 
   // ── Måleverktøy ─────────────────────────────────────────────
-  if(mode==='measure'||measureResults.length>0){
-    measureResults.forEach(m=>{
+  if(mode==='measure'||(showMeasurements&&measureResults.length>0)){
+    if(showMeasurements)measureResults.forEach((m,mi)=>{
       const s1=i2s(m.p1.x,m.p1.y),s2=i2s(m.p2.x,m.p2.y);
-      ctx.beginPath();ctx.moveTo(s1.x,s1.y);ctx.lineTo(s2.x,s2.y);
-      ctx.strokeStyle='rgba(220,38,38,0.7)';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);
-      [s1,s2].forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fillStyle='#dc2626';ctx.fill();});
-      const mx=(s1.x+s2.x)/2,my=(s1.y+s2.y)/2;
-      const lbl=m.dist<1000?m.dist.toFixed(0)+' mm':(m.dist/1000).toFixed(3)+' m';
-      ctx.font='bold 11px Inter,sans-serif';
-      const tw=ctx.measureText(lbl).width+12;
-      ctx.fillStyle='rgba(220,38,38,0.88)';ctx.beginPath();ctx.roundRect(mx-tw/2,my-10,tw,18,4);ctx.fill();
-      ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(lbl,mx,my);
+      const dMm=measureLenMm(m);
+      const hot=!!(hoveredMeasure&&hoveredMeasure.idx===mi);
+      drawDimension(s1,s2,dMm!=null?fmtMaal(dMm):'',{color:hot?'#991b1b':'#dc2626',hot});
     });
     if(mode==='measure'&&measurePts.length>0){
       const sp0=i2s(measurePts[0].x,measurePts[0].y);
@@ -2911,7 +3067,7 @@ function draw(){
         const dPx=Math.hypot((ex-sp0.x)/sc,(ey-sp0.y)/sc);
         const dMm=dPx*mmPerImgPx;
         const _msa=shiftHeld?orthoSnapAngle(ex,ey,sp0):null;
-        const lbl=(_msa!=null?_msa+'° · ':'')+(dMm<1000?dMm.toFixed(0)+' mm':(dMm/1000).toFixed(3)+' m');
+        const lbl=(_msa!=null?_msa+'° · ':'')+fmtMaal(dMm);
         ctx.font='bold 12px Inter,sans-serif';
         const tw=ctx.measureText(lbl).width+14;
         ctx.fillStyle='rgba(220,38,38,0.92)';ctx.beginPath();ctx.roundRect(ex+10,ey-12,tw,20,5);ctx.fill();
@@ -5447,8 +5603,10 @@ cwrap.addEventListener('mousemove',e=>{
   const hit=findWindowAtScreen(sx,sy);
   const prev=hoveredWin;
   hoveredWin=hit||null;
-  if((prev==null)!==(hoveredWin==null))draw();
-  cwrap.style.cursor=hoveredWin?'grab':(mode==='navigate'?'grab':'crosshair');
+  const prevM=hoveredMeasure;
+  hoveredMeasure=hoveredWin?null:findMeasureAtScreen(sx,sy);
+  if((prev==null)!==(hoveredWin==null)||(prevM&&prevM.idx)!==(hoveredMeasure&&hoveredMeasure.idx)||(prevM==null)!==(hoveredMeasure==null))draw();
+  cwrap.style.cursor=hoveredWin?'grab':(hoveredMeasure?'pointer':(mode==='navigate'?'grab':'crosshair'));
 
   // Track kva sone musa er over (for Ctrl+C)
   if(!hoveredWin&&mode==='navigate'){
@@ -5517,6 +5675,13 @@ cwrap.addEventListener('contextmenu',e=>{
   const hit=findWindowAtScreen(sx,sy);
   if(hit){
     showWindowContextMenu(e.clientX,e.clientY,hit);
+    return;
+  }
+
+  // ── Høgreklikk på ei målelinje (alle moduser) ──
+  const mHit=findMeasureAtScreen(sx,sy);
+  if(mHit){
+    showMeasureContextMenu(e.clientX,e.clientY,mHit);
     return;
   }
 
@@ -6034,9 +6199,11 @@ cv.addEventListener('click',e=>{
       const p1=measurePts[0],p2=ip;
       const dPx=Math.hypot(p2.x-p1.x,p2.y-p1.y);
       const dMm=dPx*mmPerImgPx;
-      measureResults.push({p1,p2,dist:dMm});
+      snapshot();
+      measureResults.push({p1,p2});
       measurePts=[];
-      hintText.textContent=`Målt: ${dMm<1000?dMm.toFixed(0)+' mm':(dMm/1000).toFixed(3)+' m'} — klikk for ny måling, Esc for å avslutte.`;
+      showMeasurements=true;updateMeasureUI();
+      hintText.textContent=`Målt: ${fmtMaal(dMm)} — målet er lagra. Klikk for ny måling · høgreklikk på eit mål for å slette · Esc for å avslutte.`;
     }
     draw();
     return;
@@ -6185,7 +6352,9 @@ cv.addEventListener('click',e=>{
     if(!snapped.snap){
       hintText.textContent='Klikk på ein fasade (den farga vegglinja rundt sona).';draw();return;
     }
-    winPts.push(snapped);
+    // Lagre i biletkoordinatar (ikkje skjerm) — punktet skal ikkje flytte seg
+    // om brukaren panorerer eller zoomar mellom dei to klikka.
+    winPts.push({ix:snapped.snap.cx,iy:snapped.snap.cy,snap:snapped.snap});
     if(winPts.length===1){
       hintText.textContent='Klikk der vindauget/døra sluttar på same fasade.';draw();return;
     }
@@ -6202,7 +6371,7 @@ cv.addEventListener('click',e=>{
     const ux=dx/segLen,uy=dy/segLen;
     const proj=(px,py)=>((px-seg.p1.x)*ux+(py-seg.p1.y)*uy)/segLen;
     const t0c=Math.max(0,Math.min(1,proj(s1.cx,s1.cy)));
-    const t1c=Math.max(0,Math.min(1,proj(s2.snap?s2.cx:s2i(winPts[1].x,winPts[1].y).x, s2.snap?s2.cy:s2i(winPts[1].x,winPts[1].y).y)));
+    const t1c=Math.max(0,Math.min(1,proj(s2.cx,s2.cy)));
     const tMin=Math.min(t0c,t1c),tMax=Math.max(t0c,t1c);
     if(tMax-tMin<0.005){hintText.textContent='Vindauget er for smalt. Prøv igjen.';winPts=[];draw();return;}
     // Calc width in mm
@@ -6375,7 +6544,7 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();return;
   }
   if(e.key==='Escape'){
-    if(mode==='measure'){measurePts=[];measureResults=[];measureSnap=null;setMode('navigate');draw();return;}
+    if(mode==='measure'){measurePts=[];measureSnap=null;setMode('navigate');draw();return;}
     if(mode==='edit'){setMode('navigate');editZoneIdx=null;draw();}
     else if(mode==='draw'){curPts=[];setMode('navigate');draw();}
     else if(mode==='window'){winPts=[];winSnapPreview=null;setMode('navigate');draw();}
@@ -6580,6 +6749,7 @@ function autosave(){
         sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
         pdfPage:f.pdfPage,totalPages:f.totalPages,
         paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
+        measurements:normMaal(f.measurements),
         zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]}))
       };
       if(f.bgImg){
@@ -6656,6 +6826,7 @@ function restoreAutosave(){
           pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
           paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
           bgImg:null,pdfDoc:null,
+          measurements:normMaal(f.measurements),
           zones:(f.zones||[]).map(z=>{const nz={...z,skillevegg:new Set(z.skillevegg||[])};sanitizeZoneSegRefs(nz);return nz;})
         };
         if(f.bgImgData){
@@ -7124,6 +7295,7 @@ document.getElementById('saveBtn').onclick=async()=>{
       sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
       pdfPage:f.pdfPage,totalPages:f.totalPages,
       paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
+      measurements:normMaal(f.measurements),
       zones:f.zones.map(z=>({
         ...z,
         skillevegg:z.skillevegg?Array.from(z.skillevegg):[]
@@ -7202,6 +7374,7 @@ document.getElementById('loadFi').onchange=async function(){
         pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
         paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
         pdfDoc:null,bgImg:null,
+        measurements:normMaal(f.measurements),
         zones:(f.zones||[]).map(z=>{
           const nz={...z,skillevegg:new Set(z.skillevegg||[])};
           sanitizeZoneSegRefs(nz);
