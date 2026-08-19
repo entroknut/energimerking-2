@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 2.6.1 | Single-file HTML applikasjon
+**Versjon:** 3.0.2 | Single-file HTML applikasjon
 
 ---
 
@@ -24,8 +24,13 @@ Fila har **to** inline `<script>`-blokker — syntaks-sjekken må sjekke begge.
 - `dev` — alt arbeid skjer her
 - `main` — publiserer til GitHub Pages automatisk
 
-Repo: `nedkvitneknut-sketch/energimerking-2`  
-Live: https://nedkvitneknut-sketch.github.io/energimerking-2/
+Repo: `entroknut/energimerking-2` (jobbkonto — offisiell)  
+Live: https://entroknut.github.io/energimerking-2/
+
+Speglar til privatkontoen `nedkvitneknut-sketch/energimerking-2` via ein andre
+push-URL på `origin`, så éin `git push` oppdaterer begge. Privatspegelen ligg
+live på https://nedkvitneknut-sketch.github.io/energimerking-2/ som backup —
+den er ikkje den offisielle adressa, men den skal alltid vere i synk.
 
 ### Syntaks-sjekk etter kvar endring
 
@@ -55,17 +60,28 @@ python -m http.server 8742
 
 ### Publisering
 
-Brukaren seier eksplisitt frå når noko skal publiserast. Då: bump versjonsnummer i `index.html` (søk `v2.`), commit på `dev`, merge til `main`, push.
+Brukaren seier eksplisitt frå når noko skal publiserast. Då: bump versjonsnummer i `index.html` (søk `v3.`), commit på `dev`, merge til `main`, push.
 
 **Verifiser alltid live-adressa etterpå** — ikkje meld «publisert» berre fordi pushen gjekk gjennom. GitHub Pages-bygget kan feile (det skjedde 6. august: deploy-steget timeout-a etter 10 min, to gonger på rad, og trong eit tredje forsøk).
 
+Grep-mønsteret må **ankrast på `</span>`**. To feller, begge observerte:
+
+- Ein hardkoda `v2\.`-prefiks gir tom output etter ein major-bump — det ser ut som
+  ein feila publisering sjølv når alt gjekk bra.
+- Eit ope `v[0-9]+\.[0-9]+\.[0-9]+` treffer `draco_decoder_gltf_v1.5.6.wasm` i
+  Mapbox GL-blokka på line 46, som ligg **før** appversjonen i fila. Du får
+  `v1.5.6` og trur publiseringa feila.
+
+Appversjonen står som `>v3.0.2</span>` (line 629), så ankeret er det som gjer
+kommandoen påliteleg:
+
 ```bash
-curl -s "https://nedkvitneknut-sketch.github.io/energimerking-2/index.html?cb=$(date +%s)" | grep -o 'v2\.[0-9]*\.[0-9]*' | head -1
+for u in entroknut nedkvitneknut-sketch; do printf '%-22s ' "$u"; curl -s "https://$u.github.io/energimerking-2/index.html?cb=$(date +%s)" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+</span>' | head -1 | sed 's|</span>||'; done
 ```
 
 Byggestatus (anonymt API, `gh` er ikkje innlogga):
 ```bash
-curl -s "https://api.github.com/repos/nedkvitneknut-sketch/energimerking-2/actions/runs?per_page=3"
+curl -s "https://api.github.com/repos/entroknut/energimerking-2/actions/runs?per_page=3"
 ```
 
 ---
