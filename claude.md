@@ -24,13 +24,13 @@ Fila har **to** inline `<script>`-blokker — syntaks-sjekken må sjekke begge.
 - `dev` — alt arbeid skjer her
 - `main` — publiserer til GitHub Pages automatisk
 
-Repo: `entroknut/energimerking-2` (jobbkonto — offisiell)  
+Repo: `entroknut/energimerking-2` (jobbkontoen, knut.nedkvitne@entro.no)  
 Live: https://entroknut.github.io/energimerking-2/
 
-Speglar til privatkontoen `nedkvitneknut-sketch/energimerking-2` via ein andre
-push-URL på `origin`, så éin `git push` oppdaterer begge. Privatspegelen ligg
-live på https://nedkvitneknut-sketch.github.io/energimerking-2/ som backup —
-den er ikkje den offisielle adressa, men den skal alltid vere i synk.
+**Alt arbeid skjer her.** Den gamle privatkontoen `nedkvitneknut-sketch` har eit
+frose snapshot på commit `bb76381` (19. august 2026) som framleis ligg live på
+si eiga Pages-adresse. Det skal ikkje oppdaterast: ikkje push dit, og ikkje bruk
+den adressa til verifisering — den blir gradvis utdatert.
 
 ### Syntaks-sjekk etter kvar endring
 
@@ -76,7 +76,7 @@ Appversjonen står som `>v3.0.2</span>` (line 629), så ankeret er det som gjer
 kommandoen påliteleg:
 
 ```bash
-for u in entroknut nedkvitneknut-sketch; do printf '%-22s ' "$u"; curl -s "https://$u.github.io/energimerking-2/index.html?cb=$(date +%s)" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+</span>' | head -1 | sed 's|</span>||'; done
+curl -s "https://entroknut.github.io/energimerking-2/index.html?cb=$(date +%s)" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+</span>' | head -1 | sed 's|</span>||'
 ```
 
 Byggestatus (anonymt API, `gh` er ikkje innlogga):
