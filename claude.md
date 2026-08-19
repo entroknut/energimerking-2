@@ -103,6 +103,10 @@ floors = [{
   paperWMm,       // papirformat, for målestokk-kalibrering
   paperHMm,
   paperSource,    // 'pdf' | 'dpi' | null
+  measurements,   // [{p1:{x,y}, p2:{x,y}}] — kontrollmål i biletkoordinatar.
+                  // measureResults er eit ALIAS til denne (som zones) — aldri
+                  // tildel measureResults=[], det bryt aliaset. Lengda reknast
+                  // på nytt ved teikning, så omkalibrering slår gjennom.
   zones: [...]
 }]
 
@@ -169,11 +173,21 @@ remapSegsBeforeDelete(z, pi)  // kall FØR z.pts.splice(pi,1) — treng gamle le
 sanitizeZoneSegRefs(z)        // rydd ugyldige referansar ved lasting
 ```
 
-### 3. Ghost-forskyving
+### 3. Punkt under teikning må lagrast i biletkoordinatar
+
+`curPts`, `calPts`, `measurePts` og `winPts` held alle **biletkoordinatar**, ikkje
+skjermkoordinatar. Elles flyttar punkta seg om brukaren panorerer eller zoomar
+mellom to klikk. Dette var ein reell feil i vindaugs-/dørverktøyet: `winPts`
+lagra skjermposisjonen, så vindauget hamna feil stad på veggen om ein flytta
+lerretet mellom første og andre klikk. Same gjeld `winSnapPreview` — han må
+reknast på nytt frå `mouse` ved kvar teikning, ikkje gjenbrukast frå siste
+musrørsle (zoom flyttar ikkje musa).
+
+### 4. Ghost-forskyving
 
 `floorDxImg`/`floorDyImg` er i **biletpikslar**. Dei gamle felta `floorDx`/`floorDy` (skjermpikslar) finst ikkje lenger — dei vert berre lesne ved migrering av gamle `.entro`-filer. All teikning skjer på `(ix + floorDxImg) * sc + offX`, så alt som reknar skjermposisjon må ta med forskyvinga (dette råka både kartet og `zoomToZone`).
 
-### 4. XML-escaping
+### 5. XML-escaping
 
 All brukarstyrt tekst i SXI-eksporten må gjennom `xesc()`. Eit prosjektnamn med `&` gir elles ugyldig XML som SIMIEN nektar å opne.
 
