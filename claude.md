@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.0.2 | Single-file HTML applikasjon
+**Versjon:** 3.2.0 | Single-file HTML applikasjon
 
 ---
 
@@ -72,7 +72,7 @@ Grep-mønsteret må **ankrast på `</span>`**. To feller, begge observerte:
   Mapbox GL-blokka på line 46, som ligg **før** appversjonen i fila. Du får
   `v1.5.6` og trur publiseringa feila.
 
-Appversjonen står som `>v3.0.2</span>` (line 629), så ankeret er det som gjer
+Appversjonen står som `>v3.2.0</span>` (line 630), så ankeret er det som gjer
 kommandoen påliteleg:
 
 ```bash
@@ -302,11 +302,47 @@ Vindauge fordelast til den sona veggen deira hamna i. `takflater`, `gavlflater`,
 
 ## Lagring
 
-**Manuell (.entro):** `showSaveFilePicker` der nettlesaren støttar det, så brukaren vel mappe og namn. Framlegg til filnamn er `prosjektAdresse` utan postnummer/poststad. Fallback til vanleg nedlasting.
+All serialisering går gjennom **to** delte funksjonar — `serialiserProsjekt(opts)`
+og `lastProsjekt(proj, opts)`. Manuell lagring, autolagring og EntroPi-brua
+brukar dei same to, så dei kan ikkje lenger komme i utakt.
 
-**Autolagring (localStorage):** JPEG 85%, kvart 60. sekund når `isDirty`. `markClean()` **må** kallast etter lagring — elles re-enkodar den alle bileta i full oppløysing kvart minutt for alltid.
+**Manuell (.entro):** `showSaveFilePicker` der nettlesaren støttar det, så brukaren vel mappe og namn. Framlegg til filnamn er `foreslaaFilnamn()` (adressa utan postnummer/poststad). Fallback til vanleg nedlasting.
 
-Alle felt som skal overleve må leggjast til **fem** stader: `snapshot()`, `applyHistoryState()`, `getCurrentState()`, `autosave()`/`restoreAutosave()`, og `.entro` lagre/laste.
+**Autolagring (localStorage):** `serialiserProsjekt({mime:'image/jpeg',qual:0.85})`, kvart 60. sekund når `isDirty`. `markClean()` **må** kallast etter lagring — elles re-enkodar den alle bileta i full oppløysing kvart minutt for alltid.
+
+**EntroPi (iframe):** brua sender PNG — fila på bygget er den einaste kopien, og JPEG ville tapt kvalitet på nytt for kvar opne-lagre-runde.
+
+Alle felt som skal overleve må leggjast til **fem** stader: `snapshot()`, `applyHistoryState()`, `getCurrentState()`, `serialiserProsjekt()` og `lastProsjekt()`.
+
+---
+
+## EntroPi-bru (innbygd modus)
+
+Programmet køyrer som verktøy i ein iframe inne i EntroPi. Då lagrar «Lagre»
+prosjektet rett på bygget i staden for å laste ned ei fil, og prosjektet på
+bygget kjem inn med ei `sxi:init`-melding. Brua ligg i `index.html` under
+`// ── 2b. EntroPi-bru` og er heilt passiv utanfor ein iframe.
+
+Full protokoll, EntroPi-sida (React) og lagringsråd: `docs/entropi-integrasjon.md`.
+Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
+(opne `http://localhost:8742/docs/entropi-test-host.html`).
+
+- Verktøyet eig **inga** lagring og har ingen API-nøklar. Vertssida gjer all
+  autentisering og opplasting — difor kan hostinga på GitHub Pages stå som ho er.
+- `window.EntroHost` er heile API-et mot resten av koden: `framed`, `active()`,
+  `willLoadProject()`, `notifyDirty()`, `saveToHost({auto,requestId})`,
+  `sendSxi(xml, filnamn, meta)`. Alle kall utanfrå må vere vakta med
+  `if(window.EntroHost)` — brua vert definert etter `markDirty`/`markClean`.
+- Opphavslista i brua avgjer kven vi snakkar med. Nytt domene på EntroPi ⇒
+  utvid lista, elles blir brua ståande stille utan feilmelding.
+- `?embed=1` i iframe-URL-en slår på handtrykket. Utan flagget sender brua inga
+  melding og endrar ingenting — difor kan ho liggje i produksjon før vertssida
+  er klar. Verktøylinja endrar seg fyrst når `sxi:init` har kome, så knappen
+  aldri viser «Lagre på bygget» medan lagringa framleis lastar ned fila.
+- `.entro`-fila går som **Blob**, ikkje streng — han går rett vidare til
+  opplasting utan ein ekstra kopi i minnet.
+- `sxi:state {dirty}` finst fordi `beforeunload` ikkje fyrer når ein iframe vert
+  fjerna. Det er einaste måten EntroPi kan åtvare om ulagra endringar.
 
 ---
 

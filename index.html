@@ -627,7 +627,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.1.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.2.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -6726,8 +6726,8 @@ window.addEventListener('resize',resize);
 
 // ── 1. Åtvaring ved lukking ───────────────────────────────────
 let isDirty=false;
-function markDirty(){isDirty=true;}
-function markClean(){isDirty=false;}
+function markDirty(){isDirty=true;if(window.EntroHost)window.EntroHost.notifyDirty();}
+function markClean(){isDirty=false;if(window.EntroHost)window.EntroHost.notifyDirty();}
 window.addEventListener('beforeunload',e=>{
   if(isDirty){e.preventDefault();e.returnValue='';}
 });
@@ -6739,31 +6739,94 @@ window.snapshot=snapshot=function(){_origSnapshot();markDirty();};
 const AUTOSAVE_KEY='sxi_generator_autosave';
 const AUTOSAVE_INTERVAL=60000; // 1 min
 
+// ── Prosjekt-serialisering (delt) ────────────────────────────
+// Manuell lagring (.entro), autolagringa til localStorage og EntroPi-brua
+// brukar alle desse to funksjonane, slik at dei tre aldri kjem i utakt om
+// eit nytt felt kjem til. bgImg kan ikkje serialiserast direkte og vert lagra
+// som dataURL; pdfDoc vert hoppa over (brukaren lastar opp PDF-en på nytt).
+function serialiserProsjekt(opts){
+  const o=opts||{};
+  const mime=o.mime||'image/png';
+  saveFloorState();
+  const serFloors=floors.map(f=>{
+    const obj={
+      id:f.id,name:f.name,
+      mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
+      sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
+      pdfPage:f.pdfPage,totalPages:f.totalPages,
+      paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
+      measurements:normMaal(f.measurements),
+      zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]}))
+    };
+    if(f.bgImg){
+      try{
+        const tmp=document.createElement('canvas');
+        tmp.width=f.bgImg.width;tmp.height=f.bgImg.height;
+        tmp.getContext('2d').drawImage(f.bgImg,0,0);
+        obj.bgImgData=o.qual!=null?tmp.toDataURL(mime,o.qual):tmp.toDataURL(mime);
+      }catch(e){/* tainted canvas — hopp over */}
+    }
+    return obj;
+  });
+  return {version:1,savedAt:new Date().toISOString(),activeFloor,globalNorth,globalMmPerImgPx,
+    prosjektAdresse,_nextFloorId,_nextGroupId,_nextZoneId,floors:serFloors};
+}
+
+// Byggjer heile tilstanden opp att frå eit serialisert prosjekt.
+// opts.fit=true → zoom til biletet (som ved opning av fil); elles vert lagra
+// zoom/pan frå prosjektet ståande (som ved gjenoppretting av autolagring).
+async function lastProsjekt(proj,opts){
+  const o=opts||{};
+  if(!proj||!Array.isArray(proj.floors))throw new Error('Ugyldig prosjektfil.');
+  const newFloors=await Promise.all(proj.floors.map(async f=>{
+    const floor={
+      id:f.id,name:f.name,
+      mmPerImgPx:f.mmPerImgPx??null,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
+      // floorDxImg er biletpikslar. Gamle filer har floorDx i skjermpikslar — migrer via sc.
+      floorDxImg:f.floorDxImg!=null?f.floorDxImg:(f.floorDx||0)/(f.sc||1),
+      floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
+      sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
+      pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
+      paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
+      pdfDoc:null,bgImg:null,
+      measurements:normMaal(f.measurements),
+      zones:(f.zones||[]).map(z=>{const nz={...z,skillevegg:new Set(z.skillevegg||[])};sanitizeZoneSegRefs(nz);return nz;})
+    };
+    if(f.bgImgData){
+      await new Promise(res=>{
+        const img=new Image();
+        img.onload=()=>{floor.bgImg=img;res();};
+        img.onerror=()=>res();
+        img.src=f.bgImgData;
+      });
+    }
+    return floor;
+  }));
+  floors=newFloors;
+  activeFloor=Math.min(proj.activeFloor??0,floors.length-1);
+  globalNorth=proj.globalNorth??0;
+  globalMmPerImgPx=proj.globalMmPerImgPx??null;
+  prosjektAdresse=proj.prosjektAdresse||'';
+  _syncAdresseFelt();
+  _nextFloorId=proj._nextFloorId??floors.length+1;
+  _nextGroupId=proj._nextGroupId??1;
+  _nextZoneId=proj._nextZoneId??1;
+  syncFloorState();
+  editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
+  renderFloorTabs();updateResults();renderTable();
+  if(o.fit&&bgImg)fitImage();else draw();
+}
+
+// Framlegg til filnamn: bygget si adresse, elles dato
+function foreslaaFilnamn(){
+  const base=adresseTilFilnamn(prosjektAdresse)||('SXI_generatoren_'+new Date().toISOString().slice(0,10));
+  return base+'.entro';
+}
+
 function autosave(){
   try{
-    saveFloorState();
-    const serFloors=floors.map(f=>{
-      const obj={
-        id:f.id,name:f.name,
-        mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-        sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
-        pdfPage:f.pdfPage,totalPages:f.totalPages,
-        paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-        measurements:normMaal(f.measurements),
-        zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]}))
-      };
-      if(f.bgImg){
-        try{
-          const tmp=document.createElement('canvas');
-          tmp.width=f.bgImg.width;tmp.height=f.bgImg.height;
-          tmp.getContext('2d').drawImage(f.bgImg,0,0);
-          obj.bgImgData=tmp.toDataURL('image/jpeg',0.85);
-          // Ingen bgImgScale — biletet er lagra i same oppløysing som bgImg
-        }catch(e){}
-      }
-      return obj;
-    });
-    const proj={version:1,savedAt:new Date().toISOString(),activeFloor,globalNorth,globalMmPerImgPx,prosjektAdresse,_nextFloorId,_nextGroupId,_nextZoneId,floors:serFloors};
+    // JPEG 85 % — autolagringa må vere liten nok til localStorage
+    const proj=serialiserProsjekt({mime:'image/jpeg',qual:0.85});
     localStorage.setItem(AUTOSAVE_KEY,JSON.stringify(proj));
     markClean(); // elles re-enkodar autolagringa alle bileta kvart minutt for alltid
   }catch(e){/* localStorage full */}
@@ -6814,45 +6877,12 @@ function restoreAutosave(){
 
     document.getElementById('toast-restore').onclick=async()=>{
       toast.remove();
-      // Bygg floors-array — last bgImg frå lagra bgImgData
-      floors=await Promise.all(proj.floors.map(async f=>{
-        const floor={
-          id:f.id,name:f.name,
-          mmPerImgPx:f.mmPerImgPx??null,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-          // floorDxImg: ny (biletpikslar). Bakoverkompatibilitet: migrer frå floorDx (skjermpikslar) via floorDx/sc
-          floorDxImg:f.floorDxImg!=null?f.floorDxImg:(f.floorDx||0)/(f.sc||1),
-          floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
-          sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
-          pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
-          paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-          bgImg:null,pdfDoc:null,
-          measurements:normMaal(f.measurements),
-          zones:(f.zones||[]).map(z=>{const nz={...z,skillevegg:new Set(z.skillevegg||[])};sanitizeZoneSegRefs(nz);return nz;})
-        };
-        if(f.bgImgData){
-          try{
-            await new Promise((res,rej)=>{
-              const img=new Image();
-              img.onload=()=>{floor.bgImg=img;res();};
-              img.onerror=rej;
-              img.src=f.bgImgData;
-            });
-          }catch(e){console.warn('Kunne ikkje laste autolaga bilete:',e);}
-        }
-        return floor;
-      }));
-      activeFloor=Math.min(proj.activeFloor??0,floors.length-1);
-      globalNorth=proj.globalNorth??0;
-      globalMmPerImgPx=proj.globalMmPerImgPx??null;
-    prosjektAdresse=proj.prosjektAdresse||'';
-    _syncAdresseFelt();
-      _nextFloorId=proj._nextFloorId??floors.length+1;
-      _nextGroupId=proj._nextGroupId??1;
-      _nextZoneId=proj._nextZoneId??1;
-      syncFloorState();
-      editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
-      renderFloorTabs();updateResults();renderTable();draw();
-      hintText.textContent='Autolaga prosjekt gjenoppretta.';
+      try{
+        await lastProsjekt(proj,{fit:false});
+        hintText.textContent='Autolaga prosjekt gjenoppretta.';
+      }catch(e){
+        hintText.textContent='Kunne ikkje gjenopprette autolagringa: '+e.message;
+      }
       localStorage.removeItem(AUTOSAVE_KEY);
     };
     document.getElementById('toast-dismiss').onclick=dismiss;
@@ -6865,8 +6895,246 @@ function restoreAutosave(){
 setInterval(()=>{if(isDirty)autosave();},AUTOSAVE_INTERVAL);
 // Also autosave when user leaves
 window.addEventListener('pagehide',()=>{if(isDirty)autosave();});
-// Restore on load (after a short delay so DOM is ready)
-setTimeout(()=>restoreAutosave(),300);
+// Restore on load (after a short delay so DOM is ready).
+// I EntroPi kjem prosjektet frå vertssida — då ventar vi litt lenger, slik at
+// sxi:init får komme fram før vi tilbyr den lokale autolagringa.
+setTimeout(()=>{
+  const H=window.EntroHost;
+  if(H&&H.framed&&H.willLoadProject())return;
+  restoreAutosave();
+// Brua vert definert lenger ned i fila, så «er vi i ein iframe» vert rekna
+// direkte her — window.EntroHost finst ikkje enno på dette tidspunktet.
+},(window.parent&&window.parent!==window)||window.opener?1500:300);
+
+// ── 2b. EntroPi-bru — lagre prosjektet rett på bygget ────────
+// Programmet kan køyre som verktøy i ein iframe inne i EntroPi. Då skal
+// «Lagre» leggje .entro-prosjektet på bygget i staden for å laste ned ei fil,
+// og prosjektet som alt ligg på bygget kjem inn med ei sxi:init-melding.
+// Utanfor ein iframe er brua heilt passiv og endrar ingenting.
+// Protokollen er dokumentert i docs/entropi-integrasjon.md.
+(function(){
+  const PROTOCOL=1;
+  // Kva opphav brua snakkar med. Dette er den einaste lista som avgjer kven
+  // som får sende oss eit prosjekt og ta imot prosjektdata — utvid ved nye miljø.
+  const ALLOWED=[
+    /^https?:\/\/localhost(:\d+)?$/,
+    /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+    /^https:\/\/([a-z0-9-]+\.)*entro\.no$/,
+    /^https:\/\/[a-z0-9-]+\.vercel\.app$/
+  ];
+  const hostWin=(window.parent&&window.parent!==window)?window.parent:(window.opener||null);
+  const framed=!!hostWin;
+  let hostOrigin=null;              // sett fyrst når ei godkjend melding har kome
+  let bygg=null,wantsSxi=false,saveLabel='Lagre på bygget';
+  let hasProject=false,autosaveTimer=null,inited=false;
+  let pending=null,saveSeq=0,lastDirty=null;
+
+  // Brua er berre «aktiv» etter ei sxi:init — ein vert som ikkje har sagt at
+  // han handterer lagring skal ikkje stele lagreknappen frå nedlastinga.
+  const active=()=>!!(framed&&hostOrigin&&inited);
+  const appVersion=()=>{const el=document.getElementById('appVer');return el?el.textContent.trim():'';};
+  const okOrigin=o=>ALLOWED.some(re=>re.test(o));
+  const hint=t=>{try{hintText.textContent=t;}catch(e){}};
+
+  function post(m){
+    if(!active())return;
+    try{hostWin.postMessage(Object.assign({source:'sxi-generator',protocol:PROTOCOL},m),hostOrigin);}
+    catch(e){console.warn('EntroPi-bru: kunne ikkje sende '+m.type,e);}
+  }
+  // sxi:ready inneheld ingen prosjektdata, så han kan gå til '*' før vi veit
+  // kven verten er. Alt anna går til eit kontrollert opphav.
+  function announce(){
+    if(!framed||hostOrigin)return;
+    try{hostWin.postMessage({source:'sxi-generator',protocol:PROTOCOL,type:'sxi:ready',version:appVersion()},'*');}catch(e){}
+  }
+
+  // ── UI i innbygd modus ──
+  function labelEl(){
+    const sb=document.getElementById('saveBtn');
+    if(!sb)return null;
+    let s=sb.querySelector('.host-lbl');
+    if(!s){s=document.createElement('span');s.className='host-lbl';s.style.marginLeft='5px';sb.appendChild(s);}
+    return s;
+  }
+  function applyEmbedUI(){
+    const sb=document.getElementById('saveBtn');
+    if(sb){
+      sb.classList.add('teal');
+      sb.title=saveLabel+' (Ctrl+S)';
+      const s=labelEl();if(s)s.textContent=saveLabel;
+    }
+    const lb=document.getElementById('loadBtn');
+    if(lb)lb.title='Opne ei .entro-fil frå maskina (Ctrl+O)';
+    if(bygg&&(bygg.namn||bygg.adresse)){
+      let c=document.getElementById('hostChip');
+      if(!c){
+        const anchor=document.getElementById('loadBtn');
+        if(anchor&&anchor.parentNode){
+          c=document.createElement('span');
+          c.id='hostChip';c.className='lbl';
+          c.style.cssText='margin-left:6px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+          anchor.parentNode.appendChild(c);
+        }
+      }
+      if(c){
+        const t=bygg.namn||bygg.adresse;
+        c.textContent='⌂ '+t;
+        c.title='Prosjektet vert lagra på '+t+' i EntroPi';
+      }
+    }
+  }
+  function setBusy(busy,silent){
+    const sb=document.getElementById('saveBtn');
+    if(!sb)return;
+    sb.disabled=!!busy;
+    sb.style.opacity=busy?'.6':'';
+    if(silent)return;
+    const s=labelEl();if(s)s.textContent=busy?'Lagrar…':saveLabel;
+  }
+  function hideToast(){
+    const el=document.getElementById('autosave-toast');
+    if(el)el.remove();
+  }
+
+  // ── Lagring til verten ──
+  function saveToHost(o){
+    o=o||{};
+    if(!active())return false;
+    if(pending)return false;                 // ei lagring går alt
+    let blob,meta,fname;
+    try{
+      // PNG som i den manuelle lagringa: lagringa på bygget er den einaste
+      // kopien, og JPEG ville tapt kvalitet på nytt for kvar opne-lagre-runde.
+      const proj=serialiserProsjekt();
+      blob=new Blob([JSON.stringify(proj)],{type:'application/json'});
+      fname=foreslaaFilnamn();
+      meta={
+        floors:floors.length,
+        zones:floors.reduce((s,f)=>s+f.zones.length,0),
+        braM2:Math.round(floors.flatMap(f=>f.zones).reduce((s,z)=>s+(getAreaM2(z)||0),0)*10)/10,
+        adresse:prosjektAdresse||'',
+        savedAt:proj.savedAt,
+        appVersion:appVersion()
+      };
+    }catch(e){
+      hint('Kunne ikkje lage prosjektfila: '+e.message);
+      return false;
+    }
+    const id=o.requestId||('s'+(++saveSeq));
+    setBusy(true,!!o.auto);
+    post({type:'sxi:save',requestId:id,auto:!!o.auto,filename:fname,bytes:blob.size,blob,meta});
+    pending={id:id,auto:!!o.auto,timer:setTimeout(()=>{
+      pending=null;setBusy(false);
+      if(!o.auto)hint('Ingen respons frå EntroPi. Prøv igjen, eller lagre som fil lokalt.');
+    },45000)};
+    return true;
+  }
+
+  async function toProj(p){
+    if(!p)return null;
+    if(typeof Blob!=='undefined'&&p instanceof Blob)p=await p.text();
+    else if(p instanceof ArrayBuffer)p=new TextDecoder().decode(p);
+    else if(p&&p.buffer instanceof ArrayBuffer)p=new TextDecoder().decode(p);
+    if(typeof p==='string')return JSON.parse(p);
+    if(typeof p==='object')return p;
+    return null;
+  }
+  async function loadFromHost(payload,silent){
+    const proj=await toProj(payload);
+    if(!proj)throw new Error('tomt prosjekt');
+    await lastProsjekt(proj,{fit:true});
+    markClean();
+    if(!silent)hint('Prosjektet er henta frå '+((bygg&&(bygg.namn||bygg.adresse))||'EntroPi')+'.');
+  }
+
+  // ── Meldingar frå verten ──
+  window.addEventListener('message',async ev=>{
+    if(!framed||ev.source!==hostWin)return;
+    const d=ev.data;
+    if(!d||typeof d!=='object'||typeof d.type!=='string'||d.type.indexOf('sxi:')!==0)return;
+    if(!okOrigin(ev.origin)){console.warn('EntroPi-bru: avviste melding frå '+ev.origin);return;}
+    if(hostOrigin&&ev.origin!==hostOrigin)return;   // berre éin vert per sesjon
+
+    if(d.type==='sxi:hello'){                        // verten kobla seg på seint
+      hostOrigin=ev.origin;
+      try{hostWin.postMessage({source:'sxi-generator',protocol:PROTOCOL,type:'sxi:ready',version:appVersion()},hostOrigin);}catch(e){}
+      return;
+    }
+    if(d.type==='sxi:init'){
+      hostOrigin=ev.origin;
+      inited=true;
+      bygg=d.bygg||null;
+      wantsSxi=!!d.wantsSxi;
+      if(d.saveLabel)saveLabel=String(d.saveLabel);
+      applyEmbedUI();
+      if(bygg&&bygg.adresse&&!prosjektAdresse){prosjektAdresse=String(bygg.adresse);_syncAdresseFelt();}
+      if(d.project){
+        hasProject=true;
+        hideToast();
+        try{await loadFromHost(d.project,true);}
+        catch(e){hint('Kunne ikkje opne prosjektet frå EntroPi: '+e.message);}
+      }
+      const ms=Number(d.autosaveMs)||0;
+      if(ms>=30000&&!autosaveTimer){
+        autosaveTimer=setInterval(()=>{if(isDirty&&active()&&!pending)saveToHost({auto:true});},ms);
+      }
+      lastDirty=isDirty;
+      post({type:'sxi:state',dirty:isDirty,ready:true,version:appVersion()});
+      return;
+    }
+    if(!hostOrigin)return;                           // init må komme fyrst
+    if(d.type==='sxi:load'){
+      hasProject=true;hideToast();
+      try{await loadFromHost(d.project);}
+      catch(e){hint('Kunne ikkje opne prosjektet frå EntroPi: '+e.message);}
+      return;
+    }
+    if(d.type==='sxi:request-save'){
+      saveToHost({auto:!!d.auto,requestId:d.requestId});
+      return;
+    }
+    if(d.type==='sxi:save-result'){
+      if(pending&&d.requestId&&d.requestId!==pending.id)return;
+      const auto=pending?pending.auto:false;
+      if(pending&&pending.timer)clearTimeout(pending.timer);
+      pending=null;setBusy(false);
+      if(d.ok){
+        markClean();
+        if(!auto)hint(d.message||('Lagra på '+((bygg&&(bygg.namn||bygg.adresse))||'bygget')+'.'));
+      }else{
+        hint('EntroPi kunne ikkje lagre: '+(d.message||'ukjend feil'));
+      }
+      return;
+    }
+  });
+
+  window.EntroHost={
+    framed:framed,
+    active:active,
+    willLoadProject:()=>hasProject,
+    // Lèt verten vise ulagra-endringar før modalen vert lukka
+    notifyDirty(){
+      if(!active()||lastDirty===isDirty)return;
+      lastDirty=isDirty;
+      post({type:'sxi:state',dirty:isDirty});
+    },
+    saveToHost:saveToHost,
+    // SXI-fila går også til verten om han har bede om det (wantsSxi)
+    sendSxi(xml,filename,meta){
+      if(!active()||!wantsSxi)return;
+      post({type:'sxi:export-sxi',filename:filename,bytes:xml.length,
+        blob:new Blob([xml],{type:'application/xml'}),meta:meta||{}});
+    }
+  };
+
+  // Handtrykket vert berre kringkasta når verten har bede om det med ?embed=1.
+  // Utan det ligg brua heilt stille — ingen meldingar ut, ingen UI-endring —
+  // men lyttaren står klar, så ein vert kan òg opne samtalen med sxi:hello.
+  if(framed&&new URLSearchParams(location.search).has('embed')){
+    // Verten kan montere lyttaren sin etter at iframen er lasta — prøv fleire gonger
+    [0,250,750,2000,5000].forEach(ms=>setTimeout(announce,ms));
+  }
+})();
 
 // ── 3. Pinch-to-zoom ─────────────────────────────────────────
 (()=>{
@@ -7285,50 +7553,10 @@ document.getElementById('rotBtn').onclick=()=>{
 
 // ── Lagre / opne prosjekt ─────────────────────────────────────
 document.getElementById('saveBtn').onclick=async()=>{
-  saveFloorState();
-  // Serialiser floors — bgImg og pdfDoc kan ikkje serialiserast direkte
-  // Vi lagrar bgImg som dataURL, men hoppar over pdfDoc (brukaren lastar opp PDF på nytt)
-  const serFloors=floors.map(f=>{
-    const obj={
-      id:f.id,name:f.name,
-      mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-      sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
-      pdfPage:f.pdfPage,totalPages:f.totalPages,
-      paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-      measurements:normMaal(f.measurements),
-      zones:f.zones.map(z=>({
-        ...z,
-        skillevegg:z.skillevegg?Array.from(z.skillevegg):[]
-      }))
-    };
-    // Lagre bgImg som dataURL viss det finst
-    if(f.bgImg){
-      try{
-        const tmp=document.createElement('canvas');
-        tmp.width=f.bgImg.width;tmp.height=f.bgImg.height;
-        tmp.getContext('2d').drawImage(f.bgImg,0,0);
-        obj.bgImgData=tmp.toDataURL('image/png');
-      }catch(e){/* tainted canvas — hopp over */}
-    }
-    return obj;
-  });
-  const proj={
-    version:1,
-    savedAt:new Date().toISOString(),
-    activeFloor,
-    globalNorth,
-    globalMmPerImgPx,
-    prosjektAdresse,
-    _nextFloorId,
-    _nextGroupId,
-    _nextZoneId,
-    floors:serFloors
-  };
-  const json=JSON.stringify(proj);
-  const blob=new Blob([json],{type:'application/json'});
-  // Framlegg til filnamn: bygget si adresse, elles dato
-  const base=adresseTilFilnamn(prosjektAdresse)||('SXI_generatoren_'+new Date().toISOString().slice(0,10));
-  const fname=base+'.entro';
+  // I EntroPi går lagringa rett på bygget i staden for til ei fil på maskina
+  if(window.EntroHost&&window.EntroHost.active()){window.EntroHost.saveToHost({auto:false});return;}
+  const blob=new Blob([JSON.stringify(serialiserProsjekt())],{type:'application/json'});
+  const fname=foreslaaFilnamn();
   // Native lagre-dialog der nettlesaren støttar det, så brukaren vel mappe
   // og namn sjølv. Elles fell vi tilbake til vanleg nedlasting.
   if(window.showSaveFilePicker){
@@ -7360,50 +7588,7 @@ document.getElementById('loadFi').onchange=async function(){
   const file=this.files[0];if(!file)return;
   this.value='';
   try{
-    const text=await file.text();
-    const proj=JSON.parse(text);
-    if(!proj.floors||!Array.isArray(proj.floors)){throw new Error('Ugyldig prosjektfil.');}
-    // Gjenoppbygg floors
-    const newFloors=await Promise.all(proj.floors.map(async f=>{
-      const floor={
-        id:f.id,name:f.name,
-        mmPerImgPx:f.mmPerImgPx??null,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-        floorDxImg:f.floorDxImg!=null?f.floorDxImg:(f.floorDx||0)/(f.sc||1),
-        floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
-        sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
-        pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
-        paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-        pdfDoc:null,bgImg:null,
-        measurements:normMaal(f.measurements),
-        zones:(f.zones||[]).map(z=>{
-          const nz={...z,skillevegg:new Set(z.skillevegg||[])};
-          sanitizeZoneSegRefs(nz);
-          return nz;
-        })
-      };
-      if(f.bgImgData){
-        await new Promise(res=>{
-          const img=new Image();
-          img.onload=()=>{floor.bgImg=img;res();};
-          img.onerror=()=>res();
-          img.src=f.bgImgData;
-        });
-      }
-      return floor;
-    }));
-    floors=newFloors;
-    activeFloor=Math.min(proj.activeFloor??0,floors.length-1);
-    globalNorth=proj.globalNorth??0;
-    globalMmPerImgPx=proj.globalMmPerImgPx??null;
-    prosjektAdresse=proj.prosjektAdresse||'';
-    _syncAdresseFelt();
-    _nextFloorId=proj._nextFloorId??floors.length+1;
-    _nextGroupId=proj._nextGroupId??1;
-      _nextZoneId=proj._nextZoneId??1;
-    syncFloorState();
-    editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
-    renderFloorTabs();updateResults();renderTable();
-    if(bgImg)fitImage();else draw();
+    await lastProsjekt(JSON.parse(await file.text()),{fit:true});
   }catch(e){
     alert('Kunne ikkje opne prosjektfil: '+e.message);
   }
@@ -8489,6 +8674,8 @@ ${zonesXml}${emXml}
     a.download=(namn.replace(/\s+/g,'_'))+'.sxi';
     document.body.appendChild(a);a.click();
     document.body.removeChild(a);URL.revokeObjectURL(url);
+    // I EntroPi kan SXI-fila også leggjast på bygget, om vertssida ber om det
+    if(window.EntroHost)window.EntroHost.sendSxi(sxi,(namn.replace(/\s+/g,'_'))+'.sxi',{prosjektnamn:namn,adresse:adresse});
     dlg.style.display='none';
     // 🎉 Konfetti!
     launchConfetti();

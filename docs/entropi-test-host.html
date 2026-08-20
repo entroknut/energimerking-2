@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="nn">
+<head>
+<meta charset="utf-8">
+<title>Testvert for EntroPi-brua — SXI-generatoren</title>
+<style>
+  body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f6f6;color:#111827}
+  header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1d4f4f;color:#fff}
+  header strong{font-weight:600}
+  .btn{padding:6px 12px;border:none;border-radius:6px;background:#10b69f;color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  .btn.grey{background:rgba(255,255,255,.18)}
+  #log{height:120px;overflow:auto;margin:0;padding:8px 16px;background:#0f172a;color:#cbd5e1;font:11px/1.5 'JetBrains Mono',ui-monospace,monospace;white-space:pre-wrap}
+  #wrap{height:calc(100vh - 190px);padding:8px 16px 16px}
+  iframe{width:100%;height:100%;border:1px solid #d1d5db;border-radius:10px;background:#fff}
+  .pill{padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.15);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <strong>Testvert — EntroPi</strong>
+  <span class="pill" id="bygg">Storgata 1 (bygg-42)</span>
+  <span class="pill" id="state">ikkje kopla</span>
+  <span class="pill" id="stored">ingen lagra fil</span>
+  <span style="margin-left:auto"></span>
+  <button class="btn grey" id="reqSave">Ber verktøyet lagre</button>
+  <button class="btn grey" id="reload">Last iframe på nytt</button>
+  <button class="btn grey" id="wipe">Slett lagra fil</button>
+</header>
+<pre id="log"></pre>
+<div id="wrap"><iframe id="fr" title="SXI-generatoren"
+  allow="clipboard-write; fullscreen"></iframe></div>
+
+<script>
+// Enkel referanseimplementasjon av vertssida i protokollen som er dokumentert i
+// docs/entropi-integrasjon.md. «Backend» her er berre ein variabel + IndexedDB-fri
+// localStorage-nøkkel for metadata, så vi kan sjå at rundturen verkar.
+const BYGG={id:'bygg-42',namn:'Storgata 1',adresse:'Storgata 1, 0155 Oslo'};
+const fr=document.getElementById('fr');
+const logEl=document.getElementById('log');
+let lagraTekst=null;                     // «fila på bygget»
+let dirty=false;
+
+const log=(...a)=>{logEl.textContent+=a.join(' ')+'\n';logEl.scrollTop=logEl.scrollHeight;};
+const send=m=>fr.contentWindow.postMessage(Object.assign({source:'entropi'},m),'*');
+const setState=t=>document.getElementById('state').textContent=t;
+const setStored=()=>document.getElementById('stored').textContent=
+  lagraTekst?('lagra fil: '+(lagraTekst.length/1024/1024).toFixed(2)+' MB'):'ingen lagra fil';
+
+window.addEventListener('message',async ev=>{
+  const d=ev.data;
+  if(!d||d.source!=='sxi-generator')return;
+  log('◀ '+d.type+(d.filename?' '+d.filename:'')+(d.bytes?' ('+(d.bytes/1024|0)+' kB)':''));
+
+  if(d.type==='sxi:ready'){
+    setState('kopla — v'+(d.version||'?'));
+    // ?silent=1 → verten svarar ikkje. Då skal verktøyet oppføre seg
+    // som om det ikkje var innbygd i det heile (nedlasting av .entro).
+    if(new URLSearchParams(location.search).has('silent')){
+      log('  (silent: sender ikkje init)');
+      return;
+    }
+    send({type:'sxi:init',
+      bygg:BYGG,
+      project:lagraTekst||null,      // strengen frå førre lagring
+      wantsSxi:true,
+      autosaveMs:0,                  // sett t.d. 120000 for å teste autolagring
+      saveLabel:'Lagre på bygget'});
+    log('▶ sxi:init'+(lagraTekst?' (med prosjekt)':' (tomt bygg)'));
+    return;
+  }
+  if(d.type==='sxi:state'){
+    dirty=!!d.dirty;
+    setState('kopla — '+(dirty?'ulagra endringar':'lagra'));
+    return;
+  }
+  if(d.type==='sxi:save'){
+    try{
+      lagraTekst=await d.blob.text();       // her ville EntroPi lasta opp til lagring
+      setStored();
+      log('  lagra '+d.filename+' — '+JSON.stringify(d.meta));
+      send({type:'sxi:save-result',requestId:d.requestId,ok:true,
+        message:'Lagra på '+BYGG.namn+'.'});
+    }catch(e){
+      send({type:'sxi:save-result',requestId:d.requestId,ok:false,message:e.message});
+    }
+    return;
+  }
+  if(d.type==='sxi:export-sxi'){
+    log('  fekk SXI-fil '+d.filename+' — '+d.bytes+' teikn');
+    return;
+  }
+});
+
+document.getElementById('reqSave').onclick=()=>{send({type:'sxi:request-save'});log('▶ sxi:request-save');};
+document.getElementById('reload').onclick=()=>{fr.src=fr.src;setState('lastar…');};
+document.getElementById('wipe').onclick=()=>{lagraTekst=null;setStored();log('lagra fil sletta');};
+document.getElementById('bygg').textContent=BYGG.namn+' ('+BYGG.id+')';
+setStored();
+// ?silent=1 lastar verktøyet slik EntroPi gjer det i dag — utan ?embed=1 og
+// utan at verten svarar — for å sjekke at nedlastinga av .entro er uendra.
+const SILENT=new URLSearchParams(location.search).has('silent');
+if(SILENT)document.getElementById('state').textContent='silent — svarar ikkje';
+fr.src='../index.html'+(SILENT?'':'?embed=1');
+</script>
+</body>
+</html>
