@@ -627,7 +627,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.2.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.3.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -1716,18 +1716,28 @@ function _remapSegRefs(z,mapWin,mapIdx){
       return segs.length>=2;
     });
   }
+  if(z.yvMergedGroups&&z.yvMergedGroups.length){
+    z.yvMergedGroups=z.yvMergedGroups.filter(g=>{
+      const segs=[];
+      g.segs.forEach(i=>{const m=mapIdx(i);(Array.isArray(m)?m:[m]).forEach(x=>{if(x!=null&&!segs.includes(x))segs.push(x);});});
+      g.segs=segs;
+      return segs.length>=2;
+    });
+  }
 }
 
-// Punkt sett inn midt på segment i (z.pts.splice(i+1,0,mid)) — kall ETTER splice
-function remapSegsAfterInsert(z,i){
+// Punkt sett inn på segment i (z.pts.splice(i+1,0,pt)) — kall ETTER splice.
+// t = kvar på segmentet punktet hamna (0-1). Utelaten t tyder midtpunktet.
+function remapSegsAfterInsert(z,i,t){
+  const tt=(t!=null&&t>0&&t<1)?t:0.5;
   const mapIdx=j=>j<i?j:(j===i?[i,i+1]:j+1);
   const mapWin=w=>{
     if(w.segIdx<i)return;
     if(w.segIdx>i){w.segIdx++;return;}
-    // Vindauget sat på segmentet som vart delt — legg det på halvdelen der senteret er
+    // Vindauget sat på segmentet som vart delt — legg det på den delen der senteret er
     const c=(w.t0+w.t1)/2;
-    if(c<=0.5){w.t0=Math.max(0,w.t0*2);w.t1=Math.min(1,w.t1*2);}
-    else{w.segIdx=i+1;w.t0=Math.max(0,(w.t0-0.5)*2);w.t1=Math.min(1,(w.t1-0.5)*2);}
+    if(c<=tt){w.t0=Math.max(0,w.t0/tt);w.t1=Math.min(1,w.t1/tt);}
+    else{w.segIdx=i+1;w.t0=Math.max(0,(w.t0-tt)/(1-tt));w.t1=Math.min(1,(w.t1-tt)/(1-tt));}
   };
   _remapSegRefs(z,mapWin,mapIdx);
 }
@@ -3407,13 +3417,142 @@ document.getElementById('calAreaInput').addEventListener('keydown',e=>{
   if(e.key==='Escape')document.getElementById('calCancel').click();
 });
 
+// ── Automatisk skiljekonstruksjon mot nabosoner ───────────────
+// Teiknar ein ei ny sone inntil ei eksisterande — typisk med snap til hjørne
+// eller fasade — er den felles veggen ein skiljekonstruksjon, ikkje ein fasade
+// i kvar sone. Ligg berre EIN DEL av naboveggen inntil, vert naboveggen delt
+// så resten står att som fasade.
+//
+// Berre nyteikna soner utløyser dette, og vi berre SET skillevegg — aldri
+// fjernar. Slår brukaren ein vegg tilbake til fasade, står det val fast.
+
+function _naboTolPx(){
+  const mpp=mppForFloor(curFloor());
+  if(!mpp)return 2;
+  return Math.min(5,Math.max(1,80/mpp));    // ~8 cm, men aldri under 1 px
+}
+function _naboMinOverlapPx(){
+  const mpp=mppForFloor(curFloor());
+  if(!mpp)return 5;
+  return Math.max(3,250/mpp);               // kortare berøring enn 25 cm tel ikkje
+}
+
+// Overlappet mellom to veggsegment som ligg på same linje.
+// Returnerer {ta0,ta1,tb0,tb1} — overlappet uttrykt 0-1 langs kvart segment.
+function _veggOverlapp(a1,a2,b1,b2,tol,minLen){
+  const ax=a2.x-a1.x,ay=a2.y-a1.y,la=Math.hypot(ax,ay);
+  const bx=b2.x-b1.x,by=b2.y-b1.y,lb=Math.hypot(bx,by);
+  if(la<1e-6||lb<1e-6)return null;
+  const ux=ax/la,uy=ay/la;
+  // Begge endane av B må liggje på linja gjennom A — det dekkjer både
+  // parallellitet og avstand i éin test.
+  const perp=p=>Math.abs((p.x-a1.x)*uy-(p.y-a1.y)*ux);
+  if(perp(b1)>tol||perp(b2)>tol)return null;
+  let s0=(b1.x-a1.x)*ux+(b1.y-a1.y)*uy;
+  let s1=(b2.x-a1.x)*ux+(b2.y-a1.y)*uy;
+  if(s0>s1){const t=s0;s0=s1;s1=t;}
+  const lo=Math.max(0,s0),hi=Math.min(la,s1);
+  if(hi-lo<minLen)return null;
+  const vx=bx/lb,vy=by/lb;
+  const proj=q=>((q.x-b1.x)*vx+(q.y-b1.y)*vy)/lb;
+  let r0=proj({x:a1.x+ux*lo,y:a1.y+uy*lo});
+  let r1=proj({x:a1.x+ux*hi,y:a1.y+uy*hi});
+  if(r0>r1){const t=r0;r0=r1;r1=t;}
+  return{ta0:lo/la,ta1:hi/la,tb0:Math.max(0,r0),tb1:Math.min(1,r1)};
+}
+
+// Same vegg? Endepunkta må falle saman, uansett kva veg segmenta går.
+function _sammeVegg(a1,a2,b1,b2,tol){
+  const d=(p,q)=>Math.hypot(p.x-q.x,p.y-q.y);
+  return(d(a1,b1)<=tol&&d(a2,b2)<=tol)||(d(a1,b2)<=tol&&d(a2,b1)<=tol);
+}
+
+// Set inn punkt på segmenta i ei sone. cuts = Map(segIdx -> [t,...]), der t er
+// langs det OPPHAVLEGE segmentet. Vi går bakfrå — både gjennom segmenta og
+// langs kvart segment — så indeksane vi ikkje har kome til enno står i ro.
+function _kuttSegment(z,cuts){
+  [...cuts.keys()].sort((a,b)=>b-a).forEach(si=>{
+    const ts=[...new Set(cuts.get(si))].sort((a,b)=>b-a);
+    const p1=z.pts[si],p2=z.pts[(si+1)%z.pts.length];
+    let hi=1;
+    ts.forEach(t=>{
+      z.pts.splice(si+1,0,{x:p1.x+(p2.x-p1.x)*t,y:p1.y+(p2.y-p1.y)*t});
+      remapSegsAfterInsert(z,si,t/hi);   // lokal t på den delen som står att
+      hi=t;
+    });
+  });
+}
+
+// Returnerer talet på veggar som vart skiljekonstruksjon.
+function autoSkilleveggForNySone(nz){
+  const andre=zones.filter(z=>z!==nz&&(z.pts||[]).length>=3);
+  if(!andre.length)return 0;
+  const tol=_naboTolPx(),minLen=_naboMinOverlapPx();
+
+  // 1. Finn alle overlapp på opphavleg geometri og samle kutta per sone
+  const cuts=new Map();
+  const leggTil=(z,si,t)=>{
+    if(!(t>1e-6)||!(t<1-1e-6))return;
+    if(!cuts.has(z))cuts.set(z,new Map());
+    const m=cuts.get(z);
+    if(!m.has(si))m.set(si,[]);
+    if(!m.get(si).some(v=>Math.abs(v-t)<1e-6))m.get(si).push(t);
+  };
+  const n=nz.pts.length;
+  for(let i=0;i<n;i++){
+    const a1=nz.pts[i],a2=nz.pts[(i+1)%n];
+    andre.forEach(z=>{
+      const m=z.pts.length;
+      for(let j=0;j<m;j++){
+        const o=_veggOverlapp(a1,a2,z.pts[j],z.pts[(j+1)%m],tol,minLen);
+        if(!o)continue;
+        leggTil(nz,i,o.ta0);leggTil(nz,i,o.ta1);
+        leggTil(z,j,o.tb0);leggTil(z,j,o.tb1);
+      }
+    });
+  }
+
+  // 2. Del opp veggane, så eit felles stykke er eit heilt segment i begge soner
+  cuts.forEach((m,z)=>_kuttSegment(z,m));
+
+  // 3. Marker dei felles veggane
+  const merk=(z,si)=>{
+    if(!z.skillevegg)z.skillevegg=new Set();
+    if(z.skillevegg.has(si))return false;
+    z.skillevegg.add(si);
+    // Ein SK-vegg høyrer ikkje heime i ei YV-samanslåing
+    if(z.yvMergedGroups)z.yvMergedGroups=z.yvMergedGroups.filter(g=>!g.segs.includes(si));
+    return true;
+  };
+  let tal=0;
+  const nn=nz.pts.length;
+  for(let i=0;i<nn;i++){
+    const a1=nz.pts[i],a2=nz.pts[(i+1)%nn];
+    andre.forEach(z=>{
+      const m=z.pts.length;
+      for(let j=0;j<m;j++){
+        if(!_sammeVegg(a1,a2,z.pts[j],z.pts[(j+1)%m],tol))continue;
+        const nyA=merk(nz,i),nyB=merk(z,j);
+        if(nyA||nyB)tal++;
+      }
+    });
+  }
+
+  // 4. Rydd opp i sonene vi endra geometrien på
+  cuts.forEach((m,z)=>{sanitizeZoneSegRefs(z);_syncGavlflater(z);});
+  return tal;
+}
+
 // ── Zone management ───────────────────────────────────────────
 function finishZone(){
   if(curPts.length<3)return;
   snapshot();markDirty();
-  zones.push({name:'Sone '+(++_nextZoneId),pts:[...curPts],windows:[],skillevegg:new Set(),takflater:[],gavlflater:[]});
-  curPts=[];updateResults();renderTable();draw();
-  hintText.textContent='Sone '+zones[zones.length-1].name+' lagt til!';
+  const nz={name:'Sone '+(++_nextZoneId),pts:[...curPts],windows:[],skillevegg:new Set(),takflater:[],gavlflater:[]};
+  zones.push(nz);
+  curPts=[];
+  const skTal=autoSkilleveggForNySone(nz);
+  updateResults();renderTable();draw();
+  hintText.textContent=nz.name+' lagt til!'+(skTal?' '+(skTal===1?'1 vegg':skTal+' veggar')+' mot nabosone vart skiljekonstruksjon.':'');
 }
 
 function finishTakflate(){

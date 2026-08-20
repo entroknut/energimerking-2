@@ -168,7 +168,9 @@ mppForZone(z)    // finn sona si etasje og kallar mppForFloor
 Vindauge (`segIdx`), skiljeveggar, `segOverrides` og `skMergedGroups` refererer alle veggsegment via indeks. Når `z.pts` endrar seg, forskyv indeksane seg:
 
 ```javascript
-remapSegsAfterInsert(z, i)    // kall ETTER z.pts.splice(i+1,0,pt)
+remapSegsAfterInsert(z, i, t) // kall ETTER z.pts.splice(i+1,0,pt).
+                              // t = kvar på segmentet punktet hamna (0-1);
+                              // utelaten t tyder midtpunktet.
 remapSegsBeforeDelete(z, pi)  // kall FØR z.pts.splice(pi,1) — treng gamle lengder
 sanitizeZoneSegRefs(z)        // rydd ugyldige referansar ved lasting
 ```
@@ -211,6 +213,23 @@ Krev både vassrett og loddrett strek, så skrå veggar får ikkje snap. Det er 
 `orthoSnap()` låser til næraste 45°-akse når Shift er halden. Verkar i teikning, kalibrering, måling og begge klippeverktøya.
 
 ---
+
+## Automatisk skiljekonstruksjon
+
+Ei nyteikna sone som ligg inntil ei eksisterande får den felles veggen sett til
+skiljekonstruksjon i **begge** sonene (`autoSkilleveggForNySone`, kalla frå
+`finishZone`). Ligg berre ein del av naboveggen inntil, vert naboveggen delt i
+tre — fasade, SK, fasade — ved at det vert sett inn punkt i `z.pts`.
+
+- Toleranse `_naboTolPx()` ≈ 8 cm, minste overlapp `_naboMinOverlapPx()` = 25 cm.
+  Ei berøring på nokre få centimeter tel altså ikkje.
+- Vi berre **set** `skillevegg`, aldri fjernar. Slår brukaren ein vegg tilbake
+  til fasade, står det valet fast sjølv om ei ny sone vert teikna seinare.
+- Berre den nye sona utløyser skanninga. Å flytte eit hjørne i etterkant gjer
+  ingen ting automatisk — det ville overraska meir enn det hjelpte.
+- Kutta går gjennom `remapSegsAfterInsert(z,i,t)`, så vindauge, `segOverrides`
+  og samanslåingsgrupper i nabosona følgjer med. `gavlflater` vert rekna på
+  nytt (`_syncGavlflater`), sidan dei peikar på segmentindeksar.
 
 ## Kalibrering
 
