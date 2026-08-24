@@ -181,7 +181,13 @@ Knappen er `.embed-only`, så heile funksjonen finst berre inne i EntroPi.
 - `id` må vere **stabil** — koplinga til sona lagrar han. Manglar `id`, lagar
   verktøyet ein av `kategori/namn`, og då mistar koplinga festet om namnet
   vert endra i EntroPi.
-- `kategori` styrer grupperinga i lista. Tom kategori vert «Ukategorisert».
+- `kategori` styrer grupperinga i lista, og **kva som blir vist**: berre
+  **ventilasjon, varme og kjøling** påverkar energimerkinga, så resten
+  (belysning, automasjon, gatevarme …) vert sila bort. Verten kan sende heile
+  lista si — verktøyet filtrerer, og seier i vindauget kor mange som ikkje er
+  viste, slik at ingenting forsvinn i stillheit. Samanlikninga er på
+  «byrjar med» etter at ø er normalisert, så «Varmepumpe» er med og
+  «Gatevarme» ikkje.
 - `namn` er det brukaren ser. `undertittel` og `ikon` (eitt teikn) er valfrie.
 - Feltnamna kan like godt vere `name`/`category`/`subtitle` — verktøyet
   normaliserer, så EntroPi kan sende radene sine som dei ligg.
@@ -210,6 +216,65 @@ det står då med stipla kant i vindauget.
 
 Verten kan sende `sxi:systems` uoppmoda når som helst — t.d. når nokon legg
 inn eit nytt system i EntroPi medan verktøyet står ope.
+
+#### Verdiar som skal med i SXI-fila seinare
+
+I dag sender protokollen berre `id`, `kategori` og `namn` — nok til å knyte
+system til sone. Skal systema faktisk *rekne* i SIMIEN, må tala følgje med.
+Lista under er kryssa mot det SXI-en verktøyet lagar faktisk har av felt, og
+mot kva han i dag gjettar frå byggeår og bygningskategori.
+
+**Ventilasjon** — `<ventilation>` per sone er alt der, men alle tala er norm:
+
+| Verdi frå EntroPi | Felt i SXI i dag | Kva som skjer no |
+|---|---|---|
+| Luftmengde i drift (m³/h, eller m³/(h·m²)) | `supply_air`, `extract_air` | norm per bygningskategori (kontor 7,0 i drift / 3,5 utanfor) |
+| Luftmengde utanfor drift | `supply_airflow_reduced`, `extract_airflow_reduced` | norm |
+| SFP (kW/(m³/s)) | `sfp_100` + dellast `sfp_80/60/40/20` | slått opp på byggeår: <2000 → 4,0, 2000–09 → 3,0, 2010–19 → 2,5, 2020+ → 2,0 |
+| Gjenvinningsgrad (temperaturverknadsgrad, %) | `efficiency_exchanger` + kurva `_100/_80/_60/_40/_20` | hardkoda 0,80 |
+| Vekslartype (roterande/plate/væskekopla) | `hygroscopic_exchanger`, `humidity_efficiency`, `frost_protection` | roterande-liknande, frostsikring av |
+| Systemtype (balansert / avtrekk) og CAV/VAV | `type`, namnet på systemet | alltid «CAV - konstant luftvolum» og balansert |
+| Driftstid (på/av, helg) | `usage_ventilation`-profilen, `usage_holiday` | norm per bygningskategori |
+| Tilluftstemperatur | `supply_temp`, `min/max_supply_temp` | 19 °C |
+| Varmebatteri (kW) | `heating_coil`, `heating_coil_cap` | ja, 30 kW |
+| Kjølebatteri (kW) | `cooling_coil`, `cooling_coil_cap` | per bygningskategori |
+
+Merk: SIMIEN vil ha luftmengd **per m²**. Verktøyet kjenner arealet til sonene
+systemet betjener, så EntroPi kan like godt sende total m³/h — vi deler.
+
+**Varme** — her manglar det mest. I dag skriv verktøyet **berre panelovnar**
+(`<new_local_heater_dir_el>`, 50 W/m² av BRA), altså elektrisk oppvarming for
+alle bygg. Eit reelt varmesystem treng:
+
+| Verdi frå EntroPi | Kvar det hører heime |
+|---|---|
+| Energibærar (fjernvarme, varmepumpe, el, bio, gass) | avgjer kva varmeelement som skal skrivast i staden for panelovnane |
+| Installert effekt (kW) | `capacity` |
+| Systemverknadsgrad / COP–SCOP for varmepumpe | verknadsgrad på varmeelementet |
+| Dekningsgrad (% av varmebehovet) | fleire varmeelement med `priority` |
+| Distribusjon (radiator / gulvvarme / luft) | `heater_type`, `convective_share` |
+| Tur-/returtemperatur | `heating_coil_supply_temp` / `_return_temp` (i dag 45/30) |
+
+**Kjøling** — verktøyet har inga kjølemaskin i det heile; kjøling finst berre
+som batteri i ventilasjonsaggregatet med `cooling_coil_efficiency="2.00"`.
+Relevant frå EntroPi: energibærar (fjernkjøling / kjølemaskin / VP i
+kjøledrift), effekt (kW), kjølefaktor (COP/EER), tur-/returtemperatur (i dag
+10/15) og om kjølinga er romkjøling eller berre i aggregatet.
+
+**Felles, uavhengig av kategori:** installasjonsår (avgjer normverdiar når tala
+manglar), fabrikat/modell (rapporten), status i drift/ute av drift, og kva
+soner systemet betjener — det siste er det brua alt gjer.
+
+**Før noko av dette vert skrive til SXI** må feltnamna lesast av ei
+referansefil frå SIMIEN som *har* fjernvarme, varmepumpe og kjølemaskin.
+Attributta `distr_heating_id`/`distr_cooling_id` på batteria viser at SIMIEN
+har sentrale anlegg som vert refererte med id, men elementnamna deira kan vi
+ikkje gjette — SIMIEN er kresen på feltnamn, og feil namn har før gjort at
+programmet heng. Eksporter ei slik fil frå SIMIEN, så les vi namna av henne.
+
+Ei anna strukturell avgjerd som må tas då: i dag får **kvar sone sin eigen**
+`<ventilation>`. Eitt EntroPi-aggregat som betjener fleire soner bør heller bli
+**eitt** element som sonene deler.
 
 ### `?embed=1` — slår på handtrykket
 
@@ -271,6 +336,25 @@ verktøyet til å oppføre seg annleis. Bruk `inPi()` framfor å gjenta
 
 - `http://localhost:8742/index.html` — skal vere heilt uendra
 - `http://localhost:8742/docs/entropi-test-host.html` — innbygd
+
+### Ny versjon slår ikkje gjennom med ein gong
+
+GitHub Pages sender `Cache-Control: max-age=600` på `index.html`. Nettlesaren
+brukar altså sin lagra kopi i inntil **ti minutt utan å spørje serveren**, så
+ein nypublisert versjon kan sjå ut som han ikkje kom — versjonsnummeret nede i
+verktøylinja står på det gamle sjølv om fila på Pages er ny.
+
+- Sjekk kva som faktisk ligg ute:
+  `curl -sI 'https://entroknut.github.io/energimerking-2/index.html?embed=1'`
+  (sjå `Last-Modified`) — er den ny, er det cachen lokalt.
+- Hard oppfrisking (Ctrl+F5) hentar iframen på nytt med ein gong.
+- Verktøyet sender versjonen sin i `sxi:ready` og `sxi:state`
+  (`version:'v3.7.0'`). Logg han på vertssida, så treng ingen gjette på kva
+  iframen køyrer.
+- Treng de å tvinge fram ein bestemt versjon straks, legg han i URL-en:
+  `?embed=1&v=3.7.0`. Ny query gir ny cache-nøkkel. Ikkje bruk eit tidsstempel
+  som endrar seg for kvar opning — fila er fleire megabyte, og då vert ho lasta
+  ned på nytt kvar gong.
 
 ### Sikkerheit
 

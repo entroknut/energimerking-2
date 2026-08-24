@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.7.0 | Single-file HTML applikasjon
+**Versjon:** 3.7.1 | Single-file HTML applikasjon
 
 ---
 
@@ -442,7 +442,15 @@ Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
     kopi av den aktive etasjen (same fella som `_fyllFraPi()`).
   - `snapshot()` før kvar endring gir angre. Angre byter ut soneobjekta, så
     vindauget teiknar seg på nytt frå ein wrapper rundt `applyHistoryState`.
-  - Koplinga går **ikkje** inn i SXI-eksporten enno.
+  - Berre **ventilasjon, varme og kjøling** vert viste. Verten sender heile
+    lista si; filteret (`relevant()`) står i vindauget, og talet på sila
+    system vert vist — aldri sil i stillheit. `alle` (rålista) vert brukt til
+    å avgjere om ei kopling framleis finst, `systems` (sila) til det som kan
+    dragast; elles ville ei gammal belysningskopling blitt merkt som sletta.
+  - Koplinga går **ikkje** inn i SXI-eksporten enno. Kva tal som må med når
+    han skal det (luftmengder, SFP, gjenvinningsgrad, effekt, COP …) og kva
+    verktøyet gjettar i dag: sjå «Verdiar som skal med i SXI-fila seinare» i
+    `docs/entropi-integrasjon.md`.
 - Ny melding = ny metode på `window.EntroHost`; `postMessage` bur berre i brua.
   Kvar melding inn i tre filer: brua, protokolltabellen i doc-en, og testverten.
 - Test **begge** modus: `index.html` direkte (skal vere uendra) og
