@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.2.0 | Single-file HTML applikasjon
+**Versjon:** 3.4.0 | Single-file HTML applikasjon
 
 ---
 
@@ -72,7 +72,7 @@ Grep-mønsteret må **ankrast på `</span>`**. To feller, begge observerte:
   Mapbox GL-blokka på line 46, som ligg **før** appversjonen i fila. Du får
   `v1.5.6` og trur publiseringa feila.
 
-Appversjonen står som `>v3.2.0</span>` (line 630), så ankeret er det som gjer
+Appversjonen står som `>v3.4.0</span>` (line 630), så ankeret er det som gjer
 kommandoen påliteleg:
 
 ```bash
@@ -193,6 +193,43 @@ musrørsle (zoom flyttar ikkje musa).
 
 All brukarstyrt tekst i SXI-eksporten må gjennom `xesc()`. Eit prosjektnamn med `&` gir elles ugyldig XML som SIMIEN nektar å opne.
 
+### 6. `breddeMm` er sanninga — `t0`/`t1` er berre senteret
+
+Eit vindauge lagrar breidda i millimeter (`breddeMm`) og posisjonen som `t0`/`t1`
+langs segmentet. Dei to blir **ikkje** halde i sync: endrar brukaren breidda i
+dialogen, står `t0`/`t1` att. Difor må kvar visning rekne utstrekninga på nytt:
+
+```javascript
+fitSpanT(centreT, width, segLen)   // width og segLen i SAME eining (px eller m)
+winSpanPx(w, segLenPx, mpp)        // for eit vindaugsobjekt, i biletpikslar
+```
+
+Bruk aldri `w.t1-w.t0` som breidde. Det var feil i teikninga, treff-testinga,
+draginga, «Del sone» og alle fire limeinn-vegane. `expandWindows()` gjer det same
+for fasadevising/3D.
+
+Begge hjelparane **skyv** vindauget inn på veggen når det ikkje er plass frå
+senteret — dei klipper ikkje éi side. Ei einsidig klipping viste ei anna breidde
+på skjermen enn den som gjekk til SIMIEN.
+
+### 7. Omkalibrering: alt som er teikna må følgje bygget
+
+Endrar brukaren skalaen etter å ha teikna, ligg teikninga i ro — det er **måla**
+som endrar seg. Sonearealer, veggengder og kontrollmål reknast frå biletpikslar
+ved kvar teikning og følgjer med av seg sjølv. To ting gjer det ikkje:
+
+- `w.breddeMm` — måla langs veggen med to klikk, men lagra i mm
+- `z.gavlflater[].area` / `.lenM` — cacha i meter
+
+Begge blir handterte av `reskalerVedNyKalibrering(fl, oldMpp, newMpp)`. Kall
+`_snapshotMpp()` **før** skalaen blir bytta, og `_reskalerAlleEtasjar(gammal)`
+etterpå. Det er hekta på **to** stader: `calOk` og «Eiga/Global»-vekslaren i
+skalabadgen (som òg endrar effektiv skala for etasjen).
+
+Høgd, brystning og etasjehøgde er **tasta inn**, aldri henta frå planteikninga —
+dei står urørte. Same for `areaOverride`, `perimOverride` og `segOverrides`:
+tasta fasit skal ikkje skalerast.
+
 ---
 
 ## Snapping
@@ -230,6 +267,29 @@ tre — fasade, SK, fasade — ved at det vert sett inn punkt i `z.pts`.
 - Kutta går gjennom `remapSegsAfterInsert(z,i,t)`, så vindauge, `segOverrides`
   og samanslåingsgrupper i nabosona følgjer med. `gavlflater` vert rekna på
   nytt (`_syncGavlflater`), sidan dei peikar på segmentindeksar.
+
+## Samanslåing av skiljeveggar
+
+`skMergedGroups` er ei liste med `{segs:[segIdx], name}`. Eit sett treng **ikkje**
+dekkje heile nabogruppa frå `getSkAdjacentGroups()` — brukaren kan plukke ut nokre
+av veggane, og same nabogruppa kan ha fleire sett side om side.
+
+Difor: slå **aldri** opp ei samanslåing på gruppenøkkel (`grp.map(s=>s.idx).join(',')`).
+Bruk medlemskap — `skMergedGroups.find(g => g.segs.includes(segIdx))`. Det gjeld både
+sidepanelet og SXI-eksporten; begge hadde nøkkeloppslag før og ville stille slutta å
+finne delvise sett.
+
+- Eit segment kan berre liggje i **eitt** sett. `mergeSegs()` fjernar det frå andre først.
+- Eit sett med færre enn to segment vert oppløyst.
+- Namna er automatiske: `SK samla 1`, `SK samla 2` … Prefikset er med vilje ulikt
+  fasadelappane (`SK1`, `SK2`), sidan dei no står side om side i same sone og begge
+  endar som elementnamn i SIMIEN.
+- «Slå saman» slår saman alle **ledige** SK-veggar i nabogruppa (eitt klikk, som før).
+  «Vel…» opnar plukk-modus: avkryssingsboksar rett i radene, med ein handlingsstripe
+  under. Plukk-modus byggjer **ikkje** sidepanelet på nytt — han manipulerer dei radene
+  som alt står der, og først samanslåinga utløyser `updateResults()`.
+
+---
 
 ## Kalibrering
 
@@ -417,4 +477,8 @@ Viktig bughistorikk:
 - calPts må lagrast i biletkoordinatar, ikkje skjermkoordinatar
 - floorDx/floorDy finst ikkje lenger — bruk floorDxImg/floorDyImg (biletpikslar)
 - Utjamningsfilter må kopiere kanten av vindauget, ikkje la han stå som nullar
+- Vindaugsbreidde: bruk fitSpanT/winSpanPx, ALDRI w.t1-w.t0 (som berre er senteret)
+- Omkalibrering må skalere w.breddeMm og rekne gavlflater på nytt — elles slutta
+  vindauga å følgje bygget, og glasandelen i SXI vart stille feil
+- renderFasadeView() er daud kode: det finst ingen #fasadeWrap i DOM-en
 ```
