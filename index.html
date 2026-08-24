@@ -706,7 +706,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.7.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.7.1</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -7743,7 +7743,17 @@ setTimeout(()=>{
   const CAT_ICO={ventilasjon:'❋',varme:'▲',kjøling:'❄',kjoling:'❄',gatevarme:'≋',
     belysning:'☀',automasjon:'⚙',energi:'⚡',vatn:'≈',vann:'≈',sanitær:'≈',
     brann:'▲',heis:'⇅',solceller:'☀'};
-  let systems=[];      // lista frå EntroPi — tom til han har svart
+  // Berre ventilasjon, varme og kjøling påverkar energimerkinga. Verten sender
+  // heile lista si (belysning, automasjon, gatevarme …), og vi siler her i
+  // staden for å krevje at EntroPi filtrerer — då held protokollen seg enkel,
+  // og ein ny kategori på verten dukkar ikkje uventa opp i verktøyet.
+  const REL_KAT=['ventilasjon','varme','kjoling'];
+  const relevant=s=>{
+    const k=String(s.kategori||'').toLowerCase().replace(/ø/g,'o');
+    return REL_KAT.some(r=>k.indexOf(r)===0);   // «Varmepumpe» ja, «Gatevarme» nei
+  };
+  let alle=[];         // alt verten sende — til å sjå om ei kopling framleis finst
+  let systems=[];      // dei relevante, dei som kan dragast — tom til han har svart
   let picked=null;     // system valt med klikk (vegen utan drag — touch, tastatur)
   let dragId=null;     // dataTransfer kan ikkje lesast under dragover
   let hentar=false;
@@ -7829,6 +7839,17 @@ setTimeout(()=>{
       systems.filter(x=>x.kategori===kat)
         .forEach(x=>srcEl.appendChild(itemEl(x,bruk[x.id]||0)));
     });
+    // Sil aldri i stillheit — elles ser det ut som system manglar i EntroPi
+    const skjult=alle.length-systems.length;
+    if(skjult>0){
+      const n=document.createElement('div');
+      n.className='sys-empty';
+      n.style.marginTop='12px';
+      n.textContent=skjult+(skjult===1?' system i ein annan kategori er ikkje vist'
+        :' system i andre kategoriar er ikkje viste')
+        +' — berre ventilasjon, varme og kjøling påverkar energimerkinga.';
+      srcEl.appendChild(n);
+    }
   }
   function itemEl(sys,n){
     const el=document.createElement('div');
@@ -7924,11 +7945,11 @@ setTimeout(()=>{
     return card;
   }
   function chipEl(x,o){
-    const finst=systems.some(s=>s.id===x.id);
+    const finst=alle.some(s=>s.id===x.id);
     const chip=document.createElement('span');
     // Systema kan vere sletta i EntroPi etter at koplinga vart gjord — då står
     // ho att med stipla kant i staden for å forsvinne stille frå prosjektet.
-    chip.className='sys-chip'+(systems.length&&!finst?' gone':'');
+    chip.className='sys-chip'+(alle.length&&!finst?' gone':'');
     chip.title=finst?(x.kategori||''):'Dette systemet finst ikkje i EntroPi lenger';
     const t=document.createElement('span');
     t.textContent=x.namn||x.id;
@@ -7941,6 +7962,12 @@ setTimeout(()=>{
 
   function render(){renderSrc();renderZones();}
 
+  // Éin stad som held dei to listene i takt
+  function setSystems(list){
+    alle=Array.isArray(list)?list:[];
+    systems=alle.filter(relevant);
+  }
+
   // ── Henting frå verten ──
   async function hent(){
     const H=window.EntroHost;
@@ -7948,12 +7975,15 @@ setTimeout(()=>{
     hentar=true;status('Hentar tekniske systemer…');renderSrc();
     const r=await H.requestSystems();
     hentar=false;
-    if(r&&Array.isArray(r.systems))systems=r.systems;
+    if(r&&Array.isArray(r.systems))setSystems(r.systems);
     if(r&&r.ok){
       const bn=H.byggNamn?H.byggNamn():'';
+      const skjult=alle.length-systems.length;
       status(systems.length
-        ?('Fann '+systems.length+' system'+(bn?' på '+bn:'')+'.')
-        :'Bygget har ingen tekniske systemer i EntroPi.');
+        ?('Fann '+systems.length+' system'+(bn?' på '+bn:'')
+          +(skjult>0?' ('+skjult+' i andre kategoriar)':'')+'.')
+        :(alle.length?'Ingen system i ventilasjon, varme eller kjøling på bygget.'
+                     :'Bygget har ingen tekniske systemer i EntroPi.'));
     }else status((r&&r.message)||'Kunne ikkje hente tekniske systemer.');
     render();
   }
@@ -7964,7 +7994,7 @@ setTimeout(()=>{
     saveFloorState();
     const H=window.EntroHost;
     const cache=H&&H.systems?H.systems():null;
-    if(Array.isArray(cache))systems=cache;
+    if(Array.isArray(cache))setSystems(cache);
     const bn=H&&H.byggNamn?H.byggNamn():'';
     const chip=document.getElementById('sysBygg');
     if(chip){chip.style.display=bn?'inline-flex':'none';chip.textContent='⌂ '+bn;}
@@ -7986,7 +8016,7 @@ setTimeout(()=>{
 
   // Verten kan sende lista uoppmoda — då oppdaterer vi eit ope vindauge
   if(window.EntroHost&&window.EntroHost.onSystems)window.EntroHost.onSystems(list=>{
-    if(Array.isArray(list))systems=list;
+    if(Array.isArray(list))setSystems(list);
     if(ope())render();
   });
   // Angre byter ut soneobjekta, så eit ope vindauge peikar på gamle soner
