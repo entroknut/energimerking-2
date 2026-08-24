@@ -627,7 +627,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.3.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.4.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -1441,6 +1441,48 @@ function mppForZone(z){
   return mmPerImgPx;
 }
 
+// ── Omkalibrering: alt som er teikna på planen skal følgje bygget ──
+// Endrar brukaren skalaen etter å ha teikna, blir teikninga sjølv liggjande
+// i ro — det er MÅLA som endrar seg. Sonearealer, veggengder og kontrollmål
+// blir rekna på nytt frå biletpikslar ved kvar teikning, så dei følgjer med
+// av seg sjølv. Vindaugs- og dørbreidder gjer det IKKJE: dei ligg lagra i mm
+// (`breddeMm`), måla langs veggen med to klikk på fasaden. Utan denne
+// reskaleringa vart eit vindauge liggjande med gammal millimeterbreidde på ein
+// vegg som hadde fått ny lengd — det såg ut som om vindauget endra storleik
+// utan å følgje bygget, og SXI-eksporten fekk glasareal som ikkje høyrde saman
+// med veggarealet.
+//
+// Høgd og brystning er TASTA INN (aldri henta frå planteikninga), på same måte
+// som etasjehøgda. Dei står difor urørte — akkurat som `defaultHoyde`.
+// `areaOverride`, `perimOverride` og `segOverrides` er òg tasta fasit og står.
+//
+// `gavlflater` har cacha `area`/`lenM` i meter og må reknast på nytt.
+// Returnerer talet på vindauge/dører som vart skalerte.
+function reskalerVedNyKalibrering(fl,oldMpp,newMpp){
+  if(!fl||!(oldMpp>0)||!(newMpp>0))return 0;
+  const k=newMpp/oldMpp;
+  if(!isFinite(k)||Math.abs(k-1)<1e-9)return 0;
+  let n=0;
+  (fl.zones||[]).forEach(z=>{
+    (z.windows||[]).forEach(w=>{
+      if(!(w.breddeMm>0))return;
+      w.breddeMm=Math.max(1,Math.round(w.breddeMm*k));
+      n++;
+    });
+    _syncGavlflater(z);
+  });
+  return n;
+}
+// Fangar effektiv skala for alle etasjar før ei kalibreringsendring.
+function _snapshotMpp(){return floors.map(fl=>mppForFloor(fl));}
+// Reskalerer dei etasjane som faktisk fekk ny skala. Kall ETTER at
+// mmPerImgPx/globalMmPerImgPx/f.mmPerImgPx er oppdaterte.
+function _reskalerAlleEtasjar(oldMppList){
+  let n=0;
+  floors.forEach((fl,i)=>{n+=reskalerVedNyKalibrering(fl,oldMppList[i],mppForFloor(fl));});
+  return n;
+}
+
 function calcAreaM2(pts,mpp){
   if(mpp===undefined)mpp=mmPerImgPx;
   if(!mpp||pts.length<3)return null;
@@ -1481,6 +1523,33 @@ function calcSegments(pts,fhM,mpp){
 }
 function fmtM2(v){return v.toFixed(2)+' m²';}
 function fmtM(v){return v.toFixed(2)+' m';}
+
+// ── Utstrekning for vindauge/dør langs eit veggsegment ────────
+// breddeMm er sanninga for kor breitt eit vindauge er; t0/t1 held berre
+// SENTERposisjonen langs segmentet (dei blir ikkje oppdaterte når brukaren
+// endrar breidda i dialogen). Difor må kvar visning rekne utstrekninga på nytt
+// frå breddeMm — teikning, treff-testing, fasadevising, 3D og limeinn.
+//
+// `width` og `segLen` må ha same eining (biletpikslar ELLER meter).
+// Er det ikkje plass til heile breidda frå senteret, blir vindauget SKYVD
+// inn på veggen — ikkje klipt på éi side. Ei einsidig klipping ville vist ei
+// anna breidde på skjermen enn den som går til SIMIEN.
+function fitSpanT(centreT,width,segLen){
+  if(!(segLen>0)||!(width>0))return{t0:0,t1:1};
+  const halfT=(width/2)/segLen;
+  if(halfT>=0.5)return{t0:0,t1:1};      // breiare enn veggen — fyll heile
+  const c=isFinite(centreT)?centreT:0.5;
+  let t0=c-halfT,t1=c+halfT;
+  if(t0<0){t0=0;t1=2*halfT;}
+  else if(t1>1){t1=1;t0=1-2*halfT;}
+  return{t0,t1};
+}
+// Same, men for eit vindaugsobjekt i BILETpikslar. Fell tilbake på den lagra
+// utstrekninga når teikninga ikkje er kalibrert (då finst ingen mm-breidde).
+function winSpanPx(w,segLenPx,mpp){
+  const widthPx=(mpp&&w.breddeMm>0)?w.breddeMm/mpp:Math.max(0,(w.t1-w.t0))*segLenPx;
+  return fitSpanT((w.t0+w.t1)/2,widthPx,segLenPx);
+}
 
 // ── Felles fasadenamn-generator ───────────────────────────────
 // Returnerer array med same lengde som segs, kvart element er namn for det segmentet
@@ -1842,6 +1911,8 @@ function updateScaleBadge(){
 
   toggle.onclick=e=>{
     e.stopPropagation();
+    snapshot();                     // vekslinga kan endre skalaen — gjer den angrande
+    const _oldMpp=mppForFloor(f);   // MÅ tas før ownCal blir bytta
     f.ownCal=!f.ownCal;
     if(f.ownCal){
       // Start med kopi av global som utgangspunkt
@@ -1852,8 +1923,11 @@ function updateScaleBadge(){
       f.mmPerImgPx=null;
       hintText.textContent='Tilbake til global kalibrering for '+f.name+'.';
     }
+    // Går ein frå eiga til global skala, endrar måla seg — vindauge/dører følgjer
+    const _nRe=reskalerVedNyKalibrering(f,_oldMpp,mppForFloor(f));
     syncFloorState();
     updateScaleBadge();updateResults();renderTable();draw();
+    if(_nRe>0)hintText.textContent+=' '+_nRe+' vindauge/dør'+(_nRe>1?'er':'')+' vart skalert med bygget.';
   };
 
   scaleBadge.appendChild(toggle);
@@ -2700,6 +2774,9 @@ function draw(){
         const labels=getFacadeLabels(z,segs);
         const sk=z.skillevegg||new Set();
         const yvMergedSet=new Set((z.yvMergedGroups||[]).flatMap(g=>g.segs));
+        // Namn på SK-samanslåinga, så ein ser på teikninga kva veggar som er eitt element
+        const skMergedName=new Map();
+        (z.skMergedGroups||[]).forEach(g=>g.segs.forEach(i=>skMergedName.set(i,g.name||'SK')));
         segs.forEach((seg,si)=>{
           const isSK2=sk.has(seg.idx);
           const isKJ2=!isSK2&&isKjellervegg(z,seg.idx);
@@ -2711,7 +2788,8 @@ function draw(){
           const nx=mp.x+dx/dlen*16,ny=mp.y+dy/dlen*16;
           const wins=(z.windows||[]).filter(w=>w.segIdx===seg.idx);
           const winNote=wins.length?` [${wins.length}×▭]`:'';
-          const labelTxt=(isMergedYv?'⊞ ':'')+(isKJ2?'⛰ ':'')+nm+winNote;
+          const skMName=isSK2?skMergedName.get(seg.idx):null;
+          const labelTxt=(isMergedYv?'⊞ ':'')+(skMName?'⊞ '+skMName+' · ':'')+(isKJ2?'⛰ ':'')+nm+winNote;
           ctx.font='bold 9px Inter,sans-serif';
           const tw=ctx.measureText(labelTxt).width+10;
           ctx.fillStyle=isSK2?'#fef3c7':isKJ2?'#f3ece0':isMergedYv?'#dbeafe':'rgba(255,255,255,.88)';
@@ -2756,16 +2834,8 @@ function draw(){
       const ux=dx/segLen,uy=dy/segLen;
       const perp={x:-uy,y:ux};
       // Bruk breddeMm for visuell breidde (uavhengig av segmentlengd)
-      const tCentre=(w.t0+w.t1)/2;
-      let halfT;
-      if(mmPerImgPx&&w.breddeMm){
-        const halfPx=w.breddeMm/mmPerImgPx/2; // breddeMm / (mm per px) = pikslar
-        halfT=halfPx/segLen;
-      } else {
-        halfT=(w.t1-w.t0)/2;
-      }
-      const t0vis=Math.max(0,tCentre-halfT);
-      const t1vis=Math.min(1,tCentre+halfT);
+      const _span=winSpanPx(w,segLen,mmPerImgPx);
+      const t0vis=_span.t0,t1vis=_span.t1;
       const s0i={x:seg.p1.x+ux*t0vis*segLen,y:seg.p1.y+uy*t0vis*segLen};
       const s1i={x:seg.p1.x+ux*t1vis*segLen,y:seg.p1.y+uy*t1vis*segLen};
       const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
@@ -3376,6 +3446,7 @@ document.getElementById('calBack').onclick=()=>{
 
 document.getElementById('calOk').onclick=()=>{
   let newMmPerImgPx=null;
+  let _reskalert=0;
   if(calMode==='scale'){
     const papir=gjeldandePapir();
     if(papir&&bgImg&&valdSkala>0) newMmPerImgPx=(papir.w/bgImg.width)*valdSkala;
@@ -3389,6 +3460,7 @@ document.getElementById('calOk').onclick=()=>{
   if(newMmPerImgPx){
     snapshot(); // angre-steg + markerer prosjektet som endra → autolagring
     const f=curFloor();
+    const _oldMpp=_snapshotMpp();   // MÅ tas før skalaen blir bytta
     if(f.ownCal){
       // Kun aktiv etasje
       f.mmPerImgPx=newMmPerImgPx;
@@ -3399,10 +3471,14 @@ document.getElementById('calOk').onclick=()=>{
       floors.forEach(fl=>{if(!fl.ownCal)fl.mmPerImgPx=newMmPerImgPx;});
       mmPerImgPx=newMmPerImgPx;
     }
+    // Vindauge/dører er måla på planteikninga — dei må følgje bygget
+    _reskalert=_reskalerAlleEtasjar(_oldMpp);
     updateScaleBadge();updateResults();renderTable();renderFloorTabs();draw();
   }
   calOverlay.classList.remove('show');
   calPts=[];setMode('navigate');
+  // Etter setMode(), som sjølv skriv i hintText
+  if(_reskalert>0)hintText.textContent='Ny skala — '+_reskalert+' vindauge/dør'+(_reskalert>1?'er':'')+' vart skalert med bygget. Ctrl+Z for å angre.';
 };
 
 document.getElementById('calCancel').onclick=()=>{
@@ -3850,8 +3926,12 @@ function _finishDelSone(){
         const t=((mid.x-a.x)*dx+(mid.y-a.y)*dy)/L2;
         if(t<0||t>1)continue;
         if(Math.hypot(mid.x-(a.x+dx*t),mid.y-(a.y+dy*t))>1.5)continue;
-        const halv=(w.t1-w.t0)/2*origLen/Math.sqrt(L2);
-        nz.windows.push({...w,segIdx:i,t0:Math.max(0,t-halv),t1:Math.min(1,t+halv)});
+        // Breidda kjem frå breddeMm — den nye veggen er kortare enn den opphavlege,
+        // så den lagra t1-t0 ville gitt feil utstrekning
+        const nyLen=Math.sqrt(L2);
+        const widthPx=(mmPerImgPx&&w.breddeMm>0)?w.breddeMm/mmPerImgPx:Math.max(0,(w.t1-w.t0))*origLen;
+        const _ds=fitSpanT(t,widthPx,nyLen);
+        nz.windows.push({...w,segIdx:i,t0:_ds.t0,t1:_ds.t1});
         plassert=true;break;
       }
     }
@@ -4697,26 +4777,86 @@ function updateResults(){
           return -1;
         };
 
-        // Er ei SK-gruppe slått saman?
-        const groupKey=(gi)=>skGroups[gi].map(s=>s.idx).sort().join(',');
-        const getMergedGroup=(gi)=>{
-          if(!z.skMergedGroups||gi<0||gi>=skGroups.length)return null;
-          const key=groupKey(gi);
-          return z.skMergedGroups.find(g=>g.segs.slice().sort().join(',')===key)||null;
-        };
-        const isGroupMerged=(gi)=>!!getMergedGroup(gi);
-        const toggleGroupMerge=(gi)=>{
+        // ── SK-samanslåing ──
+        // Ei samanslåing er ei fri liste med segmentindeksar — ikkje nødvendigvis
+        // heile nabogruppa. Difor slår vi opp på MEDLEMSKAP, ikkje på gruppenøkkel,
+        // og ei nabogruppe kan innehalde fleire samanslåingar side om side.
+        const getMergedFor=segIdx=>(z.skMergedGroups||[]).find(g=>g.segs.includes(segIdx))||null;
+        const skGroupKey=g=>g.segs.slice().sort((a,b)=>a-b).join(',');
+        // Namn med eige prefiks: fasadelappane heiter alt SK1, SK2 … og etter at
+        // ei samanslåing kan dekkje berre delar av gruppa, ligg dei side om side.
+        const renumberSk=()=>{z.skMergedGroups.forEach((g,i)=>{g.name='SK samla '+(i+1);});};
+        // Ledige SK-segment i ei nabogruppe — dei som ikkje alt ligg i ei samanslåing
+        const freeSegsIn=gi=>(gi<0||gi>=skGroups.length)?[]:skGroups[gi].filter(s=>!getMergedFor(s.idx));
+        const mergeSegs=idxs=>{
           if(!z.skMergedGroups)z.skMergedGroups=[];
-          const key=groupKey(gi);
-          const existingIdx=z.skMergedGroups.findIndex(g=>g.segs.slice().sort().join(',')===key);
-          if(existingIdx>=0){
-            z.skMergedGroups.splice(existingIdx,1);
-            z.skMergedGroups.forEach((g,i)=>{g.name='SK '+(i+1);});
-          } else {
-            const nextN=z.skMergedGroups.length+1;
-            z.skMergedGroups.push({segs:[...skGroups[gi].map(s=>s.idx)],name:'SK '+nextN});
-          }
-          updateResults();renderTable();
+          if(idxs.length<2)return;
+          // Eit segment kan berre liggje i éi samanslåing
+          z.skMergedGroups=z.skMergedGroups.filter(g=>{
+            g.segs=g.segs.filter(i=>!idxs.includes(i));
+            return g.segs.length>=2;
+          });
+          z.skMergedGroups.push({segs:[...idxs].sort((a,b)=>a-b),name:''});
+          renumberSk();
+          updateResults();renderTable();draw();
+        };
+        const unmergeSegs=segIdx=>{
+          if(!z.skMergedGroups)return;
+          z.skMergedGroups=z.skMergedGroups.filter(g=>!g.segs.includes(segIdx));
+          renumberSk();
+          updateResults();renderTable();draw();
+        };
+
+        // Plukk-modus — vel kva SK-veggar i nabogruppa som skal slåast saman.
+        // Alt skjer i DOM-en som alt står her; ingen full sidepanel-bygging før
+        // sjølve samanslåinga, så det kostar ingenting å opne og lukke.
+        const groupRows={};
+        let pickTeardown=null;
+        const exitPick=()=>{if(pickTeardown){const t=pickTeardown;pickTeardown=null;t();}};
+        const enterPick=(gi,preselect)=>{
+          exitPick();
+          const rows=(groupRows[gi]||[]).filter(r=>!getMergedFor(r.seg.idx));
+          if(rows.length<2)return;
+          const sel=new Set(preselect!=null?[preselect]:[]);
+          const boxes=[];
+          const bar=document.createElement('div');
+          bar.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;margin:2px 0;border-radius:6px;background:#fffbeb;border:1px dashed #d97706';
+          const info=document.createElement('span');info.style.cssText='font-size:10.5px;color:#92400e;flex:1';
+          const allBtn=document.createElement('button');
+          allBtn.style.cssText='font-size:10px;padding:2px 6px;border:1px solid #d97706;border-radius:4px;background:#fff;color:#92400e;cursor:pointer;font-family:inherit;white-space:nowrap';
+          const cancelBtn=document.createElement('button');
+          cancelBtn.style.cssText='font-size:10px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:#fff;color:#6b7280;cursor:pointer;font-family:inherit;white-space:nowrap';
+          cancelBtn.textContent='Avbryt';
+          const okBtn=document.createElement('button');
+          okBtn.style.cssText='font-size:10px;font-weight:600;padding:2px 8px;border:1px solid #d97706;border-radius:4px;background:#d97706;color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap';
+          const sync=()=>{
+            info.textContent=sel.size<2?'Vel minst to veggar':(sel.size+' av '+rows.length+' valde');
+            okBtn.textContent='Slå saman ('+sel.size+')';
+            okBtn.disabled=sel.size<2;
+            okBtn.style.opacity=sel.size<2?'.45':'1';
+            okBtn.style.cursor=sel.size<2?'default':'pointer';
+            allBtn.textContent=sel.size===rows.length?'Ingen':'Alle';
+            boxes.forEach(b=>{b.cb.checked=sel.has(b.r.seg.idx);b.r.row.style.boxShadow=b.cb.checked?'inset 0 0 0 2px #d97706':'none';});
+          };
+          rows.forEach(r=>{
+            const cb=document.createElement('input');cb.type='checkbox';
+            cb.style.cssText='margin:0;width:13px;height:13px;accent-color:#d97706;cursor:pointer;flex:none';
+            cb.onclick=e=>{e.stopPropagation();if(cb.checked)sel.add(r.seg.idx);else sel.delete(r.seg.idx);sync();};
+            r.left.insertBefore(cb,r.left.firstChild);
+            r.row._pickToggle=()=>{if(sel.has(r.seg.idx))sel.delete(r.seg.idx);else sel.add(r.seg.idx);sync();};
+            boxes.push({cb,r});
+          });
+          allBtn.onclick=()=>{if(sel.size===rows.length)sel.clear();else rows.forEach(r=>sel.add(r.seg.idx));sync();};
+          cancelBtn.onclick=()=>exitPick();
+          okBtn.onclick=()=>{if(sel.size<2)return;const list=[...sel];exitPick();mergeSegs(list);};
+          bar.appendChild(info);bar.appendChild(allBtn);bar.appendChild(cancelBtn);bar.appendChild(okBtn);
+          const lastRow=rows[rows.length-1].row;
+          facSection.insertBefore(bar,lastRow.nextSibling);
+          pickTeardown=()=>{
+            bar.remove();
+            boxes.forEach(b=>{b.cb.remove();b.r.row._pickToggle=null;b.r.row.style.boxShadow='none';});
+          };
+          sync();
         };
 
         // YV-samanslåing
@@ -4738,26 +4878,27 @@ function updateResults(){
           const isSK=z.skillevegg.has(seg.idx);
           const nm=labels2[si];
           const gi=segGroupIdx(seg.idx);
-          const merged=isSK&&gi>=0&&isGroupMerged(gi);
+          const mergedObj=isSK?getMergedFor(seg.idx):null;
 
-          // Viss fleire SK-nabo er slått saman — vis berre éin rad
-          if(merged){
-            if(shownMergedGroups.has(gi))return;
-            shownMergedGroups.add(gi);
-            const grpSegs=skGroups[gi];
+          // Viss fleire SK-veggar er slått saman — vis berre éin rad for heile settet
+          if(mergedObj){
+            const mkey=skGroupKey(mergedObj);
+            if(shownMergedGroups.has(mkey))return;
+            shownMergedGroups.add(mkey);
+            const grpSegs=segs.filter(s2=>mergedObj.segs.includes(s2.idx));
             const totalLenM=grpSegs.reduce((s,s2)=>s+(s2.lenM||0),0);
             const totalA=grpSegs.reduce((s,s2)=>s+(s2.areaM2||0),0);
-            const mergedObj=getMergedGroup(gi);
             const row=document.createElement('div');
             row.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;margin:2px 0;border-radius:6px;background:#fef3c7;border:1px solid #d97706';
             const nameTag=document.createElement('span');nameTag.style.cssText='font-size:11px;font-weight:700;color:#92400e;white-space:nowrap';
             nameTag.textContent=mergedObj?.name||'SK';
             const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:10.5px;color:#6b7280;font-family:'DM Mono',monospace;flex:1";
             statsSpan.textContent=`${grpSegs.length} veggar · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx?fmtM2(totalA):'—'}`;
+            row.title='Eitt element i SIMIEN, sett saman av: '+grpSegs.map(s2=>labels2[segs.indexOf(s2)]).join(', ');
             const unmergeBtn=document.createElement('button');
             unmergeBtn.style.cssText='font-size:10px;padding:2px 6px;border:1px solid #d97706;border-radius:4px;background:#fff;color:#92400e;cursor:pointer;font-family:inherit;white-space:nowrap';
             unmergeBtn.textContent='Del opp';
-            unmergeBtn.onclick=()=>toggleGroupMerge(gi);
+            unmergeBtn.onclick=()=>unmergeSegs(grpSegs[0]?grpSegs[0].idx:seg.idx);
             row.appendChild(nameTag);row.appendChild(statsSpan);row.appendChild(unmergeBtn);
             facSection.appendChild(row);
             return;
@@ -4828,19 +4969,28 @@ function updateResults(){
           typePill.textContent=rolle;
           typePill.title=isKJ?'Med i kjellerelementet — vert ikkje eigen fasade i SXI-fila':'';
           right.appendChild(typePill);
-          // Om SK og del av gruppe med fleire nabo-SK — vis samanslå-knapp
-          if(isSK&&gi>=0&&skGroups[gi].length>1&&!isGroupMerged(gi)){
+          // Om SK og fleire ledige nabo-SK — vis samanslå-knappane
+          const freeHere=isSK?freeSegsIn(gi):[];
+          if(isSK&&gi>=0&&freeHere.length>1){
             const mergeBtn2=document.createElement('button');
             mergeBtn2.style.cssText='font-size:10px;padding:2px 6px;border:1px solid #d97706;border-radius:4px;background:#fef3c7;color:#92400e;cursor:pointer;font-family:inherit;white-space:nowrap';
             mergeBtn2.textContent='Slå saman';
-            mergeBtn2.title='Slå saman alle samanhengande SK-veggar i denne gruppa til éin';
-            mergeBtn2.onclick=e=>{e.stopPropagation();toggleGroupMerge(gi);};
+            mergeBtn2.title='Slå saman alle ledige SK-veggar i denne gruppa til eitt element ('+freeHere.length+' stk.)';
+            mergeBtn2.onclick=e=>{e.stopPropagation();mergeSegs(freeSegsIn(gi).map(s2=>s2.idx));};
             right.appendChild(mergeBtn2);
+            const pickBtn=document.createElement('button');
+            pickBtn.style.cssText='font-size:10px;padding:2px 5px;border:1px solid #d97706;border-radius:4px;background:#fff;color:#92400e;cursor:pointer;font-family:inherit;white-space:nowrap';
+            pickBtn.textContent='Vel…';
+            pickBtn.title='Vel sjølv kva av SK-veggane som skal bli eitt element';
+            pickBtn.onclick=e=>{e.stopPropagation();enterPick(gi,seg.idx);};
+            right.appendChild(pickBtn);
           }
           row.appendChild(left);row.appendChild(right);
+          if(isSK&&gi>=0)(groupRows[gi]=groupRows[gi]||[]).push({seg,row,left});
           row.onmouseenter=()=>{row.style.background=fg.hov;};
           row.onmouseleave=()=>{row.style.background=fg.bg;};
           row.onclick=()=>{
+            if(row._pickToggle){row._pickToggle();return;}
             if(!z.skillevegg)z.skillevegg=new Set();
             const uttaKj=()=>{
               // Ta segmentet ut av kjellerelementet — materialiser lista først,
@@ -4850,7 +5000,14 @@ function updateResults(){
             };
             const gjerTilYv=()=>{
               z.skillevegg.delete(seg.idx);
-              if(z.skMergedGroups)z.skMergedGroups=z.skMergedGroups.filter(g=>g.segs.every(idx=>z.skillevegg.has(idx)));
+              // Berre dette segmentet forlet samanslåinga — resten står
+              if(z.skMergedGroups){
+                z.skMergedGroups=z.skMergedGroups.filter(g=>{
+                  g.segs=g.segs.filter(idx=>z.skillevegg.has(idx));
+                  return g.segs.length>=2;
+                });
+                renumberSk();
+              }
             };
             const gjerTilSk=()=>{
               z.skillevegg.add(seg.idx);
@@ -5010,11 +5167,15 @@ function showCopyWindowMenu(w, srcZone, srcZi, srcFloor, srcFi){
           const typeL=w.type==='dor'?'Dør':'Vindauge';
           if(!tz.windows)tz.windows=[];
           const baseName=w.name||typeL;
+          // Plasser på same relative senter som kjelda, med breidda frå
+          // breddeMm — målfasaden kan ha heilt annan lengd og skala
+          const _cSpan=winSpanPx(w,seg.lenPx,mppForZone(tz));
           tz.windows.push({
             segIdx:seg.idx,dir:seg.dir,
-            t0,t1:Math.min(t1,1),
+            t0:_cSpan.t0,t1:_cSpan.t1,
             breddeMm:w.breddeMm,hoyMm:w.hoyMm,antal,
-            type:w.type,name:uniqueWinName(baseName,tz.windows)
+            type:w.type,name:uniqueWinName(baseName,tz.windows),
+            uVerdi:w.uVerdi,brystningMm:w.brystningMm
           });
           overlay.remove();
           updateResults();renderTable();draw();
@@ -5723,17 +5884,11 @@ cwrap.addEventListener('mousemove',e=>{
     const segLenImg=Math.hypot(dx,dy);if(segLenImg<1)return;
     const ip=s2i(sx,sy);
     const t=Math.max(0,Math.min(1,((ip.x-seg.p1.x)*dx+(ip.y-seg.p1.y)*dy)/(segLenImg*segLenImg)));
-    // Bruk breddeMm-basert halvbreidde for dragging — ikkje lagra t1-t0
+    // Bruk breddeMm-basert breidde for dragging — ikkje lagra t1-t0
     // (lagra t1-t0 kan vere mykje større enn det visuelle vindauget om plasseringa vart gjort med store klikkpunkt)
-    let halfW;
-    if(mmPerImgPx&&w.breddeMm&&segLenImg>0){halfW=(w.breddeMm/mmPerImgPx/2)/segLenImg;}
-    else{halfW=(w.t1-w.t0)/2;}
-    const newCenter=t-dragWin.dragOffsetT;
-    let t0=newCenter-halfW;
-    let t1=newCenter+halfW;
-    if(t0<0){t0=0;t1=2*halfW;}
-    if(t1>1){t1=1;t0=1-2*halfW;}
-    w.t0=t0;w.t1=t1;
+    const widthPx=(mmPerImgPx&&w.breddeMm>0)?w.breddeMm/mmPerImgPx:Math.max(0,(w.t1-w.t0))*segLenImg;
+    const _ns=fitSpanT(t-dragWin.dragOffsetT,widthPx,segLenImg);
+    w.t0=_ns.t0;w.t1=_ns.t1;
     cv.style.cursor='grabbing';
     draw();
     return;
@@ -5850,13 +6005,13 @@ cwrap.addEventListener('contextmenu',e=>{
           menu.remove();
           document.removeEventListener('mousedown',close);
           snapshot();
-          const width=winClipboard.t1-winClipboard.t0;
           const dx=seg.p2.x-seg.p1.x,dy=seg.p2.y-seg.p1.y;
           const segLen=Math.hypot(dx,dy);
           const ip2=s2i(sx,sy);
           const tMid=Math.max(0,Math.min(1,((ip2.x-seg.p1.x)*dx+(ip2.y-seg.p1.y)*dy)/(segLen*segLen)));
-          const t0=Math.max(0,Math.min(1-width,tMid-width/2));
-          const t1=Math.min(1,t0+width);
+          // Breidda kjem frå breddeMm — den lagra t1-t0 gjeld kjeldeveggen
+          const widthPx=(mmPerImgPx&&winClipboard.breddeMm>0)?winClipboard.breddeMm/mmPerImgPx:Math.max(0,(winClipboard.t1-winClipboard.t0))*segLen;
+          const {t0,t1}=fitSpanT(tMid,widthPx,segLen);
           if(!z.windows)z.windows=[];
           const copy={...winClipboard,t0,t1,segIdx:seg.idx,dir:seg.dir,name:uniqueWinName(winClipboard.name||(winClipboard.type==='dor'?'Dør':'Vindauge'),z.windows)};
           z.windows.push(copy);
@@ -6133,11 +6288,8 @@ function findWindowAtScreen(sx,sy){
       const dx=seg.p2.x-seg.p1.x,dy=seg.p2.y-seg.p1.y;
       const segLen=Math.hypot(dx,dy);if(segLen<1)return;
       const ux=dx/segLen,uy=dy/segLen;
-      const tC=(w.t0+w.t1)/2;
-      let halfT;
-      if(mmPerImgPx&&w.breddeMm){const hp=w.breddeMm/mmPerImgPx/2;halfT=hp/segLen;}
-      else{halfT=(w.t1-w.t0)/2;}
-      const t0v=Math.max(0,tC-halfT),t1v=Math.min(1,tC+halfT);
+      const _sp=winSpanPx(w,segLen,mmPerImgPx);
+      const t0v=_sp.t0,t1v=_sp.t1;
       const s0i={x:seg.p1.x+ux*t0v*segLen,y:seg.p1.y+uy*t0v*segLen};
       const s1i={x:seg.p1.x+ux*t1v*segLen,y:seg.p1.y+uy*t1v*segLen};
       const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
@@ -6298,10 +6450,12 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   copyBtn.style.cssText='padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;font-size:12px;';
   copyBtn.onclick=()=>{
     snapshot();
-    const width=w.t1-w.t0;
-    let t0=Math.min(w.t1+0.02,1-width);
-    let t1=Math.min(t0+width,1);
-    if(t1>1){t1=1;t0=Math.max(0,1-width);}
+    // Breidda kjem frå breddeMm, ikkje frå lagra t1-t0 (som berre er senteret)
+    const _seg=(calcSegments(z.pts,getHoyde(z),mppForZone(z))||[])[w.segIdx];
+    const _segLenPx=_seg?_seg.lenPx:0;
+    const _src=winSpanPx(w,_segLenPx,mppForZone(z));
+    const width=_src.t1-_src.t0;
+    const {t0,t1}=fitSpanT(_src.t1+0.02+width/2,width*_segLenPx,_segLenPx);
     const copy={...w,t0,t1,name:uniqueWinName(w.name,z.windows)};
     z.windows.push(copy);
     dlg.remove();updateResults();renderTable();draw();
@@ -6635,12 +6789,17 @@ document.addEventListener('keydown',e=>{
     }
     // Vindauge
     if(winClipboard){
-      const width=winClipboard.t1-winClipboard.t0;
+      // Breidda kjem alltid frå breddeMm — den lagra t1-t0 gjeld kjeldeveggen,
+      // som kan ha annan lengd, og han følgjer ikkje endra breidde/skala
+      const _clipW=(segLenPx)=>(mmPerImgPx&&winClipboard.breddeMm>0)
+        ?winClipboard.breddeMm/mmPerImgPx
+        :Math.max(0,(winClipboard.t1-winClipboard.t0))*segLenPx;
       if(hoveredWin){
         snapshot();
         const {w:refW,z,seg}=hoveredWin;
-        let t0=refW.t1+0.02,t1=t0+width;
-        if(t1>1){t0=Math.max(0,1-width);t1=1;}
+        const _refSpan=winSpanPx(refW,seg.lenPx,mmPerImgPx);
+        const _wPx=_clipW(seg.lenPx);
+        const {t0,t1}=fitSpanT(_refSpan.t1+0.02+(_wPx/2)/(seg.lenPx||1),_wPx,seg.lenPx);
         const copy={...winClipboard,t0,t1,segIdx:refW.segIdx,dir:seg.dir};
         if(!z.windows)z.windows=[];
         copy.name=uniqueWinName(winClipboard.name||(winClipboard.type==='dor'?'Dør':'Vindauge'),z.windows);
@@ -6658,8 +6817,7 @@ document.addEventListener('keydown',e=>{
             const segLen=Math.hypot(dx,dy);
             const ip=s2i(mouse.x,mouse.y);
             const tMid=Math.max(0,Math.min(1,((ip.x-seg.p1.x)*dx+(ip.y-seg.p1.y)*dy)/(segLen*segLen)));
-            const t0=Math.max(0,Math.min(1-width,tMid-width/2));
-            const t1=Math.min(1,t0+width);
+            const {t0,t1}=fitSpanT(tMid,_clipW(segLen),segLen);
             if(!z.windows)z.windows=[];
             const copy={...winClipboard,t0,t1,segIdx:seg.idx,dir:seg.dir,name:uniqueWinName(winClipboard.name||(winClipboard.type==='dor'?'Dør':'Vindauge'),z.windows)};
             z.windows.push(copy);
@@ -8460,8 +8618,7 @@ function buildSXI(proj){
       // Legg på etasjenamn om det er fleire instansar (kopla soner)
       const flSuffix=instances.length>1?' ('+zoneFloorName.get(lz)+')':'';
 
-      // Finn slåtte-saman SK-nabo-grupper for SXI
-      const sxiSkGroups=getSkAdjacentGroups(lz,segs);
+      // Samanslåtte SK-sett for SXI (kan vere delar av ei nabogruppe)
       const sxiMergedGroupsShown=new Set();
       const sxiYvShown=new Set();
 
@@ -8474,20 +8631,18 @@ function buildSXI(proj){
         const grossA=(ov.areaM2??seg.areaM2??(lenM*fhM))??0;
 
         if(isSK){
-          // Sjekk om dette segmentet er del av ei slåtte-saman gruppe
-          const gi=sxiSkGroups.findIndex(g=>g.some(s=>s.idx===seg.idx));
-          const mergedKey=lz.skMergedGroups&&gi>=0?sxiSkGroups[gi].map(s=>s.idx).sort().join(','):null;
-          const isMergedEntry=mergedKey&&lz.skMergedGroups?lz.skMergedGroups.find(g=>g.segs.slice().sort().join(',')===mergedKey):null;
-          const isMerged=!!isMergedEntry;
-          if(isMerged){
+          // Sjekk om dette segmentet er del av eit samanslått sett
+          const isMergedEntry=(lz.skMergedGroups||[]).find(g=>g.segs.includes(seg.idx))||null;
+          if(isMergedEntry){
+            const mergedKey=isMergedEntry.segs.slice().sort((a,b)=>a-b).join(',');
             if(sxiMergedGroupsShown.has(mergedKey))return; // Allereie lagt til
             sxiMergedGroupsShown.add(mergedKey);
-            // Summer areal for heile gruppa
-            const grpSegs=sxiSkGroups[gi];
+            // Summer areal for heile settet
+            const grpSegs=segs.filter(s2=>isMergedEntry.segs.includes(s2.idx));
             const totalGrossA=grpSegs.reduce((s,gs)=>{const gov=lz.segOverrides?.[gs.idx]||{};return s+(gov.areaM2??gs.areaM2??((gov.lenM??gs.lenM??0)*fhM)??0);},0);
             const uSK=lz.uPerSeg?.['seg_'+seg.idx]??0.80;
             const iwId=nextId('partition');
-            const grpName=xesc((isMergedEntry?.name||'Skillekonstruksjon')+flSuffix);
+            const grpName=xesc((isMergedEntry.name||'Skillekonstruksjon')+flSuffix);
             facXml+=`    <partition id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
           } else {
             const uSK=lz.uPerSeg?.['seg_'+seg.idx]??0.80;
@@ -9683,9 +9838,7 @@ function expandWindows(w, segLenM){
   const centreT=(w.t0+w.t1)/2;
   if(n<=1||segLenM<=0){
     // Eit vindauge — berekn t0/t1 frå breddeMm og senter
-    const halfT=(winWidthM/2)/segLenM;
-    const t0=Math.max(0,centreT-halfT);
-    const t1=Math.min(1,centreT+halfT);
+    const {t0,t1}=fitSpanT(centreT,winWidthM,segLenM);
     return[{...w,antal:1,t0,t1}];
   }
   // Fleire vindauge — fordel jamnt rundt sentrum
@@ -9693,7 +9846,10 @@ function expandWindows(w, segLenM){
   const gapFraction=0.02; // 2% av segLenM som mellomrom
   const gap=Math.max(gapFraction*segLenM,(segLenM*0.1)/n);
   const totalSpan=totalWinWidth+gap*(n-1);
-  const startM=centreT*segLenM-totalSpan/2;
+  // Skyv heile rekkja inn på veggen om senteret ligg for nær enden — elles
+  // ville dei ytste vindauga blitt klipte og vist ei anna breidde enn resten
+  let startM=centreT*segLenM-totalSpan/2;
+  if(totalSpan<=segLenM)startM=Math.max(0,Math.min(startM,segLenM-totalSpan));
   return Array.from({length:n},(_,i)=>{
     const wStartM=startM+i*(winWidthM+gap);
     const t0=Math.max(0,wStartM/segLenM);
