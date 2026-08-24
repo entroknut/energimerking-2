@@ -665,7 +665,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.5.1</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.6.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -7285,8 +7285,16 @@ function restoreAutosave(){
   }catch(e){return false;}
 }
 
-setInterval(()=>{if(isDirty)autosave();},AUTOSAVE_INTERVAL);
-// Also autosave when user leaves
+// Lagrar brua til bygget av seg sjølv, eig ho dette — dei kan ikkje køyre side
+// om side: autosave() kallar markClean(), så den lokale lagringa ville nulla
+// isDirty før lagringa til bygget fekk sjå han, og bygget ville aldri blitt
+// oppdatert. Har verten slått autolagringa av, held vi fram som før, slik at
+// det ikkje står heilt utan.
+setInterval(()=>{
+  if(isDirty&&!(window.EntroHost&&window.EntroHost.autosaves()))autosave();
+},AUTOSAVE_INTERVAL);
+// Also autosave when user leaves. Her tek vi lokalkopien uansett: dette er
+// siste sjanse, og postMessage til verten rekk ikkje fram når iframen forsvinn.
 window.addEventListener('pagehide',()=>{if(isDirty)autosave();});
 // Restore on load (after a short delay so DOM is ready).
 // I EntroPi kjem prosjektet frå vertssida — då ventar vi litt lenger, slik at
@@ -7321,6 +7329,14 @@ setTimeout(()=>{
   let bygg=null,wantsSxi=false,saveLabel='Lagre på bygget';
   let hasProject=false,autosaveTimer=null,inited=false;
   let pending=null,saveSeq=0,lastDirty=null;
+  // Autolagring til bygget står på som standard — i EntroPi er fila på bygget
+  // den einaste kopien, og den lokale autolagringa står ned (sjå setInterval
+  // ved AUTOSAVE_INTERVAL). Verten kan overstyre med autosaveMs, eller slå det
+  // av med 0.
+  const AUTOSAVE_MS_STD=120000;   // 2 min — kvar lagring er ei ny fil på bygget
+  const AUTOSAVE_MS_MIN=30000;    // vern mot at verten ber om lagring i eit kjør
+  const FIRST_SAVE_MS=10000;      // fyrste endringa skal ikkje vente eit heilt intervall
+  let firstSaveTimer=null,firstSaveDone=false;
 
   // Brua er berre «aktiv» etter ei sxi:init — ein vert som ikkje har sagt at
   // han handterer lagring skal ikkje stele lagreknappen frå nedlastinga.
@@ -7479,8 +7495,12 @@ setTimeout(()=>{
         try{await loadFromHost(d.project,true);}
         catch(e){hint('Kunne ikkje opne prosjektet frå EntroPi: '+e.message);}
       }
-      const ms=Number(d.autosaveMs)||0;
-      if(ms>=30000&&!autosaveTimer){
+      // Utelate autosaveMs ⇒ standardintervallet. Eksplisitt 0 ⇒ av.
+      // Alt anna vert løfta til minimumet, slik at ein feilskriven verdi
+      // ikkje lagrar i eit kjør på bygget.
+      const ms=(d.autosaveMs==null)?AUTOSAVE_MS_STD
+              :(Number(d.autosaveMs)>0?Math.max(AUTOSAVE_MS_MIN,Number(d.autosaveMs)):0);
+      if(ms&&!autosaveTimer){
         autosaveTimer=setInterval(()=>{if(isDirty&&active()&&!pending)saveToHost({auto:true});},ms);
       }
       lastDirty=isDirty;
@@ -7517,11 +7537,24 @@ setTimeout(()=>{
     framed:framed,
     active:active,
     willLoadProject:()=>hasProject,
+    // Lagrar vi til bygget av oss sjølve? Den lokale autolagringa står ned då.
+    autosaves:()=>!!(active()&&autosaveTimer),
     // Lèt verten vise ulagra-endringar før modalen vert lukka
     notifyDirty(){
       if(!active()||lastDirty===isDirty)return;
       lastDirty=isDirty;
       post({type:'sxi:state',dirty:isDirty});
+      // Den fyrste endringa i økta skal på bygget med ein gong, ikkje etter
+      // eit heilt intervall. Berre éin gong: elles ville kvar lagring gjere
+      // prosjektet reint, neste endring skulle straks lagrast, og
+      // intervallet vart i praksis FIRST_SAVE_MS for resten av økta.
+      if(isDirty&&!firstSaveDone&&autosaveTimer&&!firstSaveTimer&&!pending){
+        firstSaveDone=true;
+        firstSaveTimer=setTimeout(()=>{
+          firstSaveTimer=null;
+          if(isDirty&&active()&&!pending)saveToHost({auto:true});
+        },FIRST_SAVE_MS);
+      }
     },
     saveToHost:saveToHost,
     // SXI-fila går også til verten om han har bede om det (wantsSxi)

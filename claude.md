@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.5.1 | Single-file HTML applikasjon
+**Versjon:** 3.6.0 | Single-file HTML applikasjon
 
 ---
 
@@ -448,6 +448,14 @@ Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
   opplasting utan ein ekstra kopi i minnet.
 - `sxi:state {dirty}` finst fordi `beforeunload` ikkje fyrer når ein iframe vert
   fjerna. Det er einaste måten EntroPi kan åtvare om ulagra endringar.
+- **Autolagring til bygget står på som standard** (2 min, `autosaveMs` overstyrer,
+  `0` slår av). Fyrste endringa i økta går etter 10 s, og **berre den fyrste** —
+  elles ville kvar lagring gjere prosjektet reint, neste endring skulle lagrast
+  straks, og intervallet vart i praksis 10 s for resten av økta.
+  Den lokale autolagringa til localStorage står ned medan dette er på
+  (`EntroHost.autosaves()`). Dei kan ikkje køyre side om side: `autosave()`
+  kallar `markClean()`, så lokalkopien ville nulla `isDirty` før lagringa til
+  bygget fekk sjå han, og bygget ville aldri blitt oppdatert.
 
 ---
 
