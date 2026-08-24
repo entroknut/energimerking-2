@@ -49,7 +49,7 @@ const setStored=()=>document.getElementById('stored').textContent=
 window.addEventListener('message',async ev=>{
   const d=ev.data;
   if(!d||d.source!=='sxi-generator')return;
-  log('◀ '+d.type+(d.filename?' '+d.filename:'')+(d.bytes?' ('+(d.bytes/1024|0)+' kB)':''));
+  log('◀ '+d.type+(d.auto?' (auto)':'')+(d.filename?' '+d.filename:'')+(d.bytes?' ('+(d.bytes/1024|0)+' kB)':''));
 
   if(d.type==='sxi:ready'){
     setState('kopla — v'+(d.version||'?'));
@@ -63,7 +63,11 @@ window.addEventListener('message',async ev=>{
       bygg:BYGG,
       project:lagraTekst||null,      // strengen frå førre lagring
       wantsSxi:true,
-      autosaveMs:0,                  // sett t.d. 120000 for å teste autolagring
+      // Utelaten ⇒ verktøyet brukar standardintervallet (2 min).
+      // ?autosave=0 slår det av, ?autosave=30000 kortar det ned.
+      ...(new URLSearchParams(location.search).has('autosave')
+          ?{autosaveMs:Number(new URLSearchParams(location.search).get('autosave'))}
+          :{}),
       saveLabel:'Lagre på bygget'});
     log('▶ sxi:init'+(lagraTekst?' (med prosjekt)':' (tomt bygg)'));
     return;

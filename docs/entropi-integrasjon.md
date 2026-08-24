@@ -71,10 +71,38 @@ Felta i `sxi:init`:
 - `project` — `.entro`-innhaldet, som **Blob, streng eller ferdig parsa
   objekt**. `null` for eit bygg utan prosjekt.
 - `wantsSxi: true` — send også SXI-fila til EntroPi ved eksport.
-- `autosaveMs` — automatisk lagring til bygget når det finst ulagra endringar.
-  Minst 30 000; `0`/utelate slår det av. Kvar autolagring skriv ei ny fil, så
-  vel eit tal som passar med kor mange versjonar de vil ta vare på.
+- `autosaveMs` — intervall for automatisk lagring til bygget.
+  **Utelate ⇒ 120 000 (2 min), som er standard.** `0` slår det av; alt anna
+  vert løfta til minst 30 000, slik at ein feilskriven verdi ikkje lagrar i eit
+  kjør. Kvar autolagring skriv ei ny fil, så vel eit tal som passar med kor
+  mange versjonar de vil ta vare på.
 - `saveLabel` — tekst på lagreknappen (standard «Lagre på bygget»).
+
+### Autolagring til bygget
+
+Autolagringa står **på som standard** i innbygd modus — verten treng ikkje
+gjere noko. Ho oppfører seg slik:
+
+- **Fyrste endringa i økta går til bygget etter 10 sekund.** Ein skal ikkje
+  kunne miste den fyrste halvtimen med arbeid fordi intervallet ikkje hadde
+  slått til enno.
+- **Deretter kvart intervall**, men berre når det finst ulagra endringar. Er
+  prosjektet reint, går det ingen meldingar.
+- Eingongslagringa skjer **berre éin gong** per økt. Elles ville kvar lagring
+  gjere prosjektet reint, neste endring skulle lagrast straks, og intervallet
+  vart i praksis 10 sekund for resten av økta.
+- Autolagringar er merkte `auto:true` i `sxi:save`. Dei skal svarast med
+  `sxi:save-result` som alle andre, men verten bør ikkje vise varsel for dei.
+
+Den lokale autolagringa til `localStorage` **står ned** medan dette er på. Dei
+kan ikkje køyre side om side: den lokale lagringa kallar `markClean()`, så ho
+ville nulla «ulagra endringar» før lagringa til bygget fekk sjå det, og bygget
+ville aldri blitt oppdatert. Slår verten autolagringa av med `autosaveMs: 0`,
+tek den lokale over att, slik at det ikkje står heilt utan.
+
+Ved `pagehide` (iframen vert fjerna) vert lokalkopien skriven uansett — det er
+siste sjanse, og ein `postMessage` rekk ikkje fram når iframen forsvinn. Det er
+difor `sxi:state {dirty}` finst: bruk han til å åtvare før modalen vert lukka.
 
 ### Verdiar som vert fylte inn frå bygget
 
