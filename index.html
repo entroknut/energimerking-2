@@ -454,6 +454,46 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .ai-skip{padding:7px 14px;background:var(--surface);color:var(--text2);border:1px solid var(--border2);border-radius:var(--r);cursor:pointer;font-size:13px;font-family:inherit;transition:all .1s}
 .ai-skip:hover{background:var(--surface2)}
 
+/* ── Tekniske system frå EntroPi (beta) ── */
+/* Eige vindauge, ikkje ein .dialog-overlay: dei ligg inne i #cwrap og dekkjer
+   berre lerretet. Her skal både systema og sonelista få plass, så vindauget
+   ligg på body med position:fixed. */
+#sysOverlay{display:none;position:fixed;inset:0;background:rgba(17,24,39,.45);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#sysOverlay.show{display:flex}
+#sysWin{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);width:min(1020px,94vw);height:min(680px,88vh);display:flex;flex-direction:column;overflow:hidden}
+.sys-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sys-head button{white-space:nowrap}
+.sys-head h3{font-size:14px;font-weight:700;color:var(--text);margin:0;white-space:nowrap}
+.sys-beta{font-size:9px;font-weight:700;background:#f59e0b;color:#fff;padding:1px 4px;border-radius:3px;letter-spacing:.3px;flex-shrink:0}
+.sys-pill{font-size:11px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:99px;padding:2px 9px;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sysStatus{font-size:11.5px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sys-sub{padding:8px 16px;font-size:12px;color:var(--text2);background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0;line-height:1.6}
+.sys-body{display:flex;flex:1;min-height:0}
+.sys-col{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+.sys-col+.sys-col{border-left:1px solid var(--border)}
+.sys-col-hd{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;padding:10px 14px 6px;flex-shrink:0}
+.sys-list{flex:1;overflow-y:auto;padding:0 14px 14px}
+.sys-cat{font-size:11px;font-weight:600;color:var(--text2);margin:9px 0 4px}
+.sys-item{display:flex;align-items:center;gap:8px;padding:7px 9px;margin-bottom:4px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);cursor:grab;font-size:12.5px;color:var(--text);user-select:none}
+.sys-item:hover{border-color:var(--accent-light);background:var(--surface2)}
+.sys-item.picked{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 0 2px var(--accent-dim)}
+.sys-item.dragging{opacity:.45}
+.sys-ico{width:20px;height:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:5px;background:var(--surface3);font-size:11px;color:var(--text2)}
+.sys-nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sys-count{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-dim);border-radius:99px;padding:1px 6px;flex-shrink:0}
+.sys-zone{border:1.5px dashed var(--border2);border-radius:var(--r-lg);padding:9px 11px;margin-bottom:8px;background:var(--surface2);transition:border-color .1s,background .1s}
+.sys-zone.over{border-color:var(--accent);background:var(--accent-dim)}
+.sys-zone-hd{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:2px}
+.sys-zone-sub{font-size:10.5px;color:var(--text3);margin-bottom:6px}
+.sys-linked{font-size:9.5px;font-weight:700;color:#7c3aed;background:#f5f3ff;border:1px solid #ede9fe;border-radius:4px;padding:1px 5px;white-space:nowrap}
+.sys-chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.sys-chip{display:flex;align-items:center;gap:4px;font-size:11.5px;background:var(--surface);border:1px solid var(--border2);border-radius:99px;padding:2px 3px 2px 9px;color:var(--text2);max-width:100%}
+.sys-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sys-chip.gone{border-style:dashed;color:var(--text3)}
+.sys-chip button{border:none;background:transparent;color:var(--text3);cursor:pointer;font:inherit;font-size:12px;line-height:1;padding:2px 5px;border-radius:99px}
+.sys-chip button:hover{background:var(--red-dim);color:var(--red)}
+.sys-empty{font-size:11.5px;color:var(--text3);line-height:1.6}
+
 /* ── Floor tabs bar ── */
 #floor-tabs-bar{
   display:flex;align-items:center;padding:0 12px;gap:6px;
@@ -631,6 +671,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div class="tg">
       <button class="btn" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ <span class="tb-full">Slå saman fasadar</span><span class="tb-short">Fasadar</span></button>
+      <button class="btn embed-only" id="sysBtn" title="Hent dei tekniske systema som ligg på bygget i EntroPi og legg dei på soner">⚙ <span class="tb-full">Hent tekniske systemer</span><span class="tb-short">Tekn. system</span> <span class="sys-beta">BETA</span></button>
     </div>
     <div class="tg">
       <button class="btn" id="undoBtn" title="Angre (Ctrl+Z)" style="opacity:.4" disabled>↩</button>
@@ -665,7 +706,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.6.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.7.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -960,6 +1001,36 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
   </div>
 </div>
+<!-- Tekniske system frå EntroPi (beta). Knappen som opnar dette er
+     .embed-only, så vindauget finst berre inne i EntroPi. -->
+<div id="sysOverlay">
+  <div id="sysWin">
+    <div class="sys-head">
+      <h3>⚙ Tekniske systemer</h3>
+      <span class="sys-beta">BETA</span>
+      <span class="sys-pill" id="sysBygg" style="display:none"></span>
+      <span id="sysStatus"></span>
+      <span style="margin-left:auto"></span>
+      <button class="dcancel" id="sysReload">↻ Hent på nytt</button>
+      <button class="dok" id="sysClose">Ferdig</button>
+    </div>
+    <div class="sys-sub">
+      Dra eit system over på ei sone — eller klikk systemet og deretter sona. Kopla soner står som éi sone.<br>
+      <span style="color:var(--text3)">Koplinga vert lagra med prosjektet. Ho går enno ikkje inn i SXI-eksporten.</span>
+    </div>
+    <div class="sys-body">
+      <div class="sys-col">
+        <div class="sys-col-hd">Tekniske systemer i EntroPi</div>
+        <div class="sys-list" id="sysSrc"></div>
+      </div>
+      <div class="sys-col">
+        <div class="sys-col-hd">Soner i energimerkinga</div>
+        <div class="sys-list" id="sysZones"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="hintbar"><span id="modeLabel">Naviger</span> <span id="hintText">Scroll for zoom · klikk+dra for å flytte · last opp PDF for å starte</span></div>
 
 <script>
@@ -7337,6 +7408,15 @@ setTimeout(()=>{
   const AUTOSAVE_MS_MIN=30000;    // vern mot at verten ber om lagring i eit kjør
   const FIRST_SAVE_MS=10000;      // fyrste endringa skal ikkje vente eit heilt intervall
   let firstSaveTimer=null,firstSaveDone=false;
+  // sxi:request-save som kom medan ei lagring alt gjekk. Verten ventar på sin
+  // requestId — får han aldri svar, står «Lagre og gå ut» og heng. Difor vert
+  // førespurnaden lagd i kø og send på nytt så snart den fyrste er ferdig.
+  let queuedReq=null;
+  // Tekniske system på bygget (beta). Lista er verten sin — brua cachar henne
+  // berre, slik at vindauget kan opnast utan å vente på ein ny rundtur.
+  const SYS_TIMEOUT_MS=12000;     // ein vert som ikkje kan meldinga skal ikkje henge oss
+  let sysCache=null,sysReq=null,sysSeq=0;
+  const sysListeners=[];
 
   // Brua er berre «aktiv» etter ei sxi:init — ein vert som ikkje har sagt at
   // han handterer lagring skal ikkje stele lagreknappen frå nedlastinga.
@@ -7409,7 +7489,51 @@ setTimeout(()=>{
     if(el)el.remove();
   }
 
+  // ── Tekniske system frå bygget (beta) ──
+  // Verten eig lista. Vi normaliserer henne her, slik at resten av programmet
+  // slepp å vite om EntroPi skriv nynorsk, bokmål eller engelsk i feltnamna.
+  function normSystems(raw){
+    if(!Array.isArray(raw))return null;
+    const out=[],seen=new Set();
+    raw.forEach(x=>{
+      if(!x||typeof x!=='object')return;
+      const namn=String(x.namn||x.name||'').trim();
+      const kat=String(x.kategori||x.category||'').trim()||'Ukategorisert';
+      const id=String(x.id||x.systemId||(kat+'/'+namn)).trim();
+      if(!id||(!namn&&!x.id)||seen.has(id))return;   // same id ⇒ same system
+      seen.add(id);
+      out.push({id:id,namn:namn||id,kategori:kat,
+        undertittel:String(x.undertittel||x.subtitle||'').trim(),
+        ikon:String(x.ikon||'').trim().slice(0,3)});
+    });
+    return out;
+  }
+  // Éin førespurnad om gongen — fleire klikk på knappen skal ikkje gi fleire
+  // rundturar. Lovnaden vert alltid innfridd: svarar ikkje verten (t.d. fordi
+  // han ikkje kan denne meldinga enno), kjem ok:false etter tidsavbrotet.
+  function requestSystems(){
+    if(!active())return Promise.resolve({ok:false,systems:sysCache,message:'Ikkje kopla til EntroPi.'});
+    if(sysReq)return sysReq.promise;
+    const id='sys'+(++sysSeq);
+    let done;
+    const promise=new Promise(r=>{done=r;});
+    sysReq={id:id,promise:promise,timer:setTimeout(()=>{
+      sysReq=null;
+      done({ok:false,systems:sysCache,
+        message:'EntroPi svarte ikkje — vertssida må svare på sxi:request-systems.'});
+    },SYS_TIMEOUT_MS),resolve:done};
+    post({type:'sxi:request-systems',requestId:id});
+    return promise;
+  }
+
   // ── Lagring til verten ──
+  // Send ein førespurnad som stod i kø. Kvar sxi:request-save skal ende i ein
+  // sxi:save, elles ventar verten for alltid på svaret sitt.
+  function flushQueuedReq(){
+    if(!queuedReq)return;
+    const q=queuedReq;queuedReq=null;
+    saveToHost({auto:q.auto,requestId:q.requestId});
+  }
   function saveToHost(o){
     o=o||{};
     if(!active())return false;
@@ -7439,6 +7563,7 @@ setTimeout(()=>{
     pending={id:id,auto:!!o.auto,timer:setTimeout(()=>{
       pending=null;setBusy(false);
       if(!o.auto)hint('Ingen respons frå EntroPi. Prøv igjen, eller lagre som fil lokalt.');
+      flushQueuedReq();   // verten skal få svar på førespurnaden sin uansett
     },45000)};
     return true;
   }
@@ -7515,7 +7640,9 @@ setTimeout(()=>{
       return;
     }
     if(d.type==='sxi:request-save'){
-      saveToHost({auto:!!d.auto,requestId:d.requestId});
+      if(!saveToHost({auto:!!d.auto,requestId:d.requestId})&&pending&&d.requestId){
+        queuedReq={requestId:d.requestId,auto:!!d.auto};   // send når den fyrste er ferdig
+      }
       return;
     }
     if(d.type==='sxi:save-result'){
@@ -7529,6 +7656,20 @@ setTimeout(()=>{
       }else{
         hint('EntroPi kunne ikkje lagre: '+(d.message||'ukjend feil'));
       }
+      flushQueuedReq();
+      return;
+    }
+    if(d.type==='sxi:systems'){
+      const list=normSystems(d.systems);
+      if(list)sysCache=list;
+      if(sysReq&&(!d.requestId||d.requestId===sysReq.id)){
+        const r=sysReq;sysReq=null;clearTimeout(r.timer);
+        r.resolve({ok:d.ok!==false&&!!list,systems:sysCache,
+          message:d.message||(list?'':'EntroPi sende inga liste.')});
+      }
+      // Verten kan sende lista uoppmoda — t.d. når han er ferdig med å laste
+      // henne, eller når nokon har lagt inn eit nytt system i EntroPi.
+      sysListeners.forEach(f=>{try{f(sysCache);}catch(e){}});
       return;
     }
   });
@@ -7557,6 +7698,12 @@ setTimeout(()=>{
       }
     },
     saveToHost:saveToHost,
+    // Namnet på bygget lagringa går til — til byggbrikka i systemvindauget
+    byggNamn:()=>bygg?String(bygg.namn||bygg.adresse||''):'',
+    // ── Tekniske system (beta) ──
+    systems:()=>sysCache,
+    requestSystems:requestSystems,
+    onSystems(f){if(typeof f==='function')sysListeners.push(f);},
     // SXI-fila går også til verten om han har bede om det (wantsSxi)
     sendSxi(xml,filename,meta){
       if(!active()||!wantsSxi)return;
@@ -7572,6 +7719,282 @@ setTimeout(()=>{
     // Verten kan montere lyttaren sin etter at iframen er lasta — prøv fleire gonger
     [0,250,750,2000,5000].forEach(ms=>setTimeout(announce,ms));
   }
+})();
+
+// ── 2c. Tekniske system frå EntroPi (beta) ───────────────────
+// Eige vindauge der dei tekniske systema som ligg på bygget i EntroPi kan
+// dragast over på sonene i energimerkinga. Koplinga vert lagra på sona som
+// z.tekniskeSystem=[{id,namn,kategori}] og følgjer prosjektfila; ho påverkar
+// ikkje geometri, areal eller SXI-eksporten.
+//
+// Lista over system er verten sin (sxi:request-systems → sxi:systems), men
+// koplinga er vår. Difor lagrar vi namn og kategori saman med id-en: eit
+// system som vert sletta i EntroPi skal framleis vere leseleg i prosjektet.
+//
+// Knappen er .embed-only, så heile funksjonen finst berre inne i EntroPi.
+(function(){
+  const overlay=document.getElementById('sysOverlay');
+  const btn=document.getElementById('sysBtn');
+  if(!overlay||!btn)return;
+  const srcEl=document.getElementById('sysSrc');
+  const zoneEl=document.getElementById('sysZones');
+  const statusEl=document.getElementById('sysStatus');
+  // Kategoriikona er berre pynt. Verten kan sende sitt eige teikn i `ikon`.
+  const CAT_ICO={ventilasjon:'❋',varme:'▲',kjøling:'❄',kjoling:'❄',gatevarme:'≋',
+    belysning:'☀',automasjon:'⚙',energi:'⚡',vatn:'≈',vann:'≈',sanitær:'≈',
+    brann:'▲',heis:'⇅',solceller:'☀'};
+  let systems=[];      // lista frå EntroPi — tom til han har svart
+  let picked=null;     // system valt med klikk (vegen utan drag — touch, tastatur)
+  let dragId=null;     // dataTransfer kan ikkje lesast under dragover
+  let hentar=false;
+
+  const ope=()=>overlay.classList.contains('show');
+  const status=t=>{statusEl.textContent=t||'';};
+  const catIco=s=>s.ikon||CAT_ICO[(s.kategori||'').toLowerCase()]||'⚙';
+  // Feltet kan komme frå ei gammal fil eller frå ein handredigert JSON — les
+  // det defensivt, elles ville éin rar verdi velte heile vindauget.
+  const sysOf=z=>Array.isArray(z.tekniskeSystem)?z.tekniskeSystem:[];
+
+  // Kopla soner (groupId) er éi sone for brukaren — same regelen som
+  // SXI-eksporten brukar. Vi tek den fyrste instansen som anker og lèt alle
+  // endringar gå til heile gruppa via getLinkedZones().
+  function logiskeSoner(){
+    const out=[],seenGrp=new Set();
+    floors.forEach(f=>{
+      f.zones.forEach(z=>{
+        if(!z.pts||z.pts.length<3)return;
+        if(z.groupId){
+          if(seenGrp.has(z.groupId))return;
+          seenGrp.add(z.groupId);
+        }
+        const inst=getLinkedZones(z);
+        out.push({z:z,inst:inst,
+          etasjar:[...new Set(inst.map(etasjeNamn).filter(Boolean))],
+          areal:inst.reduce((sum,x)=>sum+(getAreaM2(x)||0),0)});
+      });
+    });
+    return out;
+  }
+  function etasjeNamn(z){
+    const f=floors.find(fl=>fl.zones.indexOf(z)>=0);
+    return f?f.name:'';
+  }
+
+  // ── Endringar ──
+  function leggTil(sys,o){
+    if(o.inst.every(z=>sysOf(z).some(x=>x.id===sys.id))){
+      status('«'+sys.namn+'» ligg alt på '+(o.z.name||'sona')+'.');
+      picked=null;render();return;
+    }
+    snapshot();                                  // markDirty følgjer med
+    o.inst.forEach(z=>{
+      if(!Array.isArray(z.tekniskeSystem))z.tekniskeSystem=[];
+      if(!z.tekniskeSystem.some(x=>x.id===sys.id))
+        z.tekniskeSystem.push({id:sys.id,namn:sys.namn,kategori:sys.kategori});
+    });
+    picked=null;
+    status('«'+sys.namn+'» lagt på '+(o.z.name||'sona')
+      +(o.inst.length>1?' ('+o.inst.length+' kopla soner)':'')+'.');
+    render();
+  }
+  function fjern(id,o){
+    snapshot();
+    o.inst.forEach(z=>{
+      if(Array.isArray(z.tekniskeSystem))
+        z.tekniskeSystem=z.tekniskeSystem.filter(x=>x.id!==id);
+    });
+    status('Fjerna frå '+(o.z.name||'sona')+'.');
+    render();
+  }
+
+  // ── Vising: systema i EntroPi ──
+  function renderSrc(){
+    srcEl.innerHTML='';
+    if(!systems.length){
+      const d=document.createElement('div');
+      d.className='sys-empty';
+      d.textContent=hentar?'Hentar tekniske systemer frå EntroPi…'
+        :'Ingen tekniske systemer henta. Trykk «↻ Hent på nytt».';
+      srcEl.appendChild(d);return;
+    }
+    // Kor mange soner kvart system ligg på — så ein ser kva som er plassert
+    const bruk={};
+    logiskeSoner().forEach(o=>sysOf(o.z).forEach(x=>{bruk[x.id]=(bruk[x.id]||0)+1;}));
+    const kats=[];
+    systems.forEach(x=>{if(kats.indexOf(x.kategori)<0)kats.push(x.kategori);});
+    kats.forEach(kat=>{
+      const h=document.createElement('div');
+      h.className='sys-cat';h.textContent=kat;
+      srcEl.appendChild(h);
+      systems.filter(x=>x.kategori===kat)
+        .forEach(x=>srcEl.appendChild(itemEl(x,bruk[x.id]||0)));
+    });
+  }
+  function itemEl(sys,n){
+    const el=document.createElement('div');
+    el.className='sys-item'+(picked&&picked.id===sys.id?' picked':'');
+    el.draggable=true;
+    el.title=sys.namn+(sys.undertittel?' — '+sys.undertittel:'')+' · '+sys.kategori;
+    const ico=document.createElement('span');
+    ico.className='sys-ico';ico.textContent=catIco(sys);
+    const nm=document.createElement('span');
+    nm.className='sys-nm';nm.textContent=sys.namn;
+    el.appendChild(ico);el.appendChild(nm);
+    if(n){
+      const b=document.createElement('span');
+      b.className='sys-count';b.textContent=n+(n===1?' sone':' soner');
+      el.appendChild(b);
+    }
+    el.addEventListener('dragstart',e=>{
+      dragId=sys.id;el.classList.add('dragging');
+      try{e.dataTransfer.setData('text/plain',sys.id);e.dataTransfer.effectAllowed='copy';}catch(_){}
+    });
+    el.addEventListener('dragend',()=>{dragId=null;el.classList.remove('dragging');});
+    el.onclick=()=>{
+      picked=(picked&&picked.id===sys.id)?null:sys;
+      status(picked?'Klikk på ei sone for å leggje «'+sys.namn+'» der.':'');
+      render();
+    };
+    return el;
+  }
+
+  // ── Vising: sonene ──
+  function renderZones(){
+    zoneEl.innerHTML='';
+    const list=logiskeSoner();
+    if(!list.length){
+      const d=document.createElement('div');
+      d.className='sys-empty';
+      d.textContent='Ingen soner enno — teikn soner på planteikninga først.';
+      zoneEl.appendChild(d);return;
+    }
+    list.forEach(o=>zoneEl.appendChild(zoneCard(o)));
+  }
+  function zoneCard(o){
+    const card=document.createElement('div');
+    card.className='sys-zone';
+
+    const hd=document.createElement('div');
+    hd.className='sys-zone-hd';
+    const nm=document.createElement('span');
+    nm.textContent='⬡ '+(o.z.name||'Sone');
+    hd.appendChild(nm);
+    if(o.inst.length>1){
+      const lb=document.createElement('span');
+      lb.className='sys-linked';
+      lb.textContent='KOPLA · '+o.inst.length+' SONER';
+      lb.title='Kopla soner er éi sone i SIMIEN — systema vert lagde på alle.';
+      hd.appendChild(lb);
+    }
+    card.appendChild(hd);
+
+    const sub=document.createElement('div');
+    sub.className='sys-zone-sub';
+    sub.textContent=(o.etasjar.length?o.etasjar.join(' + ')+' · ':'')
+      +(o.areal?fmtM2(o.areal):'areal ikkje kalibrert');
+    card.appendChild(sub);
+
+    const chips=document.createElement('div');
+    chips.className='sys-chips';
+    const lst=sysOf(o.z);
+    if(!lst.length){
+      const e=document.createElement('span');
+      e.className='sys-empty';
+      e.textContent=picked?'Klikk her for «'+picked.namn+'»':'Slepp eit system her';
+      chips.appendChild(e);
+    }
+    lst.forEach(x=>chips.appendChild(chipEl(x,o)));
+    card.appendChild(chips);
+
+    card.addEventListener('dragover',e=>{
+      if(!dragId)return;
+      e.preventDefault();
+      try{e.dataTransfer.dropEffect='copy';}catch(_){}
+      card.classList.add('over');
+    });
+    card.addEventListener('dragleave',()=>card.classList.remove('over'));
+    card.addEventListener('drop',e=>{
+      e.preventDefault();card.classList.remove('over');
+      let id=dragId;
+      if(!id){try{id=e.dataTransfer.getData('text/plain');}catch(_){}}
+      const sys=systems.find(x=>x.id===id);
+      if(sys)leggTil(sys,o);
+    });
+    card.onclick=()=>{if(picked)leggTil(picked,o);};
+    return card;
+  }
+  function chipEl(x,o){
+    const finst=systems.some(s=>s.id===x.id);
+    const chip=document.createElement('span');
+    // Systema kan vere sletta i EntroPi etter at koplinga vart gjord — då står
+    // ho att med stipla kant i staden for å forsvinne stille frå prosjektet.
+    chip.className='sys-chip'+(systems.length&&!finst?' gone':'');
+    chip.title=finst?(x.kategori||''):'Dette systemet finst ikkje i EntroPi lenger';
+    const t=document.createElement('span');
+    t.textContent=x.namn||x.id;
+    const b=document.createElement('button');
+    b.type='button';b.textContent='×';b.title='Fjern frå sona';
+    b.onclick=e=>{e.stopPropagation();fjern(x.id,o);};
+    chip.appendChild(t);chip.appendChild(b);
+    return chip;
+  }
+
+  function render(){renderSrc();renderZones();}
+
+  // ── Henting frå verten ──
+  async function hent(){
+    const H=window.EntroHost;
+    if(!H||!H.active()){status('Ikkje kopla til EntroPi.');return;}
+    hentar=true;status('Hentar tekniske systemer…');renderSrc();
+    const r=await H.requestSystems();
+    hentar=false;
+    if(r&&Array.isArray(r.systems))systems=r.systems;
+    if(r&&r.ok){
+      const bn=H.byggNamn?H.byggNamn():'';
+      status(systems.length
+        ?('Fann '+systems.length+' system'+(bn?' på '+bn:'')+'.')
+        :'Bygget har ingen tekniske systemer i EntroPi.');
+    }else status((r&&r.message)||'Kunne ikkje hente tekniske systemer.');
+    render();
+  }
+
+  function opne(){
+    // floors[activeFloor].zones må vere same array som `zones`, elles ser
+    // vindauget ein gammal kopi av den aktive etasjen.
+    saveFloorState();
+    const H=window.EntroHost;
+    const cache=H&&H.systems?H.systems():null;
+    if(Array.isArray(cache))systems=cache;
+    const bn=H&&H.byggNamn?H.byggNamn():'';
+    const chip=document.getElementById('sysBygg');
+    if(chip){chip.style.display=bn?'inline-flex':'none';chip.textContent='⌂ '+bn;}
+    picked=null;status('');
+    overlay.classList.add('show');
+    render();
+    hent();
+  }
+  function lukk(){overlay.classList.remove('show');picked=null;dragId=null;}
+
+  btn.onclick=opne;
+  document.getElementById('sysClose').onclick=lukk;
+  document.getElementById('sysReload').onclick=hent;
+  overlay.addEventListener('click',e=>{if(e.target===overlay)lukk();});
+  // Esc må stoppast før modus-handteraren under, elles byter han verktøy òg
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&ope()){e.stopPropagation();lukk();}
+  },true);
+
+  // Verten kan sende lista uoppmoda — då oppdaterer vi eit ope vindauge
+  if(window.EntroHost&&window.EntroHost.onSystems)window.EntroHost.onSystems(list=>{
+    if(Array.isArray(list))systems=list;
+    if(ope())render();
+  });
+  // Angre byter ut soneobjekta, så eit ope vindauge peikar på gamle soner
+  const _origApplyHist=applyHistoryState;
+  window.applyHistoryState=applyHistoryState=function(p){
+    _origApplyHist(p);
+    if(ope())render();
+  };
 })();
 
 // ── 3. Pinch-to-zoom ─────────────────────────────────────────
