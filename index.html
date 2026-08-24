@@ -479,7 +479,9 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .sys-item.picked{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 0 2px var(--accent-dim)}
 .sys-item.dragging{opacity:.45}
 .sys-ico{width:20px;height:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:5px;background:var(--surface3);font-size:11px;color:var(--text2)}
-.sys-nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sys-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.sys-nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sys-meta{font-size:10.5px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'JetBrains Mono',monospace}
 .sys-count{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-dim);border-radius:99px;padding:1px 6px;flex-shrink:0}
 .sys-zone{border:1.5px dashed var(--border2);border-radius:var(--r-lg);padding:9px 11px;margin-bottom:8px;background:var(--surface2);transition:border-color .1s,background .1s}
 .sys-zone.over{border-color:var(--accent);background:var(--accent-dim)}
@@ -706,7 +708,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.7.1</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.8.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -7504,10 +7506,46 @@ setTimeout(()=>{
       seen.add(id);
       out.push({id:id,namn:namn||id,kategori:kat,
         undertittel:String(x.undertittel||x.subtitle||'').trim(),
-        ikon:String(x.ikon||'').trim().slice(0,3)});
+        ikon:String(x.ikon||'').trim().slice(0,3),
+        luft:sysLuft(x),gjenvinning:sysGjenvinning(x),sfp:sysSfp(x)});
     });
     return out;
   }
+  // Tala som SXI-eksporten kan bruke. Dei vert leste defensivt: eit vrøvltal
+  // frå verten ville elles gått rett inn i energiberekninga utan at nokon såg
+  // det. Utanfor grensene her fell verktøyet tilbake på normverdiane sine.
+  const sysNum=v=>{
+    if(v==null||v==='')return null;
+    const n=parseFloat(String(v).replace(',','.'));
+    return isFinite(n)?n:null;
+  };
+  function sysLuft(x){
+    const til=sysNum(x.tilluft!=null?x.tilluft:(x.supplyAir!=null?x.supplyAir:x.luftmengde));
+    const fra=sysNum(x.avtrekk!=null?x.avtrekk:(x.extractAir!=null?x.extractAir:x.luftmengde));
+    if((til==null||til<=0)&&(fra==null||fra<=0))return null;
+    // Verten kan sende total m³/h eller ferdig spesifikk m³/(h·m²) — vi må
+    // vite kva, elles vert luftmengda feil med ein faktor på arealet.
+    const e=String(x.luftEining||x.airflowUnit||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    // Luftmengd utanfor drift. 0 er ein gyldig verdi (anlegget står heilt av),
+    // så han må skiljast frå «ikkje oppgitt» — same eining som resten.
+    const rT=sysNum(x.tilluftRedusert!=null?x.tilluftRedusert:x.supplyAirReduced);
+    const rF=sysNum(x.avtrekkRedusert!=null?x.avtrekkRedusert:x.extractAirReduced);
+    return {til:(til>0?til:null),fra:(fra>0?fra:null),per:e.indexOf('m2')>=0,
+            redTil:(rT!=null&&rT>=0?rT:null),redFra:(rF!=null&&rF>=0?rF:null)};
+  }
+  function sysGjenvinning(x){
+    let g=sysNum(x.gjenvinning!=null?x.gjenvinning
+              :(x.gjenvinningsgrad!=null?x.gjenvinningsgrad:x.heatRecovery));
+    if(g==null)return null;
+    if(g>1)g=g/100;                       // 80 og 0,80 tyder det same
+    return (g>=0&&g<=1)?g:null;
+  }
+  function sysSfp(x){
+    const s=sysNum(x.sfp!=null?x.sfp:x.sfpKw);
+    // SFP i kW/(m³/s). Over 20 er ikkje eit aggregat, det er ein skrivefeil.
+    return (s!=null&&s>=0&&s<=20)?s:null;
+  }
+
   // Éin førespurnad om gongen — fleire klikk på knappen skal ikkje gi fleire
   // rundturar. Lovnaden vert alltid innfridd: svarar ikkje verten (t.d. fordi
   // han ikkje kan denne meldinga enno), kjem ok:false etter tidsavbrotet.
@@ -7800,7 +7838,7 @@ setTimeout(()=>{
     o.inst.forEach(z=>{
       if(!Array.isArray(z.tekniskeSystem))z.tekniskeSystem=[];
       if(!z.tekniskeSystem.some(x=>x.id===sys.id))
-        z.tekniskeSystem.push({id:sys.id,namn:sys.namn,kategori:sys.kategori});
+        z.tekniskeSystem.push(kopi(sys));
     });
     picked=null;
     status('«'+sys.namn+'» lagt på '+(o.z.name||'sona')
@@ -7858,9 +7896,14 @@ setTimeout(()=>{
     el.title=sys.namn+(sys.undertittel?' — '+sys.undertittel:'')+' · '+sys.kategori;
     const ico=document.createElement('span');
     ico.className='sys-ico';ico.textContent=catIco(sys);
+    const txt=document.createElement('span');
+    txt.className='sys-txt';
     const nm=document.createElement('span');
     nm.className='sys-nm';nm.textContent=sys.namn;
-    el.appendChild(ico);el.appendChild(nm);
+    const meta=document.createElement('span');
+    meta.className='sys-meta';meta.textContent=sysMeta(sys);
+    txt.appendChild(nm);txt.appendChild(meta);
+    el.appendChild(ico);el.appendChild(txt);
     if(n){
       const b=document.createElement('span');
       b.className='sys-count';b.textContent=n+(n===1?' sone':' soner');
@@ -7950,7 +7993,8 @@ setTimeout(()=>{
     // Systema kan vere sletta i EntroPi etter at koplinga vart gjord — då står
     // ho att med stipla kant i staden for å forsvinne stille frå prosjektet.
     chip.className='sys-chip'+(alle.length&&!finst?' gone':'');
-    chip.title=finst?(x.kategori||''):'Dette systemet finst ikkje i EntroPi lenger';
+    chip.title=finst?((x.kategori||'')+(sysMeta(x)?' · '+sysMeta(x):''))
+                    :'Dette systemet finst ikkje i EntroPi lenger';
     const t=document.createElement('span');
     t.textContent=x.namn||x.id;
     const b=document.createElement('button');
@@ -7961,6 +8005,51 @@ setTimeout(()=>{
   }
 
   function render(){renderSrc();renderZones();}
+
+  // Det som vert lagra på sona. Tala er med fordi SXI-eksporten må kunne
+  // køyre utan EntroPi — frå ei .entro-fil, i ei anna økt, på ein annan maskin.
+  const kopi=s=>({id:s.id,namn:s.namn,kategori:s.kategori,
+    luft:s.luft||null,gjenvinning:s.gjenvinning!=null?s.gjenvinning:null,
+    sfp:s.sfp!=null?s.sfp:null});
+
+  // Tala kan ha endra seg i EntroPi sidan koplinga vart gjord. Vi oppdaterer
+  // dei lagra kopiane, men lagar ikkje eit angre-steg av det — brukaren gjorde
+  // ingenting. Endringa vert markert som ulagra, så ho kjem med til bygget.
+  function oppdaterLagra(){
+    if(!alle.length)return 0;
+    let n=0;
+    floors.forEach(f=>f.zones.forEach(z=>{
+      const l=Array.isArray(z.tekniskeSystem)?z.tekniskeSystem:[];
+      l.forEach((s,i)=>{
+        const fersk=alle.find(x=>x.id===s.id);
+        if(!fersk)return;
+        const ny=kopi(fersk);
+        if(JSON.stringify(ny)!==JSON.stringify(s)){l[i]=ny;n++;}
+      });
+    }));
+    if(n)markDirty();
+    return n;
+  }
+
+  // Tala slik dei står i vindauget. Tom streng = ingenting å vise.
+  const nf=v=>String(Math.round(v*100)/100).replace('.',',');
+  function sysMeta(s){
+    const d=[];
+    if(s.luft){
+      const e=s.luft.per?' m³/(h·m²)':' m³/h';
+      const t=s.luft.til,f=s.luft.fra;
+      if(t!=null&&f!=null&&t!==f)d.push(nf(t)+'/'+nf(f)+e);
+      else if(t!=null||f!=null)d.push(nf(t!=null?t:f)+e);
+      const r=s.luft.redTil!=null?s.luft.redTil:s.luft.redFra;
+      if(r!=null)d.push('redusert '+nf(r));
+    }
+    if(s.gjenvinning!=null)d.push(Math.round(s.gjenvinning*100)+' % gjenvinning');
+    if(s.sfp!=null)d.push('SFP '+nf(s.sfp));
+    if(d.length)return d.join(' · ');
+    // Ver tydeleg på kva som skjer i SXI-en når tala manglar
+    return erVent(s)?'ingen tal frå EntroPi — normverdiar i SXI':'ikkje i SXI enno';
+  }
+  const erVent=s=>String(s.kategori||'').toLowerCase().replace(/ø/g,'o').indexOf('ventilasjon')===0;
 
   // Éin stad som held dei to listene i takt
   function setSystems(list){
@@ -7976,12 +8065,14 @@ setTimeout(()=>{
     const r=await H.requestSystems();
     hentar=false;
     if(r&&Array.isArray(r.systems))setSystems(r.systems);
+    const oppd=oppdaterLagra();
     if(r&&r.ok){
       const bn=H.byggNamn?H.byggNamn():'';
       const skjult=alle.length-systems.length;
       status(systems.length
         ?('Fann '+systems.length+' system'+(bn?' på '+bn:'')
-          +(skjult>0?' ('+skjult+' i andre kategoriar)':'')+'.')
+          +(skjult>0?' ('+skjult+' i andre kategoriar)':'')+'.'
+          +(oppd?' Oppdaterte tal for '+oppd+(oppd===1?' kopling.':' koplingar.'):''))
         :(alle.length?'Ingen system i ventilasjon, varme eller kjøling på bygget.'
                      :'Bygget har ingen tekniske systemer i EntroPi.'));
     }else status((r&&r.message)||'Kunne ikkje hente tekniske systemer.');
@@ -9140,6 +9231,40 @@ const BYGKAT_PROFILER = {
 // XML-escaping for brukarstyrte strenger — «Bygg & Anlegg» utan escaping gir ugyldig XML som SIMIEN nektar å opne
 function xesc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');}
 
+// ── Ventilasjonsanlegg frå EntroPi (beta) ────────────────────
+// Er det lagt eit ventilasjonssystem på sona i systemvindauget, overstyrer
+// luftmengd, gjenvinningsgrad og SFP frå EntroPi normverdiane i <ventilation>.
+// Alt anna — driftstid, batteri, tilluftstemperatur — står som før. Manglar
+// eit tal, står normverdien for det eine talet; vi blandar per felt, ikkje
+// alt-eller-ingenting.
+function ventSysForZone(z){
+  const list=Array.isArray(z.tekniskeSystem)?z.tekniskeSystem:[];
+  return list.find(s=>String(s.kategori||'').toLowerCase()
+    .replace(/ø/g,'o').indexOf('ventilasjon')===0)||null;
+}
+// SIMIEN vil ha luftmengd per m². Sender EntroPi total m³/h, deler vi på
+// arealet anlegget faktisk betjener — summen av alle soner det er lagt på,
+// over alle etasjar. Eitt aggregat gir då same spesifikke luftmengd i alle
+// sonene sine, som er den fysisk rette tolkinga.
+function ventAreaForSys(id){
+  let a=0;
+  floors.forEach(f=>f.zones.forEach(z=>{
+    const l=Array.isArray(z.tekniskeSystem)?z.tekniskeSystem:[];
+    if(l.some(s=>s.id===id))a+=getAreaM2(z)||0;
+  }));
+  return a;
+}
+function ventSpesLuft(sys,v){
+  // 0 er gyldig (anlegget står av utanfor drift), null/negativt er det ikkje
+  if(v==null||!(v>=0))return null;
+  if(sys.luft&&sys.luft.per)return v;      // alt per m² frå verten
+  const a=ventAreaForSys(sys.id);
+  return a>0?v/a:null;                     // utan areal veit vi ingenting
+}
+// Gjenvinningskurva i referansefila ligg som forhold til 0,80. Vi skalerer
+// same forma opp eller ned i staden for å finne opp ei ny kurve.
+const VENT_EFF_KURVE=[0.79/0.80,0.81/0.80,0.83/0.80,0.81/0.80,0.76/0.80];
+
 function buildSXI(proj){
   const {prosjektnamn,adresse,klimasted,byggeaar,kommunenr} = proj;
   const k=KLIMA[klimasted];
@@ -9192,6 +9317,47 @@ function buildSXI(proj){
     const BST          = btCfg.subtype;
     const WDAYS        = btCfg.working_days;
     const WDAYS_EN     = btCfg.working_days_en;
+
+    // Ventilasjonstal. Utan eit anlegg på sona står alle normverdiane
+    // akkurat som før — ein fil frå eit prosjekt utan EntroPi-system er
+    // teikn for teikn den same som før denne funksjonen kom.
+    const V={name:'CAV - konstant luftvolum 1',
+      sfp100:String(sfp),sfp80:sfp80,sfp60:sfp60,sfp40:sfp40,sfp20:sfp20,
+      hx:'yes',eff:'0.80',eff100:'0.79',eff80:'0.81',eff60:'0.83',eff40:'0.81',eff20:'0.76',
+      supply:bpCfg.vent_supply_air,extract:bpCfg.vent_extract_air,
+      redSupply:bpCfg.vent_supply_reduced,redExtract:bpCfg.vent_extract_reduced};
+    const vsys=ventSysForZone(z);
+    if(vsys){
+      if(vsys.namn)V.name=vsys.namn;
+      const til=ventSpesLuft(vsys,vsys.luft?vsys.luft.til:null);
+      const fra=ventSpesLuft(vsys,vsys.luft?vsys.luft.fra:null);
+      const s=til!=null?til:fra, e=fra!=null?fra:til;
+      // Luftmengd utanfor drift: frå EntroPi om han veit henne. Elles står
+      // normverdien, men aldri høgare enn den luftmengda anlegget faktisk har
+      // — det ville vore reint tull i SIMIEN. Vi skalerer *ikkje* ned norma
+      // etter forholdet mellom design og norm: ei nattsenking vi ikkje veit om
+      // ville gjort energimerket betre enn vi har grunnlag for å seie.
+      const redT=ventSpesLuft(vsys,vsys.luft?vsys.luft.redTil:null);
+      const redF=ventSpesLuft(vsys,vsys.luft?vsys.luft.redFra:null);
+      if(s!=null){V.supply=s.toFixed(2);
+        V.redSupply=(redT!=null?Math.min(redT,s)
+          :Math.min(parseFloat(bpCfg.vent_supply_reduced),s)).toFixed(2);}
+      if(e!=null){V.extract=e.toFixed(2);
+        V.redExtract=(redF!=null?Math.min(redF,e)
+          :Math.min(parseFloat(bpCfg.vent_extract_reduced),e)).toFixed(2);}
+      if(vsys.sfp!=null){
+        V.sfp100=vsys.sfp.toFixed(2);V.sfp80=(vsys.sfp*0.9).toFixed(2);
+        V.sfp60=(vsys.sfp*0.8).toFixed(2);V.sfp40=(vsys.sfp*0.7).toFixed(2);
+        V.sfp20=(vsys.sfp*0.6).toFixed(2);
+      }
+      if(vsys.gjenvinning!=null){
+        const g=vsys.gjenvinning;
+        V.hx=g>0?'yes':'no';
+        V.eff=g.toFixed(2);
+        const k=VENT_EFF_KURVE.map(r=>Math.min(0.99,g*r).toFixed(2));
+        V.eff100=k[0];V.eff80=k[1];V.eff60=k[2];V.eff40=k[3];V.eff20=k[4];
+      }
+    }
 
     const totalBra=instances.reduce((s,lz)=>{const a=getAreaM2(lz);return s+(a||0);},0);
     const totalVol=instances.reduce((s,lz)=>{const v=getVolum(lz);return s+(v||0);},0);
@@ -9397,7 +9563,7 @@ function buildSXI(proj){
     const vol=totalVol.toFixed(1);
     const zId=thisZoneId;
     zonesXml+=`  <zone id="${zId}" name="${xesc(z.name)}" comment="" building_type="${BT}" building_subtype="${BST}" area="${bra}" volume="${vol}" n50="${n50}" furniture="Middels møblert" thermal_cap_furniture="4.00" shielding="moderat" facades="flere" thermal_bridge_type="normalisert" norm_thermal_bridge="${kuldebro}" working_days="${WDAYS}" working_days_en="${WDAYS_EN}" working_days_jan="${btCfg.working_days_jan}" working_days_feb="${btCfg.working_days_feb}" working_days_mar="${btCfg.working_days_mar}" working_days_apr="${btCfg.working_days_apr}" working_days_may="${btCfg.working_days_may}" working_days_jun="${btCfg.working_days_jun}" working_days_jul="${btCfg.working_days_jul}" working_days_aug="${btCfg.working_days_aug}" working_days_sep="${btCfg.working_days_sep}" working_days_oct="${btCfg.working_days_oct}" working_days_nov="${btCfg.working_days_nov}" working_days_dec="${btCfg.working_days_dec}">
-${kjellerXml}${facXml}${takXml}${gulvXml}    <ventilation id="${nextId('cav')}" name="CAV - konstant luftvolum 1" comment="" sfp_input="prosent" sfp_100="${sfp}" sfp_80="${sfp80}" sfp_60="${sfp60}" sfp_40="${sfp40}" sfp_20="${sfp20}" position_supply_fan="etter" position_extract_fan="etter" supply_temp="19.00" summer_scheme="no" supply_temp_summer="17.00" first_summer_month="mai" last_summer_month="august" heating_coil="yes" heating_coil_cap="30.00" heating_coil_efficiency="0.98" heating_coil_type="lokal" distr_heating_id="" heating_coil_spp="0.50" heating_coil_supply_temp="45.00" heating_coil_return_temp="30.00" cooling_coil="${bpCfg.vent_cooling_coil}" cooling_coil_cap="${bpCfg.vent_cooling_coil_cap}" cooling_coil_efficiency="2.00" cooling_coil_type="lokal" distr_cooling_id="" cooling_coil_spp="0.50" cooling_coil_supply_temp="10.00" cooling_coil_return_temp="15.00" heat_exchanger="yes" exchanger_efficiency_input="prosent" efficiency_exchanger="0.80" efficiency_exchanger_100="0.79" efficiency_exchanger_80="0.81" efficiency_exchanger_60="0.83" efficiency_exchanger_40="0.81" efficiency_exchanger_20="0.76" frost_protection="no" frost_protect_temp="-10.00" hygroscopic_exchanger="no" humidity_efficiency="0.60" contamination_risk="no" night_cooling="no" start_time_night_cooling="23.00" end_time_night_cooling="06.00" room_temp_night_cooling="22.00" ext_temp_night_cooling="20.00" max_room_temp_night_cooling="24.00" min_room_temp_night_cooling="18.00" min_supply_temp_night_cooling="12.00" night_cooling_holiday="no" reduced_airflow="no" reduced_airflow_temp="-15.00" heating_coil_distr_description="forenklet" heating_coil_specific_length_pipes="0.20" heating_coil_uvalue_pipes="0.20" heating_coil_share_heated_room="50.00" heating_coil_temp_unheated_room="10.00" cooling_coil_distr_description="forenklet" cooling_coil_specific_length_pipes="0.20" cooling_coil_uvalue_pipes="0.20" cooling_coil_share_heated_room="50.00" cooling_coil_temp_unheated_room="10.00" type="balansert" supply_air="${bpCfg.vent_supply_air}" extract_air="${bpCfg.vent_extract_air}" supply_temp_type="konstant" max_supply_temp="19.00" min_supply_temp="16.00" high_extract_temp="24.00" low_extract_temp="21.00" usage_holiday="${bpCfg.vent_usage_holiday}" supply_airflow_night_cooling="1.20" extract_airflow_night_cooling="1.20" supply_airflow_reduced="${bpCfg.vent_supply_reduced}" extract_airflow_reduced="${bpCfg.vent_extract_reduced}" norm_airflow="no" norm_air_on="${bpCfg.vent_norm_on}" norm_air_off="${bpCfg.vent_norm_off}" norm_sfp_on="1.50" norm_sfp_off="1.50" cooling_coil_water_flow="variable" heating_coil_water_flow="variable" frost_protection_type="preheat">
+${kjellerXml}${facXml}${takXml}${gulvXml}    <ventilation id="${nextId('cav')}" name="${xesc(V.name)}" comment="" sfp_input="prosent" sfp_100="${V.sfp100}" sfp_80="${V.sfp80}" sfp_60="${V.sfp60}" sfp_40="${V.sfp40}" sfp_20="${V.sfp20}" position_supply_fan="etter" position_extract_fan="etter" supply_temp="19.00" summer_scheme="no" supply_temp_summer="17.00" first_summer_month="mai" last_summer_month="august" heating_coil="yes" heating_coil_cap="30.00" heating_coil_efficiency="0.98" heating_coil_type="lokal" distr_heating_id="" heating_coil_spp="0.50" heating_coil_supply_temp="45.00" heating_coil_return_temp="30.00" cooling_coil="${bpCfg.vent_cooling_coil}" cooling_coil_cap="${bpCfg.vent_cooling_coil_cap}" cooling_coil_efficiency="2.00" cooling_coil_type="lokal" distr_cooling_id="" cooling_coil_spp="0.50" cooling_coil_supply_temp="10.00" cooling_coil_return_temp="15.00" heat_exchanger="${V.hx}" exchanger_efficiency_input="prosent" efficiency_exchanger="${V.eff}" efficiency_exchanger_100="${V.eff100}" efficiency_exchanger_80="${V.eff80}" efficiency_exchanger_60="${V.eff60}" efficiency_exchanger_40="${V.eff40}" efficiency_exchanger_20="${V.eff20}" frost_protection="no" frost_protect_temp="-10.00" hygroscopic_exchanger="no" humidity_efficiency="0.60" contamination_risk="no" night_cooling="no" start_time_night_cooling="23.00" end_time_night_cooling="06.00" room_temp_night_cooling="22.00" ext_temp_night_cooling="20.00" max_room_temp_night_cooling="24.00" min_room_temp_night_cooling="18.00" min_supply_temp_night_cooling="12.00" night_cooling_holiday="no" reduced_airflow="no" reduced_airflow_temp="-15.00" heating_coil_distr_description="forenklet" heating_coil_specific_length_pipes="0.20" heating_coil_uvalue_pipes="0.20" heating_coil_share_heated_room="50.00" heating_coil_temp_unheated_room="10.00" cooling_coil_distr_description="forenklet" cooling_coil_specific_length_pipes="0.20" cooling_coil_uvalue_pipes="0.20" cooling_coil_share_heated_room="50.00" cooling_coil_temp_unheated_room="10.00" type="balansert" supply_air="${V.supply}" extract_air="${V.extract}" supply_temp_type="konstant" max_supply_temp="19.00" min_supply_temp="16.00" high_extract_temp="24.00" low_extract_temp="21.00" usage_holiday="${bpCfg.vent_usage_holiday}" supply_airflow_night_cooling="1.20" extract_airflow_night_cooling="1.20" supply_airflow_reduced="${V.redSupply}" extract_airflow_reduced="${V.redExtract}" norm_airflow="no" norm_air_on="${bpCfg.vent_norm_on}" norm_air_off="${bpCfg.vent_norm_off}" norm_sfp_on="1.50" norm_sfp_off="1.50" cooling_coil_water_flow="variable" heating_coil_water_flow="variable" frost_protection_type="preheat">
       <usage_ventilation name="${bpCfg.uv_name}" ${bpCfg.uv_pct}></usage_ventilation>
     </ventilation>
     <new_heating id="${nextId('new-heating-system')}" name="Varmesystem 1" comment="" setpoint_temp_on="21.00" setpoint_temp_off="21.00" on_time="${bpCfg.nh_on}" off_time="${bpCfg.nh_off}" summer_scheme="no" summer_scheme_reg="dato" start_date_summer="15.05" stop_date_summer="15.09" ext_temperature_summer="10.00" setpoint_temp_on_summer="20.00" setpoint_temp_off_summer="16.00" on_time_summer="${bpCfg.nh_on_summer}" off_time_summer="${bpCfg.nh_off_summer}" delta_t_setpoint="0.00">

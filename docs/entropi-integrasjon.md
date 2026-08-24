@@ -188,12 +188,62 @@ Knappen er `.embed-only`, så heile funksjonen finst berre inne i EntroPi.
   viste, slik at ingenting forsvinn i stillheit. Samanlikninga er på
   «byrjar med» etter at ø er normalisert, så «Varmepumpe» er med og
   «Gatevarme» ikkje.
-- `namn` er det brukaren ser. `undertittel` og `ikon` (eitt teikn) er valfrie.
+- `namn` er det brukaren ser — og det blir namnet på `<ventilation>`-elementet
+  i SXI-fila, så anlegget er til å kjenne att i SIMIEN. `undertittel` og `ikon`
+  (eitt teikn) er valfrie.
 - Feltnamna kan like godt vere `name`/`category`/`subtitle` — verktøyet
   normaliserer, så EntroPi kan sende radene sine som dei ligg.
 - Same `id` to gonger vert rekna som same system, og duplikatet vert forkasta.
 - Svarar verten ikkje i det heile (t.d. før dette er implementert), seier
   vindauget det etter 12 sekund i staden for å stå og hente for alltid.
+
+#### Tal på ventilasjonsanlegga (går inn i SXI-fila)
+
+Eit ventilasjonssystem kan sende med tal som overstyrer normverdiane i
+`<ventilation>`:
+
+| felt i `sxi:systems` | eining | hamnar i SXI som |
+|---|---|---|
+| `tilluft`, `avtrekk` | m³/h | `supply_air`, `extract_air` |
+| `tilluftRedusert`, `avtrekkRedusert` | m³/h | `supply_airflow_reduced`, `extract_airflow_reduced` |
+| `gjenvinning` | % (`78`) eller brøk (`0.78`) | `efficiency_exchanger` + dellastkurva |
+| `sfp` | kW/(m³/s) | `sfp_100` + dellastkurva |
+
+Alle er valfrie, og dei blandast **per felt**: sender de SFP men ikkje
+gjenvinningsgrad, brukar verktøyet SFP-en dykkar og normverdien for
+gjenvinning. Utan tal i det heile står heile elementet på norm som før —
+ei fil frå eit prosjekt utan EntroPi-tal er teikn for teikn den same.
+
+Reglar det er verdt å kjenne:
+
+- **Luftmengd vert delt på arealet anlegget betjener.** SIMIEN vil ha
+  m³/(h·m²), og verktøyet kjenner arealet til alle sonene systemet ligg på —
+  også på tvers av etasjar. Eitt aggregat gir då same spesifikke luftmengd i
+  alle sonene sine. Sender de ferdig spesifikk luftmengd, sei det med
+  `luftEining: 'm3/(h·m2)'` — elles vert tala feil med ein faktor på arealet.
+- **Legg de anlegget på ei ny sone, endrar luftmengda seg i alle dei andre.**
+  Det er meint slik: same luftmengd fordelt på meir areal.
+- `gjenvinning: 0` gir `heat_exchanger="no"` — altså eit aggregat utan
+  varmegjenvinning, ikkje eit aggregat med 0 % verknadsgrad.
+- **Dellastkurvene vert skalerte, ikkje funne opp.** SFP-en fell til
+  90/80/70/60 % ved 80/60/40/20 % luftmengd, og gjenvinningskurva held same
+  forma som referansefila har rundt 0,80.
+- **Luftmengd utanfor drift gjettar vi ikkje.** Utan `tilluftRedusert` står
+  normverdien, men aldri høgare enn den luftmengda anlegget faktisk har. Vi
+  skalerer den *ikkje* ned etter forholdet mellom design og norm: ei
+  nattsenking vi ikkje veit om ville gjort energimerket betre enn vi har
+  grunnlag for å seie. `0` er ein gyldig verdi og tyder at anlegget står av.
+- Tal utanfor rimeleg område vert forkasta og normverdien brukt: SFP må vere
+  0–20, gjenvinningsgrad 0–100 %. Eit vrøvltal frå verten skal ikkje gå rett
+  inn i energiberekninga.
+- Har ei sone fleire ventilasjonssystem, brukar SXI-en **det fyrste**.
+- Driftstid, tilluftstemperatur, varme- og kjølebatteri kjem framleis frå
+  bygningskategorien — ikkje frå EntroPi enno.
+
+Tala vert **lagra saman med koplinga** på sona, så SXI-eksporten verkar utan
+EntroPi (frå ei `.entro`-fil, i ei anna økt). Ved kvar henting vert dei lagra
+kopiane oppdaterte mot lista frå verten, og vindauget seier kor mange
+koplingar som fekk nye tal.
 
 **Koplinga er verktøyet sitt, ikkje verten sitt.** Ho vert lagra på sona som
 
@@ -219,28 +269,20 @@ inn eit nytt system i EntroPi medan verktøyet står ope.
 
 #### Verdiar som skal med i SXI-fila seinare
 
-I dag sender protokollen berre `id`, `kategori` og `namn` — nok til å knyte
-system til sone. Skal systema faktisk *rekne* i SIMIEN, må tala følgje med.
-Lista under er kryssa mot det SXI-en verktøyet lagar faktisk har av felt, og
-mot kva han i dag gjettar frå byggeår og bygningskategori.
+Luftmengder, gjenvinningsgrad og SFP for ventilasjon er **på plass** — sjå
+«Tal på ventilasjonsanlegga» over. Det som står att, kryssa mot det SXI-en
+faktisk har av felt og kva verktøyet gjettar i dag:
 
-**Ventilasjon** — `<ventilation>` per sone er alt der, men alle tala er norm:
+**Ventilasjon** — resten av `<ventilation>`:
 
-| Verdi frå EntroPi | Felt i SXI i dag | Kva som skjer no |
+| Verdi frå EntroPi | Felt i SXI | Kva som skjer no |
 |---|---|---|
-| Luftmengde i drift (m³/h, eller m³/(h·m²)) | `supply_air`, `extract_air` | norm per bygningskategori (kontor 7,0 i drift / 3,5 utanfor) |
-| Luftmengde utanfor drift | `supply_airflow_reduced`, `extract_airflow_reduced` | norm |
-| SFP (kW/(m³/s)) | `sfp_100` + dellast `sfp_80/60/40/20` | slått opp på byggeår: <2000 → 4,0, 2000–09 → 3,0, 2010–19 → 2,5, 2020+ → 2,0 |
-| Gjenvinningsgrad (temperaturverknadsgrad, %) | `efficiency_exchanger` + kurva `_100/_80/_60/_40/_20` | hardkoda 0,80 |
 | Vekslartype (roterande/plate/væskekopla) | `hygroscopic_exchanger`, `humidity_efficiency`, `frost_protection` | roterande-liknande, frostsikring av |
-| Systemtype (balansert / avtrekk) og CAV/VAV | `type`, namnet på systemet | alltid «CAV - konstant luftvolum» og balansert |
+| Systemtype (balansert/avtrekk) og CAV/VAV | `type`, `norm_airflow` | alltid balansert CAV |
 | Driftstid (på/av, helg) | `usage_ventilation`-profilen, `usage_holiday` | norm per bygningskategori |
 | Tilluftstemperatur | `supply_temp`, `min/max_supply_temp` | 19 °C |
 | Varmebatteri (kW) | `heating_coil`, `heating_coil_cap` | ja, 30 kW |
 | Kjølebatteri (kW) | `cooling_coil`, `cooling_coil_cap` | per bygningskategori |
-
-Merk: SIMIEN vil ha luftmengd **per m²**. Verktøyet kjenner arealet til sonene
-systemet betjener, så EntroPi kan like godt sende total m³/h — vi deler.
 
 **Varme** — her manglar det mest. I dag skriv verktøyet **berre panelovnar**
 (`<new_local_heater_dir_el>`, 50 W/m² av BRA), altså elektrisk oppvarming for

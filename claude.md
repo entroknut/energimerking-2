@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.7.1 | Single-file HTML applikasjon
+**Versjon:** 3.8.0 | Single-file HTML applikasjon
 
 ---
 
@@ -447,10 +447,28 @@ Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
     system vert vist — aldri sil i stillheit. `alle` (rålista) vert brukt til
     å avgjere om ei kopling framleis finst, `systems` (sila) til det som kan
     dragast; elles ville ei gammal belysningskopling blitt merkt som sletta.
-  - Koplinga går **ikkje** inn i SXI-eksporten enno. Kva tal som må med når
-    han skal det (luftmengder, SFP, gjenvinningsgrad, effekt, COP …) og kva
-    verktøyet gjettar i dag: sjå «Verdiar som skal med i SXI-fila seinare» i
-    `docs/entropi-integrasjon.md`.
+  - **Ventilasjonstala går inn i SXI-en** (`ventSysForZone`, `ventSpesLuft`,
+    `V`-objektet i `buildSXI`): luftmengd, redusert luftmengd, gjenvinningsgrad
+    og SFP. Invariantar:
+    - Blanding skjer **per felt** — manglar eitt tal, står normverdien for det
+      eine. Utan system er fila teikn for teikn som før (difor står `sfp_100`
+      framleis som `String(sfp)`, ikkje `toFixed(2)`, på normvegen).
+    - m³/h vert delt på **arealet anlegget betjener** (`ventAreaForSys`, alle
+      soner det er lagt på, over alle etasjar). `luft.per` fortel at verten
+      alt sende m³/(h·m²).
+    - Redusert luftmengd vert **ikkje** skalert ned frå norma etter design —
+      ei nattsenking vi ikkje veit om ville gjort energimerket for godt. Utan
+      tal: norm, klipt til å ikkje vere større enn designluftmengda.
+    - Dellastkurvene er **skalerte** frå referansefila (SFP 90/80/70/60 %,
+      gjenvinningskurva som forhold til 0,80), aldri nyoppfunne.
+    - Namnet på `<ventilation>` kjem frå EntroPi (gjennom `xesc`), men
+      **id-prefikset `cav#` står** — SIMIEN slår opp elementtype på prefikset.
+    - Tala vert lagra på sona (`kopi()`), så eksporten verkar utan EntroPi.
+      `oppdaterLagra()` friskar dei opp ved kvar henting og markerer prosjektet
+      ulagra, men lagar **ikkje** eit angre-steg — brukaren gjorde ingenting.
+  - Varme og kjøling går **ikkje** inn i SXI-en enno (varme er framleis
+    panelovnar 50 W/m²). Kva som må til: sjå «Verdiar som skal med i SXI-fila
+    seinare» i `docs/entropi-integrasjon.md`.
 - Ny melding = ny metode på `window.EntroHost`; `postMessage` bur berre i brua.
   Kvar melding inn i tre filer: brua, protokolltabellen i doc-en, og testverten.
 - Test **begge** modus: `index.html` direkte (skal vere uendra) og

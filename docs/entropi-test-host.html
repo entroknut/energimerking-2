@@ -39,8 +39,12 @@ const BYGG={id:'bygg-42',namn:'Storgata 1',adresse:'Storgata 1, 0155 Oslo',bygge
 // Dei tekniske systema som ligg på bygget i EntroPi. Same forma som
 // produksjonssida sender: {id, kategori, namn}.
 const SYSTEMS=[
-  {id:'vent-201362',     kategori:'Ventilasjon', namn:'201.362'},
-  {id:'varme-fjern',     kategori:'Varme',       namn:'Fjernvarme'},
+  // Ventilasjonsanlegga har tala SXI-eksporten brukar: luftmengd i m³/h
+  // (verktøyet deler på arealet), gjenvinningsgrad i prosent og SFP.
+  {id:'vent-201362',     kategori:'Ventilasjon', namn:'201.362',
+   tilluft:7000, avtrekk:6800, tilluftRedusert:2000, avtrekkRedusert:2000,
+   gjenvinning:78, sfp:1.8},
+  {id:'varme-fjern',     kategori:'Varme',       namn:'Fjernvarme', effekt:250},
   {id:'varme-vp',        kategori:'Varme',       namn:'Varmepumpe'},
   {id:'kjol-fjern',      kategori:'Kjøling',     namn:'Fjernkjøling'},
   {id:'gate-1',          kategori:'Gatevarme',   namn:'Gatevarme'},
