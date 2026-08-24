@@ -665,7 +665,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.5.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.5.1</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -1002,13 +1002,20 @@ let globalMmPerImgPx=null; // kalibrering som gjeld alle etasjar utan eigen kali
 // Bygget si adresse — sett frå kartsøket eller SXI-dialogen, lagra i prosjektfila
 // og brukt som framlegg til filnamn.
 let prosjektAdresse='';
-function adresseTilFilnamn(a){
+// Gateadressa åleine — utan postnummer og poststad.
+// «Nordre gate 3, 7011 Trondheim» → «Nordre gate 3»
+// Både filnamnet og prosjektnamnet i SXI-dialogen byggjer på denne, så regelen
+// for kva som er «adressa» bur på éin stad.
+function gateadresse(a){
   if(!a)return null;
-  // «Bleivassvegen 105 B, 5178 Loddefjord, Norge» → «Bleivassvegen 105 B»
-  const s=String(a).split(',')[0]
-    .replace(/[\\/:*?"<>|]/g,'-')   // teikn som ikkje er lovlege i filnamn
-    .replace(/\s+/g,' ').trim();
+  const s=String(a).split(',')[0].replace(/\s+/g,' ').trim();
   return s||null;
+}
+function adresseTilFilnamn(a){
+  const s=gateadresse(a);
+  if(!s)return null;
+  // «Bleivassvegen 105 B, 5178 Loddefjord, Norge» → «Bleivassvegen 105 B»
+  return s.replace(/[\\/:*?"<>|]/g,'-').trim()||null;   // teikn som ikkje er lovlege i filnamn
 }
 // ── Verdiar frå EntroPi ──────────────────────────────────────
 // Bygget i EntroPi har alt adresse og byggeår utfylt, så brukaren skal ikkje
@@ -1036,12 +1043,18 @@ function _fyllFraPi(){
   return endra;
 }
 
-// Held adressefelta i kartet og SXI-dialogen i takt med den lagra adressa
+// Held adressefelta i kartet og SXI-dialogen i takt med den lagra adressa.
+// Fyller berre inn tomme felt, så det brukaren har skrive sjølv står.
 function _syncAdresseFelt(){
   const m=document.getElementById('mapSearchInput');
   if(m&&prosjektAdresse&&!m.value)m.value=prosjektAdresse;
   const s=document.getElementById('sxi_adresse');
   if(s&&prosjektAdresse&&!s.value)s.value=prosjektAdresse;
+  // Prosjektnamnet er gateadressa — same framlegg som filnamnet får. Feltet er
+  // eit vanleg skrivefelt, så det kan overskrivast fritt, og det brukaren
+  // skriv står til han endrar det sjølv.
+  const n=document.getElementById('sxi_namn');
+  if(n&&!n.value){const g=gateadresse(prosjektAdresse);if(g)n.value=g;}
 }
 let zones=[],curPts=[],mode='navigate',calPts=[];
 let draftZones=[];

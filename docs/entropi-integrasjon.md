@@ -84,8 +84,13 @@ brukaren ikkje må tasta dei på nytt:
 
 | felt i `bygg` | hamnar i verktøyet |
 |---|---|
-| `adresse` | `prosjektAdresse` → adressefeltet i kartet og i SXI-dialogen, og framlegg til filnamn |
+| `adresse` | `prosjektAdresse` → adressefeltet i kartet og i SXI-dialogen, framlegg til filnamn, og prosjektnamnet (sjå under) |
 | `byggeaar` | `byggeaar` på kvar sone → standard U-verdiar, TEK-kode og SFP i SXI-eksporten |
+
+Prosjektnamnet i SXI-dialogen er **gateadressa** — adressa utan postnummer og
+poststad («Nordre gate 3, 7011 Trondheim» → «Nordre gate 3»). Det er ikkje eit
+eige felt i protokollen: `gateadresse()` utleier det av adressa, og same
+regelen gjeld utanfor EntroPi når adressa kjem frå kartsøket.
 
 Dette er **framlegg, aldri fasit**. Regelen er den same for alle felt, og han
 er verdt å halde når lista veks:
