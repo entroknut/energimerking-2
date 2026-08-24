@@ -23,6 +23,7 @@
   <span class="pill" id="stored">ingen lagra fil</span>
   <span style="margin-left:auto"></span>
   <button class="btn grey" id="reqSave">Ber verktøyet lagre</button>
+  <button class="btn grey" id="pushSys">Send systema uoppmoda</button>
   <button class="btn grey" id="reload">Last iframe på nytt</button>
   <button class="btn grey" id="wipe">Slett lagra fil</button>
 </header>
@@ -35,6 +36,21 @@
 // docs/entropi-integrasjon.md. «Backend» her er berre ein variabel + IndexedDB-fri
 // localStorage-nøkkel for metadata, så vi kan sjå at rundturen verkar.
 const BYGG={id:'bygg-42',namn:'Storgata 1',adresse:'Storgata 1, 0155 Oslo',byggeaar:1978};
+// Dei tekniske systema som ligg på bygget i EntroPi. Same forma som
+// produksjonssida sender: {id, kategori, namn}.
+const SYSTEMS=[
+  {id:'vent-201362',     kategori:'Ventilasjon', namn:'201.362'},
+  {id:'varme-fjern',     kategori:'Varme',       namn:'Fjernvarme'},
+  {id:'varme-vp',        kategori:'Varme',       namn:'Varmepumpe'},
+  {id:'kjol-fjern',      kategori:'Kjøling',     namn:'Fjernkjøling'},
+  {id:'gate-1',          kategori:'Gatevarme',   namn:'Gatevarme'},
+  {id:'bel-kontor',      kategori:'Belysning',   namn:'Kontorareal'},
+  {id:'auto-sd',         kategori:'Automasjon',  namn:'SD anlegg: GK'},
+  {id:'annet-inneklima', kategori:'Annet',       namn:'Inneklima sensorikk'}
+];
+// ?nosys=1 → verten kan ikkje denne meldinga. Verktøyet skal då gi ei
+// forklaring etter tidsavbrotet, ikkje stå og hente i det uendelege.
+const NOSYS=new URLSearchParams(location.search).has('nosys');
 const fr=document.getElementById('fr');
 const logEl=document.getElementById('log');
 let lagraTekst=null;                     // «fila på bygget»
@@ -49,7 +65,7 @@ const setStored=()=>document.getElementById('stored').textContent=
 window.addEventListener('message',async ev=>{
   const d=ev.data;
   if(!d||d.source!=='sxi-generator')return;
-  log('◀ '+d.type+(d.auto?' (auto)':'')+(d.filename?' '+d.filename:'')+(d.bytes?' ('+(d.bytes/1024|0)+' kB)':''));
+  log('◀ '+d.type+(d.auto?' (auto)':'')+(d.requestId?' #'+d.requestId:'')+(d.filename?' '+d.filename:'')+(d.bytes?' ('+(d.bytes/1024|0)+' kB)':''));
 
   if(d.type==='sxi:ready'){
     setState('kopla — v'+(d.version||'?'));
@@ -89,6 +105,12 @@ window.addEventListener('message',async ev=>{
     }
     return;
   }
+  if(d.type==='sxi:request-systems'){
+    if(NOSYS){log('  (nosys: svarar ikkje)');return;}
+    send({type:'sxi:systems',requestId:d.requestId,ok:true,systems:SYSTEMS});
+    log('▶ sxi:systems ('+SYSTEMS.length+' system)');
+    return;
+  }
   if(d.type==='sxi:export-sxi'){
     log('  fekk SXI-fil '+d.filename+' — '+d.bytes+' teikn');
     return;
@@ -97,6 +119,10 @@ window.addEventListener('message',async ev=>{
 
 document.getElementById('reqSave').onclick=()=>{send({type:'sxi:request-save'});log('▶ sxi:request-save');};
 document.getElementById('reload').onclick=()=>{fr.src=fr.src;setState('lastar…');};
+// Uoppmoda push — verten kan sende lista når han vil, t.d. når nokon har lagt
+// inn eit nytt system i EntroPi medan verktøyet står ope.
+document.getElementById('pushSys').onclick=()=>{
+  send({type:'sxi:systems',systems:SYSTEMS});log('▶ sxi:systems (uoppmoda)');};
 document.getElementById('wipe').onclick=()=>{lagraTekst=null;setStored();log('lagra fil sletta');};
 document.getElementById('bygg').textContent=BYGG.namn+' ('+BYGG.id+')';
 setStored();

@@ -25,6 +25,8 @@ EntroPi (entro-digital.vercel.app)          iframe (github.io)
 ├──── sxi:request-save ─────────────────────▶│  (t.d. når modalen vert lukka)
 │  ◀── sxi:save {blob, meta, filename} ──────┤  brukaren trykte «Lagre»
 ├──── sxi:save-result {ok} ─────────────────▶│  lagra — verktøyet blir «reint»
+│  ◀── sxi:request-systems ──────────────────┤  «Hent tekniske systemer»
+├──── sxi:systems {systems} ────────────────▶│  systema som ligg på bygget
 │  ◀── sxi:export-sxi {blob} ────────────────┤  SXI-fila til SIMIEN (valfritt)
 ```
 
@@ -47,6 +49,7 @@ plukkar lyttaren opp meldingar frå andre bibliotek (Mapbox, React DevTools).
 | `sxi:ready` | `version` | verktøyet er lasta. Krev `?embed=1` i iframe-URL-en (sjå under). Vert sendt fleire gonger (0/250/750/2000/5000 ms) til init kjem, så det er trygt om React monterer lyttaren seint. |
 | `sxi:state` | `dirty`, (`ready`) | ulagra endringar har endra seg. Bruk til å åtvare før modalen vert lukka. |
 | `sxi:save` | `requestId`, `auto`, `filename`, `bytes`, `blob`, `meta` | brukaren trykte «Lagre» (eller EntroPi bad om det). **Må** svarast med `sxi:save-result`. |
+| `sxi:request-systems` | `requestId` | brukaren opna «Hent tekniske systemer». Svar med `sxi:systems`. Verktøyet ventar 12 s, så gir det opp og seier det til brukaren. |
 | `sxi:export-sxi` | `filename`, `bytes`, `blob`, `meta` | SXI-fila til SIMIEN vart eksportert. Kjem berre om init hadde `wantsSxi:true`. Krev ikkje svar. |
 
 `meta` på `sxi:save`: `{floors, zones, braM2, adresse, savedAt, appVersion}` —
@@ -58,8 +61,9 @@ nok til å vise «3 etasjar · 12 soner · 2 480 m²» på byggkortet utan å op
 |---|---|---|
 | `sxi:init` | `bygg`, `project`, `wantsSxi`, `autosaveMs`, `saveLabel` | slår på innbygd modus. Send han som svar på `sxi:ready`. |
 | `sxi:load` | `project` | byt til eit anna prosjekt medan verktøyet står ope (t.d. ein tidlegare versjon). |
-| `sxi:request-save` | `requestId`, `auto` | ber verktøyet lagre no. |
+| `sxi:request-save` | `requestId`, `auto` | ber verktøyet lagre no. Kvar førespurnad endar i ein `sxi:save` med same `requestId` — kjem han medan ei lagring alt går (t.d. ei autolagring), vert han lagd i kø og send så snart den fyrste er ferdig. |
 | `sxi:save-result` | `requestId`, `ok`, `message` | resultatet av lagringa. Utan svar innan 45 s gir verktøyet opp og ber brukaren prøve igjen. |
+| `sxi:systems` | `requestId`, `ok`, `systems`, `message` | dei tekniske systema på bygget. Svar på `sxi:request-systems`, men kan òg sendast uoppmoda — då oppdaterer verktøyet lista si (og eit ope vindauge) med ein gong. |
 
 Felta i `sxi:init`:
 
@@ -104,6 +108,23 @@ Ved `pagehide` (iframen vert fjerna) vert lokalkopien skriven uansett — det er
 siste sjanse, og ein `postMessage` rekk ikkje fram når iframen forsvinn. Det er
 difor `sxi:state {dirty}` finst: bruk han til å åtvare før modalen vert lukka.
 
+### Åtvaring om ulagra endringar
+
+Verktøyet ligg i ein iframe og kan ikkje stoppe navigasjon i EntroPi. Skal
+brukaren åtvarast før han går ut av energimerkinga med ulagra endringar, må det
+byggjast på **EntroPi-sida** — verktøyet gir grunnlaget:
+
+1. Følg `sxi:state {dirty}`. Han kjem ved init og ved kvar endring i tilstanden,
+   så verten har alltid ferskt svar på «finst det ulagra endringar?».
+2. Er `dirty` sann når brukaren navigerer bort: vis dialogen. «Lagre og gå ut»
+   sender `sxi:request-save` med ein eigen `requestId` og ventar på
+   `sxi:save-result` for **den** id-en før navigasjonen held fram.
+3. Kvar `sxi:request-save` får svar, også når ei autolagring var i gang då han
+   kom. Verten trenger ikkje ta høgd for kollisjonen sjølv.
+
+`beforeunload` er ikkje til hjelp: han fyrer ikkje når ein iframe vert fjerna.
+Det er heile grunnen til at `sxi:state` finst.
+
 ### Verdiar som vert fylte inn frå bygget
 
 Bygget i EntroPi har alt fleire av dei same opplysningane som verktøyet spør
@@ -138,6 +159,57 @@ I koden: `piBygg` held verdiane frå verten (brua er einaste skrivar), og
 `_fyllFraPi()` avgjer kva som faktisk vert fylt inn. Eit nytt felt av same
 slag skal berre inn i desse to — pluss der feltet har ein eigen standardverdi,
 som `finishZone()` for nye soner.
+
+### Tekniske system frå bygget (beta)
+
+Bygget i EntroPi har alt ei liste med tekniske system (Ventilasjon, Varme,
+Kjøling, Belysning, Automasjon …). Knappen **«⚙ Hent tekniske systemer»** i
+verktøylinja opnar eit eige vindauge der desse systema står på venstre side og
+sonene i energimerkinga på høgre, og der ein dreg system over på soner.
+
+Knappen er `.embed-only`, så heile funksjonen finst berre inne i EntroPi.
+
+**Verten svarar på `sxi:request-systems` med `sxi:systems`:**
+
+```js
+{ type:'sxi:systems', requestId, ok:true, systems:[
+    {id:'vent-201362', kategori:'Ventilasjon', namn:'201.362'},
+    {id:'varme-fjern', kategori:'Varme',       namn:'Fjernvarme'}
+] }
+```
+
+- `id` må vere **stabil** — koplinga til sona lagrar han. Manglar `id`, lagar
+  verktøyet ein av `kategori/namn`, og då mistar koplinga festet om namnet
+  vert endra i EntroPi.
+- `kategori` styrer grupperinga i lista. Tom kategori vert «Ukategorisert».
+- `namn` er det brukaren ser. `undertittel` og `ikon` (eitt teikn) er valfrie.
+- Feltnamna kan like godt vere `name`/`category`/`subtitle` — verktøyet
+  normaliserer, så EntroPi kan sende radene sine som dei ligg.
+- Same `id` to gonger vert rekna som same system, og duplikatet vert forkasta.
+- Svarar verten ikkje i det heile (t.d. før dette er implementert), seier
+  vindauget det etter 12 sekund i staden for å stå og hente for alltid.
+
+**Koplinga er verktøyet sitt, ikkje verten sitt.** Ho vert lagra på sona som
+
+```js
+z.tekniskeSystem = [{id, namn, kategori}]
+```
+
+og følgjer `.entro`-fila, angre-historikken og lagringa på bygget som alle
+andre sonefelt. Namn og kategori vert lagra **saman med** id-en med vilje: eit
+system som vert sletta i EntroPi skal framleis vere leseleg i prosjektet, og
+det står då med stipla kant i vindauget.
+
+- **Kopla soner (`groupId`) er éi sone** i vindauget — same regel som
+  SXI-eksporten brukar. Eit system som vert lagt der, vert lagt på alle
+  instansane, slik at koplinga ikkje kan komme i utakt mellom etasjar.
+- Drag og slepp er hovudvegen; klikk på systemet og deretter sona gjer det
+  same (for peikeflater der drag er tungt).
+- Koplinga påverkar **ikkje** geometri, areal eller SXI-eksporten. Ho er
+  dokumentasjon inntil vi veit kva SIMIEN skal ha av det.
+
+Verten kan sende `sxi:systems` uoppmoda når som helst — t.d. når nokon legg
+inn eit nytt system i EntroPi medan verktøyet står ope.
 
 ### `?embed=1` — slår på handtrykket
 
@@ -287,6 +359,19 @@ export function Energimerking({ bygg, onClose }: { bygg: Bygg; onClose: () => vo
           break;
         }
 
+        case 'sxi:request-systems': {
+          // Dei tekniske systema på bygget. Verktøyet ventar 12 s på svaret.
+          try {
+            const res = await fetch(`/api/bygg/${bygg.id}/tekniske-systemer`);
+            const systems = await res.json();   // [{id, kategori, namn}]
+            send({ type: 'sxi:systems', requestId: d.requestId, ok: true, systems });
+          } catch (e) {
+            send({ type: 'sxi:systems', requestId: d.requestId, ok: false, systems: [],
+                   message: e instanceof Error ? e.message : 'ukjend feil' });
+          }
+          break;
+        }
+
         case 'sxi:export-sxi': {
           // SIMIEN-fila — same opplasting, annan filtype
           const form = new FormData();
@@ -376,6 +461,12 @@ Legg til `?silent=1` for å laste verktøyet slik EntroPi gjer det utan
 integrasjon — utan `?embed=1`, og med ein vert som ikkje svarar. Då skal
 lagring gå til nedlasting som før.
 
+For dei tekniske systema: verten svarar på `sxi:request-systems` med åtte
+system i sju kategoriar (same døme som i EntroPi). «Send systema uoppmoda»
+testar at eit ope vindauge oppdaterer seg, og `?nosys=1` gjer verten stum, så
+ein kan sjå at vindauget forklarar seg etter tidsavbrotet i staden for å stå og
+hente.
+
 Verifisert 20. august 2026 (v3.2.0): handtrykk, lagring med `meta` (BRA, soner,
 etasjar), rundtur der soner, kalibrering, kontrollmål og adresse kjem uendra
 tilbake, `sxi:request-save`, at autolagringstoasten frå localStorage vert
@@ -398,6 +489,9 @@ undertrykt når verten sender eit prosjekt, og at `?silent=1` framleis lastar ne
 - Nedlastinga ligg i `lastNedProsjektfil()`. I innbygd modus får ho ein eigen
   knapp (`#dlBtn`, skjult elles); utanfor iframe kallar lagreknappen henne
   direkte. `Ctrl+Shift+S` lastar ned i begge modus.
+- «⚙ Hent tekniske systemer» (beta) er ny: eige vindauge under
+  `// ── 2c. Tekniske system frå EntroPi` i `index.html`, og koplinga ligg på
+  sona som `z.tekniskeSystem`. Knappen er `.embed-only`.
 - Autolagringstoasten («Autolaga prosjekt frå 52 min sidan») vert undertrykt
   når verten sender eit prosjekt, og gjenopprettinga vert utsett 1,5 s i
   iframe så `sxi:init` får komme fyrst.

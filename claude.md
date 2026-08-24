@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.6.0 | Single-file HTML applikasjon
+**Versjon:** 3.7.0 | Single-file HTML applikasjon
 
 ---
 
@@ -121,6 +121,7 @@ zones = [{
   takflater: [{pts, vinkel, retning, name}],
   gavlflater: [{segIdx, profile, area, lenM, dir}],
   groupId,        // kopling mellom soner (berre SIMIEN-gruppering)
+  tekniskeSystem, // [{id,namn,kategori}] frå EntroPi (beta) — ikkje i SXI
   bygkat, hoyde, himling, gulvtype, taktype, takvinkel, byggeaar,
   areaOverride, perimOverride,
   uVegg, uTak, uGulv, uVindu, n50
@@ -427,6 +428,21 @@ Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
   `saveFloorState()`/`syncFloorState()` har gått, så `_fyllFraPi()` les
   `i===activeFloor?zones:fl.zones`. Andre løkker over alle soner har same
   fella, men vert i praksis redda av autolagringa som flusher kvart minutt.
+- **Tekniske system (beta):** «⚙ Hent tekniske systemer» opnar eit eige
+  vindauge (`#sysOverlay`, koden under `// ── 2c.`) der systema på bygget vert
+  dregne over på soner. Lista kjem frå verten (`sxi:request-systems` →
+  `sxi:systems`) og vert cacha i brua; **koplinga** er vår og ligg på sona som
+  `z.tekniskeSystem=[{id,namn,kategori}]`.
+  - Namn og kategori vert lagra saman med `id` med vilje: eit system som vert
+    sletta i EntroPi skal framleis vere leseleg i prosjektet (det står med
+    stipla kant i vindauget).
+  - **Kopla soner er éi sone** her — endringar går til alle instansane via
+    `getLinkedZones()`, elles ville koplinga komme i utakt mellom etasjar.
+  - Vindauget kallar `saveFloorState()` når det opnar, elles ser det ein gammal
+    kopi av den aktive etasjen (same fella som `_fyllFraPi()`).
+  - `snapshot()` før kvar endring gir angre. Angre byter ut soneobjekta, så
+    vindauget teiknar seg på nytt frå ein wrapper rundt `applyHistoryState`.
+  - Koplinga går **ikkje** inn i SXI-eksporten enno.
 - Ny melding = ny metode på `window.EntroHost`; `postMessage` bur berre i brua.
   Kvar melding inn i tre filer: brua, protokolltabellen i doc-en, og testverten.
 - Test **begge** modus: `index.html` direkte (skal vere uendra) og
@@ -447,7 +463,13 @@ Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
 - `.entro`-fila går som **Blob**, ikkje streng — han går rett vidare til
   opplasting utan ein ekstra kopi i minnet.
 - `sxi:state {dirty}` finst fordi `beforeunload` ikkje fyrer når ein iframe vert
-  fjerna. Det er einaste måten EntroPi kan åtvare om ulagra endringar.
+  fjerna. Det er einaste måten EntroPi kan åtvare om ulagra endringar. Sjølve
+  åtvaringsdialogen må byggjast på vertssida — verktøyet kan ikkje stoppe
+  navigasjon i EntroPi.
+- Kvar `sxi:request-save` **må** ende i ein `sxi:save` med same `requestId`.
+  Kjem han medan ei lagring går, vert han lagd i kø (`queuedReq`) og send når
+  den fyrste er ferdig — elles ville «Lagre og gå ut» på vertssida hengt for
+  alltid. Dette var ein reell feil: `saveToHost` returnerte berre `false`.
 - **Autolagring til bygget står på som standard** (2 min, `autosaveMs` overstyrer,
   `0` slår av). Fyrste endringa i økta går etter 10 s, og **berre den fyrste** —
   elles ville kvar lagring gjere prosjektet reint, neste endring skulle lagrast
