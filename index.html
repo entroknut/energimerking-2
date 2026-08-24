@@ -269,11 +269,11 @@ return mapboxgl$1;
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased;font-size:13px}
 
 /* ── Header ── */
-#header{display:flex;align-items:center;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--border);height:44px;flex-shrink:0;box-shadow:var(--shadow-xs);gap:0}
+#header{display:flex;align-items:center;padding:4px 12px;background:var(--surface);border-bottom:1px solid var(--border);min-height:44px;flex-shrink:0;box-shadow:var(--shadow-xs);gap:0}
 #logo{display:none}
-#toolbar{display:flex;align-items:center;gap:2px;flex:1;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-#toolbar::-webkit-scrollbar{display:none}
-.tg{display:flex;align-items:center;gap:2px;padding:0 8px 0 0;border-right:1px solid var(--border);margin-right:6px;flex-shrink:0}
+/* Verktøylinja brekk til fleire rader i staden for å skjule knappar utanfor skjermen */
+#toolbar{display:flex;align-items:center;gap:2px;flex:1;min-width:0;flex-wrap:wrap;row-gap:4px}
+.tg{display:flex;align-items:center;gap:2px;row-gap:3px;flex-wrap:wrap;padding:0 8px 0 0;border-right:1px solid var(--border);margin-right:6px;flex-shrink:0}
 .tg:last-child{border-right:none;margin-right:0;padding-right:0}
 #logo-mark,#logo-text,#logo-sep,#logo-sub{display:none}
 .lbl{font-size:11.5px;color:var(--text3);white-space:nowrap;margin-right:4px;font-weight:500}
@@ -287,6 +287,30 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .btn.red:hover{background:var(--red-dim)}
 .ni{width:56px;padding:3px 7px;font-size:12px;font-family:'JetBrains Mono',monospace;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);height:28px;text-align:right;box-shadow:var(--shadow-xs)}
 .ni:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(29,79,79,.12)}
+
+/* ── Responsiv verktøylinje ──────────────────────────────────
+   Knappane skal alltid vere synlege. Først vert alt tettare, og
+   dei lengste merkelappane vert korta ned; er det framleis for
+   smalt, brekk gruppene ned på ei ny rad (flex-wrap over). */
+.tb-short{display:none}
+@media (max-width:1600px){
+  #toolbar{gap:1px}
+  .btn{padding:0 8px}
+  .tg{padding-right:6px;margin-right:4px}
+}
+@media (max-width:1340px){
+  .btn{padding:0 6px;font-size:11.5px;gap:3px}
+  .lbl{font-size:11px;margin-right:2px}
+  .ni{width:48px}
+  .tg{padding-right:5px;margin-right:3px}
+  .tb-full{display:none}
+  .tb-short{display:inline}
+}
+@media (max-width:1100px){
+  .btn{height:26px;padding:0 5px}
+  .ni{height:26px;width:44px}
+  #header{padding:4px 8px}
+}
 
 /* ── Layout ── */
 #main{display:flex;flex:1;overflow:hidden}
@@ -575,7 +599,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div class="tg">
       <button class="btn" id="calBtn" title="Kalibrer skala">⊕ Kalibrer</button>
       <button class="btn" id="rotBtn" title="Roter 90°">↻ Roter</button>
-      <span class="lbl" style="margin-left:4px">Etg.høgde</span>
+      <span class="lbl" style="margin-left:4px"><span class="tb-full">Etg.høgde</span><span class="tb-short">Etg.</span></span>
       <input type="number" class="ni" id="fhI" value="3.0" min="0.1" step="0.1">
       <span class="lbl">m</span>
       <span class="lbl" style="margin-left:4px">Nord</span>
@@ -586,13 +610,13 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <button class="btn on" id="navBtn" title="Naviger — panorér og zoom (Esc)">↖ Naviger</button>
       <button class="btn" id="drawBtn" title="Teikn sone — klikk hjørner, Shift for 90°/45°, Enter/dobbelklikk for å avslutte (Esc for å avbryte)">⬡ Sone</button>
       <button class="btn" id="editBtn" title="Rediger sonegeometri — dra hjørner, høgreklikk for å slette (Esc for å avslutte)">⊹ Rediger</button>
-      <button class="btn" id="winBtn" title="Legg til vindauge/dør — klikk på ein fasade (Ctrl+C/V for å kopiere)">▭ Vindauge/dør</button>
+      <button class="btn" id="winBtn" title="Legg til vindauge/dør — klikk på ein fasade (Ctrl+C/V for å kopiere)">▭ <span class="tb-full">Vindauge/dør</span><span class="tb-short">Vindauge</span></button>
       <button class="btn on" id="snapBtn" title="Snap til hjørne — låser punktet til hjørne i planteikninga og på eksisterande soner. Slå av om det snappar til feil stad.">⌖ Snap</button>
       <button class="btn" id="measureBtn" title="Kontrollmål avstand (påverkar ikkje SXI) — klikk start og slutt, Shift for 90°/45°, Esc for å avslutte"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="4.5" rx="1"/><path d="M4.5 6v2M7.5 6v3M10.5 6v2"/></svg> Mål</button>
       <button class="btn on" id="measShowBtn" style="display:none" title="Vis eller skjul lagra mål. Måla følgjer etasjen og blir lagra med prosjektet — høgreklikk på ei målelinje for å slette henne."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="1.9"/></svg> Mål (<span class="mcount">0</span>)</button>
     </div>
     <div class="tg">
-      <button class="btn" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ Slå saman fasadar</button>
+      <button class="btn" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ <span class="tb-full">Slå saman fasadar</span><span class="tb-short">Fasadar</span></button>
     </div>
     <div class="tg">
       <button class="btn" id="undoBtn" title="Angre (Ctrl+Z)" style="opacity:.4" disabled>↩</button>
@@ -606,7 +630,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <button class="btn" id="helpBtn" title="Tastatursnarvegar (?)" style="font-weight:700">?</button>
     </div>
     <div class="tg" style="margin-left:auto">
-      <button class="btn teal" id="sxiBtn" style="font-weight:600" title="Eksporter SXI-fil til SIMIEN">⬇ Eksporter SXI</button>
+      <button class="btn teal" id="sxiBtn" style="font-weight:600" title="Eksporter SXI-fil til SIMIEN">⬇ <span class="tb-full">Eksporter SXI</span><span class="tb-short">SXI</span></button>
     </div>
   </div>
 </div>
@@ -627,7 +651,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.4.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.4.1</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -7020,6 +7044,10 @@ function resize(){
   cv.width=r.width;cv.height=r.height;draw();
 }
 window.addEventListener('resize',resize);
+// Verktøylinja kan brekke til fleire rader utan at vindauget endrar storleik
+// (t.d. når sidekontrollar eller PDF-navigasjonen dukkar opp) — då fyrer
+// ingen resize-hending, så vi ser på cwrap direkte.
+if(window.ResizeObserver)new ResizeObserver(()=>resize()).observe(cwrap);
 
 // ── 1. Åtvaring ved lukking ───────────────────────────────────
 let isDirty=false;
