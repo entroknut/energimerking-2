@@ -63,9 +63,11 @@ nok til å vise «3 etasjar · 12 soner · 2 480 m²» på byggkortet utan å op
 
 Felta i `sxi:init`:
 
-- `bygg: {id, namn, adresse}` — `namn` vert vist som brikke i verktøylinja, så
-  brukaren ser kvar lagringa hamnar. `adresse` fyller inn adressefeltet i
-  SXI-dialogen når prosjektet er nytt.
+- `bygg: {id, namn, adresse, byggeaar}` — `namn` vert vist som brikke i
+  verktøylinja, så brukaren ser kvar lagringa hamnar. `adresse` og `byggeaar`
+  er **framlegg** som vert fylte inn i verktøyet (sjå under). `byggeaar` må
+  vere eit årstal mellom 1800 og 2100; alt anna vert ignorert, sidan eit
+  vrøvltal ville gitt feil standard-U-verdiar utan at nokon såg det.
 - `project` — `.entro`-innhaldet, som **Blob, streng eller ferdig parsa
   objekt**. `null` for eit bygg utan prosjekt.
 - `wantsSxi: true` — send også SXI-fila til EntroPi ved eksport.
@@ -73,6 +75,36 @@ Felta i `sxi:init`:
   Minst 30 000; `0`/utelate slår det av. Kvar autolagring skriv ei ny fil, så
   vel eit tal som passar med kor mange versjonar de vil ta vare på.
 - `saveLabel` — tekst på lagreknappen (standard «Lagre på bygget»).
+
+### Verdiar som vert fylte inn frå bygget
+
+Bygget i EntroPi har alt fleire av dei same opplysningane som verktøyet spør
+om. Dei som EntroPi sender i `bygg` vert fylte inn av seg sjølv, slik at
+brukaren ikkje må tasta dei på nytt:
+
+| felt i `bygg` | hamnar i verktøyet |
+|---|---|
+| `adresse` | `prosjektAdresse` → adressefeltet i kartet og i SXI-dialogen, og framlegg til filnamn |
+| `byggeaar` | `byggeaar` på kvar sone → standard U-verdiar, TEK-kode og SFP i SXI-eksporten |
+
+Dette er **framlegg, aldri fasit**. Regelen er den same for alle felt, og han
+er verdt å halde når lista veks:
+
+- Verktøyet fyller berre inn der feltet står **tomt**. Eit tal brukaren har
+  skrive sjølv vert aldri overskrive — heller ikkje neste gong prosjektet vert
+  opna, sidan det då ligg i `.entro`-fila.
+- Nye soner arvar byggeåret frå bygget, så ein slepp å setje det per sone.
+- Verdiane kjem med `sxi:init` kvar gong verktøyet vert opna, så dei vert
+  **ikkje** serialiserte. Det som ligg i prosjektfila er brukaren sine eigne
+  verdiar (`prosjektAdresse`, `z.byggeaar`) — altså slepp dei den femdelte
+  lagringsregelen.
+- Eit prosjekt som er lagra før feltet fanst får verdien frå bygget ved
+  opning, utan at prosjektet vert markert som endra.
+
+I koden: `piBygg` held verdiane frå verten (brua er einaste skrivar), og
+`_fyllFraPi()` avgjer kva som faktisk vert fylt inn. Eit nytt felt av same
+slag skal berre inn i desse to — pluss der feltet har ein eigen standardverdi,
+som `finishZone()` for nye soner.
 
 ### `?embed=1` — slår på handtrykket
 
@@ -91,6 +123,49 @@ I innbygd modus dukkar det òg opp ein eigen nedlastingsknapp (`#dlBtn`) ved
 sida av lagreknappen. Han lastar ned `.entro`-fila til maskina, slik at ein kan
 ta med seg ein kopi ut av EntroPi. Utanfor iframe er han skjult — der gjer
 «Lagre» alt det same. Snarvegen er `Ctrl+Shift+S`, og han verkar i begge modus.
+
+---
+
+## Legge til ein funksjon som berre gjeld EntroPi
+
+To mekanismar, og ingen andre. Bruk dei, så slepp du å hugse på ei liste med
+stader som må haldast i sync.
+
+**Vising: `data-embed` på `<html>`.** `applyEmbedUI()` set flagget når
+`sxi:init` har kome. All vising går gjennom to klasser:
+
+```html
+<button class="btn embed-only" id="minKnapp">…</button>   <!-- berre i EntroPi -->
+<span class="lbl local-only">Last ned fila</span>          <!-- berre vanleg fane -->
+```
+
+Ein ny EntroPi-berre-knapp er altså **rein markup** — ingen ny linje i
+`applyEmbedUI()`. Standard vising er `flex` (som `.btn`); brikker og
+merkelappar legg til `.eo-inline`.
+
+**Logikk: `inPi()`.** Éin gate for alt som skal oppføre seg annleis inne i
+EntroPi:
+
+```js
+if(inPi()){ /* … */ return; }
+```
+
+Han er sann **først etter `sxi:init`** — ikkje berre fordi vi ligg i ein
+iframe. Ein vert som ikkje har sagt at han handterer lagring skal aldri få
+verktøyet til å oppføre seg annleis. Bruk `inPi()` framfor å gjenta
+`window.EntroHost&&window.EntroHost.active()`; brua vert definert etter
+`markDirty`, så vakta på eksistens må vere med, og den bur no på éin stad.
+
+**Ny melding til/frå verten:** legg ein metode på `window.EntroHost` (som
+`sendSxi`) — `postMessage` skal ikkje spreiast utover brua. Additive felt held
+`protocol:1`; bump berre ved brekkjande endring, og la verten ignorere ukjende
+`sxi:`-typar. Kvar ny melding skal inn i **tre** filer samtidig: brua i
+`index.html`, protokolltabellen over, og `docs/entropi-test-host.html`.
+
+**Test alltid begge modus:**
+
+- `http://localhost:8742/index.html` — skal vere heilt uendra
+- `http://localhost:8742/docs/entropi-test-host.html` — innbygd
 
 ### Sikkerheit
 
@@ -122,7 +197,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const TOOL_ORIGIN = 'https://entroknut.github.io';
 const TOOL_URL = `${TOOL_ORIGIN}/energimerking-2/index.html?embed=1`;
 
-type Bygg = { id: string; namn: string; adresse?: string };
+type Bygg = { id: string; namn: string; adresse?: string; byggeaar?: number };
 
 export function Energimerking({ bygg, onClose }: { bygg: Bygg; onClose: () => void }) {
   const ref = useRef<HTMLIFrameElement>(null);
@@ -146,7 +221,7 @@ export function Energimerking({ bygg, onClose }: { bygg: Bygg; onClose: () => vo
         case 'sxi:ready':
           send({
             type: 'sxi:init',
-            bygg: { id: bygg.id, namn: bygg.namn, adresse: bygg.adresse },
+            bygg: { id: bygg.id, namn: bygg.namn, adresse: bygg.adresse, byggeaar: bygg.byggeaar },
             project: lagra.current,          // Blob, streng eller null
             wantsSxi: true,
             saveLabel: 'Lagre på bygget',
