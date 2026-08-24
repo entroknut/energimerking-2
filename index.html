@@ -593,6 +593,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
         <button class="btn" id="nextPg">›</button>
       </div>
       <button class="btn" id="saveBtn" title="Lagre prosjekt (Ctrl+S)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 2.5h8l2.5 2.5v8a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5z"/><path d="M5 2.5h5V6H5z"/><path d="M4.5 13.5V10h7v3.5"/></svg></button>
+      <button class="btn" id="dlBtn" style="display:none" title="Last ned .entro-fila til maskina (Ctrl+Shift+S)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7"/><path d="M5 6.8 8 9.8l3-3"/><path d="M2.8 12.5h10.4"/></svg></button>
       <button class="btn" id="loadBtn" title="Opne prosjekt (Ctrl+O)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 4.5a1 1 0 0 1 1-1h3.2l1.6 1.8H13a1 1 0 0 1 1 1v6.2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4.5z"/></svg></button>
       <input type="file" id="loadFi" accept=".entro" style="display:none">
     </div>
@@ -651,7 +652,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.4.1</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.4.2</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -6771,6 +6772,7 @@ document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
   if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo();return;}
   if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.shiftKey&&e.key==='Z'))){e.preventDefault();redo();return;}
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='S'||e.key==='s')){e.preventDefault();lastNedProsjektfil();return;}
   if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();document.getElementById('saveBtn').click();return;}
   if((e.ctrlKey||e.metaKey)&&e.key==='o'){e.preventDefault();document.getElementById('loadBtn').click();return;}
 
@@ -7290,6 +7292,10 @@ setTimeout(()=>{
     }
     const lb=document.getElementById('loadBtn');
     if(lb)lb.title='Opne ei .entro-fil frå maskina (Ctrl+O)';
+    // «Lagre» går til bygget her, så nedlastinga treng ein eigen knapp —
+    // elles hadde det ikkje vore råd å ta med seg ein kopi ut av EntroPi.
+    const db=document.getElementById('dlBtn');
+    if(db)db.style.display='flex';
     if(bygg&&(bygg.namn||bygg.adresse)){
       let c=document.getElementById('hostChip');
       if(!c){
@@ -7709,7 +7715,8 @@ setTimeout(()=>{
       ['Generelt',''],
       ['Ctrl+Z / ⌘Z','Angre siste handling'],
       ['Ctrl+Y / Ctrl+Shift+Z','Gjere om'],
-      ['Ctrl+S','Lagre prosjekt'],
+      ['Ctrl+S','Lagre prosjekt (på bygget i EntroPi)'],
+      ['Ctrl+Shift+S','Last ned prosjektfila til maskina'],
       ['Ctrl+O','Opne prosjekt'],
       ['Esc','Avbryt / avslutt til navigeringsmodus'],
       ['?','Vis/skjul denne oversikta'],
@@ -7877,9 +7884,9 @@ document.getElementById('rotBtn').onclick=()=>{
 };
 
 // ── Lagre / opne prosjekt ─────────────────────────────────────
-document.getElementById('saveBtn').onclick=async()=>{
-  // I EntroPi går lagringa rett på bygget i staden for til ei fil på maskina
-  if(window.EntroHost&&window.EntroHost.active()){window.EntroHost.saveToHost({auto:false});return;}
+// Lagrar prosjektet som .entro-fil på maskina. I EntroPi ligg dette på ein eigen
+// knapp ved sida av «Lagre på bygget», så ein kan ta med seg ein kopi lokalt.
+async function lastNedProsjektfil(){
   const blob=new Blob([JSON.stringify(serialiserProsjekt())],{type:'application/json'});
   const fname=foreslaaFilnamn();
   // Native lagre-dialog der nettlesaren støttar det, så brukaren vel mappe
@@ -7906,7 +7913,14 @@ document.getElementById('saveBtn').onclick=async()=>{
   document.body.appendChild(a);a.click();
   document.body.removeChild(a);URL.revokeObjectURL(url);
   hintText.textContent='Lagra som «'+fname+'» i nedlastingsmappa.';
+}
+
+document.getElementById('saveBtn').onclick=()=>{
+  // I EntroPi går lagringa rett på bygget i staden for til ei fil på maskina
+  if(window.EntroHost&&window.EntroHost.active()){window.EntroHost.saveToHost({auto:false});return;}
+  lastNedProsjektfil();
 };
+document.getElementById('dlBtn').onclick=()=>lastNedProsjektfil();
 
 document.getElementById('loadBtn').onclick=()=>document.getElementById('loadFi').click();
 document.getElementById('loadFi').onchange=async function(){
