@@ -399,7 +399,9 @@ Alle felt som skal overleve må leggjast til **fem** stader: `snapshot()`, `appl
 
 Programmet køyrer som verktøy i ein iframe inne i EntroPi. Då lagrar «Lagre»
 prosjektet rett på bygget i staden for å laste ned ei fil, og prosjektet på
-bygget kjem inn med ei `sxi:init`-melding. Brua ligg i `index.html` under
+bygget kjem inn med ei `sxi:init`-melding. Nedlastinga forsvinn ikkje — ho får
+ein eigen knapp (`#dlBtn`) ved sida av lagreknappen, slik at ein kan ta med seg
+ein `.entro`-kopi ut av EntroPi (`Ctrl+Shift+S`). Utanfor iframe er han skjult. Brua ligg i `index.html` under
 `// ── 2b. EntroPi-bru` og er heilt passiv utanfor ein iframe.
 
 Full protokoll, EntroPi-sida (React) og lagringsråd: `docs/entropi-integrasjon.md`.

@@ -87,6 +87,11 @@ tilbake.
 Verktøylinja endrar seg («Lagre på bygget», byggbrikka) fyrst når `sxi:init`
 faktisk har kome — knappen lyg aldri om kvar lagringa hamnar.
 
+I innbygd modus dukkar det òg opp ein eigen nedlastingsknapp (`#dlBtn`) ved
+sida av lagreknappen. Han lastar ned `.entro`-fila til maskina, slik at ein kan
+ta med seg ein kopi ut av EntroPi. Utanfor iframe er han skjult — der gjer
+«Lagre» alt det same. Snarvegen er `Ctrl+Shift+S`, og han verkar i begge modus.
+
 ### Sikkerheit
 
 Verktøyet tek berre imot meldingar frå opphav i denne lista (i `index.html`,
@@ -282,6 +287,9 @@ undertrykt når verten sender eit prosjekt, og at `?silent=1` framleis lastar ne
   ho heilt passiv.
 - Lagreknappen sender til verten i innbygd modus, og viser «Lagre på bygget»
   pluss ei brikke med byggnamnet. `Ctrl+S` går same vegen.
+- Nedlastinga ligg i `lastNedProsjektfil()`. I innbygd modus får ho ein eigen
+  knapp (`#dlBtn`, skjult elles); utanfor iframe kallar lagreknappen henne
+  direkte. `Ctrl+Shift+S` lastar ned i begge modus.
 - Autolagringstoasten («Autolaga prosjekt frå 52 min sidan») vert undertrykt
   når verten sender eit prosjekt, og gjenopprettinga vert utsett 1,5 s i
   iframe så `sxi:init` får komme fyrst.
