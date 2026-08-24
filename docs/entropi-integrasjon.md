@@ -272,6 +272,25 @@ verktøyet til å oppføre seg annleis. Bruk `inPi()` framfor å gjenta
 - `http://localhost:8742/index.html` — skal vere heilt uendra
 - `http://localhost:8742/docs/entropi-test-host.html` — innbygd
 
+### Ny versjon slår ikkje gjennom med ein gong
+
+GitHub Pages sender `Cache-Control: max-age=600` på `index.html`. Nettlesaren
+brukar altså sin lagra kopi i inntil **ti minutt utan å spørje serveren**, så
+ein nypublisert versjon kan sjå ut som han ikkje kom — versjonsnummeret nede i
+verktøylinja står på det gamle sjølv om fila på Pages er ny.
+
+- Sjekk kva som faktisk ligg ute:
+  `curl -sI 'https://entroknut.github.io/energimerking-2/index.html?embed=1'`
+  (sjå `Last-Modified`) — er den ny, er det cachen lokalt.
+- Hard oppfrisking (Ctrl+F5) hentar iframen på nytt med ein gong.
+- Verktøyet sender versjonen sin i `sxi:ready` og `sxi:state`
+  (`version:'v3.7.0'`). Logg han på vertssida, så treng ingen gjette på kva
+  iframen køyrer.
+- Treng de å tvinge fram ein bestemt versjon straks, legg han i URL-en:
+  `?embed=1&v=3.7.0`. Ny query gir ny cache-nøkkel. Ikkje bruk eit tidsstempel
+  som endrar seg for kvar opning — fila er fleire megabyte, og då vert ho lasta
+  ned på nytt kvar gong.
+
 ### Sikkerheit
 
 Verktøyet tek berre imot meldingar frå opphav i denne lista (i `index.html`,
