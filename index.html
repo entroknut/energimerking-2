@@ -288,6 +288,19 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .ni{width:56px;padding:3px 7px;font-size:12px;font-family:'JetBrains Mono',monospace;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text);height:28px;text-align:right;box-shadow:var(--shadow-xs)}
 .ni:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(29,79,79,.12)}
 
+/* ── Innbygd modus (EntroPi) ─────────────────────────────────
+   `data-embed` vert sett på <html> når sxi:init har kome — altså først når
+   verten faktisk handterer lagring, aldri berre av at vi ligg i ein iframe.
+   Alt som berre skal finnast inne i EntroPi får klassa .embed-only; alt som
+   berre gjeld ei vanleg fane får .local-only. Då er ein ny EntroPi-funksjon
+   rein markup, utan ei ny linje i applyEmbedUI() som kan bli gløymd.
+   Standard vising er flex (som .btn). Element som ikkje er blokk — brikker
+   og merkelappar i verktøylinja — legg til .eo-inline. */
+.embed-only{display:none!important}
+[data-embed] .embed-only{display:flex!important}
+[data-embed] .embed-only.eo-inline{display:inline-flex!important}
+[data-embed] .local-only{display:none!important}
+
 /* ── Responsiv verktøylinje ──────────────────────────────────
    Knappane skal alltid vere synlege. Først vert alt tettare, og
    dei lengste merkelappane vert korta ned; er det framleis for
@@ -593,7 +606,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
         <button class="btn" id="nextPg">›</button>
       </div>
       <button class="btn" id="saveBtn" title="Lagre prosjekt (Ctrl+S)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 2.5h8l2.5 2.5v8a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5z"/><path d="M5 2.5h5V6H5z"/><path d="M4.5 13.5V10h7v3.5"/></svg></button>
-      <button class="btn" id="dlBtn" style="display:none" title="Last ned .entro-fila til maskina (Ctrl+Shift+S)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7"/><path d="M5 6.8 8 9.8l3-3"/><path d="M2.8 12.5h10.4"/></svg></button>
+      <button class="btn embed-only" id="dlBtn" title="Last ned .entro-fila til maskina (Ctrl+Shift+S)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7"/><path d="M5 6.8 8 9.8l3-3"/><path d="M2.8 12.5h10.4"/></svg></button>
       <button class="btn" id="loadBtn" title="Opne prosjekt (Ctrl+O)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 4.5a1 1 0 0 1 1-1h3.2l1.6 1.8H13a1 1 0 0 1 1 1v6.2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4.5z"/></svg></button>
       <input type="file" id="loadFi" accept=".entro" style="display:none">
     </div>
@@ -652,7 +665,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.4.2</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.5.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -997,6 +1010,32 @@ function adresseTilFilnamn(a){
     .replace(/\s+/g,' ').trim();
   return s||null;
 }
+// ── Verdiar frå EntroPi ──────────────────────────────────────
+// Bygget i EntroPi har alt adresse og byggeår utfylt, så brukaren skal ikkje
+// måtte tasta dei inn på nytt. Dette er **framlegg**, aldri fasit: vi fyller
+// berre inn der feltet står tomt, og eit tal brukaren har skrive sjølv vert
+// aldri overskrive. Verdiane kjem med sxi:init kvar gong verktøyet vert opna,
+// så dei skal ikkje serialiserast — z.byggeaar og prosjektAdresse er det som
+// vert lagra, og dei er brukaren sine.
+// Brua er einaste skrivar. Utanfor EntroPi står objektet tomt, og då gjer
+// _fyllFraPi() ingenting.
+let piBygg={adresse:'',byggeaar:null};
+
+// Fyller inn dei tomme felta frå bygget i EntroPi. Trygg å kalle fleire gonger.
+// Returnerer true om noko vart endra, så kallaren veit om han må teikne på nytt.
+// NB: floors[activeFloor].zones er ikkje same array som `zones` før eit
+// saveFloorState()/syncFloorState() har gått, så vi må lese den live arrayen
+// for aktiv etasje. Elles ville byggeåret stille ikkje nå sonene brukaren
+// nettopp teikna. Kall difor denne etter syncFloorState() i lastProsjekt().
+function _fyllFraPi(){
+  let endra=false;
+  if(piBygg.adresse&&!prosjektAdresse){prosjektAdresse=String(piBygg.adresse);_syncAdresseFelt();endra=true;}
+  if(piBygg.byggeaar)floors.forEach((fl,i)=>(i===activeFloor?zones:fl.zones).forEach(z=>{
+    if(!z.byggeaar){z.byggeaar=piBygg.byggeaar;endra=true;}
+  }));
+  return endra;
+}
+
 // Held adressefelta i kartet og SXI-dialogen i takt med den lagra adressa
 function _syncAdresseFelt(){
   const m=document.getElementById('mapSearchInput');
@@ -3649,6 +3688,7 @@ function finishZone(){
   if(curPts.length<3)return;
   snapshot();markDirty();
   const nz={name:'Sone '+(++_nextZoneId),pts:[...curPts],windows:[],skillevegg:new Set(),takflater:[],gavlflater:[]};
+  if(piBygg.byggeaar)nz.byggeaar=piBygg.byggeaar;   // byggeåret frå EntroPi
   zones.push(nz);
   curPts=[];
   const skTal=autoSkilleveggForNySone(nz);
@@ -4365,7 +4405,9 @@ function updateResults(){
       const byWrap=document.createElement('div');byWrap.style.cssText='display:flex;align-items:center;gap:5px;flex:1';
       const byInp=document.createElement('input');byInp.type='number';byInp.min='1800';byInp.max='2030';byInp.placeholder='t.d. 1985';byInp.value=z.byggeaar||'';
       byInp.style.cssText="width:70px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace";
-      byInp.title='Byggeår for denne sona';
+      byInp.title=(piBygg.byggeaar&&z.byggeaar===piBygg.byggeaar)
+        ?'Byggeår frå EntroPi ('+piBygg.byggeaar+') — skriv over for å endre'
+        :'Byggeår for denne sona';
       const allBtn=document.createElement('button');
       allBtn.textContent='Alle';
       allBtn.title='Kopier dette byggeåret til alle soner';
@@ -7055,6 +7097,12 @@ if(window.ResizeObserver)new ResizeObserver(()=>resize()).observe(cwrap);
 let isDirty=false;
 function markDirty(){isDirty=true;if(window.EntroHost)window.EntroHost.notifyDirty();}
 function markClean(){isDirty=false;if(window.EntroHost)window.EntroHost.notifyDirty();}
+
+// Køyrer vi innbygd i EntroPi, med ein vert som har sagt at han handterer
+// lagring? Dette er gaten for all EntroPi-berre logikk — bruk han i staden
+// for å gjenta vakta på window.EntroHost (brua vert definert lenger ned).
+// Sann først etter sxi:init, aldri berre av at vi ligg i ein iframe.
+function inPi(){return !!(window.EntroHost&&window.EntroHost.active());}
 window.addEventListener('beforeunload',e=>{
   if(isDirty){e.preventDefault();e.returnValue='';}
 });
@@ -7139,6 +7187,11 @@ async function lastProsjekt(proj,opts){
   _nextGroupId=proj._nextGroupId??1;
   _nextZoneId=proj._nextZoneId??1;
   syncFloorState();
+  // Prosjektfila kan mangle felt som bygget i EntroPi alt har — då tek vi dei
+  // derifrå. Må stå etter syncFloorState() (så `zones` peikar på den nye
+  // etasjen) og etter at prosjektAdresse er sett, som elles ville viska ut
+  // adressa vi alt hadde fått frå verten.
+  _fyllFraPi();
   editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
   renderFloorTabs();updateResults();renderTable();
   if(o.fit&&bgImg)fitImage();else draw();
@@ -7284,6 +7337,10 @@ setTimeout(()=>{
     return s;
   }
   function applyEmbedUI(){
+    // Éin flagg styrer all vising: .embed-only vert synleg, .local-only skjult.
+    // Difor dukkar nedlastingsknappen (#dlBtn) opp av seg sjølv her — «Lagre»
+    // går til bygget, så utan han kunne ein ikkje ta ein .entro-kopi ut.
+    document.documentElement.dataset.embed='1';
     const sb=document.getElementById('saveBtn');
     if(sb){
       sb.classList.add('teal');
@@ -7292,10 +7349,6 @@ setTimeout(()=>{
     }
     const lb=document.getElementById('loadBtn');
     if(lb)lb.title='Opne ei .entro-fil frå maskina (Ctrl+O)';
-    // «Lagre» går til bygget her, så nedlastinga treng ein eigen knapp —
-    // elles hadde det ikkje vore råd å ta med seg ein kopi ut av EntroPi.
-    const db=document.getElementById('dlBtn');
-    if(db)db.style.display='flex';
     if(bygg&&(bygg.namn||bygg.adresse)){
       let c=document.getElementById('hostChip');
       if(!c){
@@ -7398,7 +7451,15 @@ setTimeout(()=>{
       wantsSxi=!!d.wantsSxi;
       if(d.saveLabel)saveLabel=String(d.saveLabel);
       applyEmbedUI();
-      if(bygg&&bygg.adresse&&!prosjektAdresse){prosjektAdresse=String(bygg.adresse);_syncAdresseFelt();}
+      // Verdiane EntroPi alt har på bygget. Brua er einaste skrivar til piBygg;
+      // _fyllFraPi() avgjer kva som faktisk vert fylt inn, og han vert kalla
+      // igjen frå lastProsjekt() for prosjektet som kjem under her.
+      const _by=bygg?parseInt(bygg.byggeaar):NaN;
+      piBygg={adresse:(bygg&&bygg.adresse)?String(bygg.adresse):'',
+              // eit vrøvltal ville gitt feil standard-U-verdiar utan at nokon såg det
+              byggeaar:(_by>=1800&&_by<=2100)?_by:null};
+      // Utan prosjekt teiknar vi sjølve; med prosjekt gjer lastProsjekt() det.
+      if(_fyllFraPi()&&!d.project){updateResults();renderTable();}
       if(d.project){
         hasProject=true;
         hideToast();
@@ -7917,7 +7978,7 @@ async function lastNedProsjektfil(){
 
 document.getElementById('saveBtn').onclick=()=>{
   // I EntroPi går lagringa rett på bygget i staden for til ei fil på maskina
-  if(window.EntroHost&&window.EntroHost.active()){window.EntroHost.saveToHost({auto:false});return;}
+  if(inPi()){window.EntroHost.saveToHost({auto:false});return;}
   lastNedProsjektfil();
 };
 document.getElementById('dlBtn').onclick=()=>lastNedProsjektfil();
@@ -8968,6 +9029,7 @@ ${zonesXml}${emXml}
     // Pre-fill byggeår from first zone that has it
     const firstBy=allZones.find(z=>z.byggeaar);
     if(firstBy)document.getElementById('sxi_byggeaar').value=firstBy.byggeaar;
+    else if(piBygg.byggeaar)document.getElementById('sxi_byggeaar').value=piBygg.byggeaar;
     // Pre-fill kommunenr from current klimasted selection
     const kl=document.getElementById('sxi_klima').value;
     document.getElementById('sxi_kommunenr').value=KOMMUNE_NR[kl]||'';

@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.4.0 | Single-file HTML applikasjon
+**Versjon:** 3.5.0 | Single-file HTML applikasjon
 
 ---
 
@@ -407,6 +407,30 @@ ein `.entro`-kopi ut av EntroPi (`Ctrl+Shift+S`). Utanfor iframe er han skjult. 
 Full protokoll, EntroPi-sida (React) og lagringsråd: `docs/entropi-integrasjon.md`.
 Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
 (opne `http://localhost:8742/docs/entropi-test-host.html`).
+
+**Funksjonar som berre gjeld EntroPi** har to mekanismar, og ingen andre:
+
+- **Vising:** `data-embed` vert sett på `<html>` av `applyEmbedUI()` når
+  `sxi:init` har kome. Klassene `.embed-only` og `.local-only` gjer resten, så
+  ein ny EntroPi-berre-knapp er rein markup — ikkje ei ny linje i
+  `applyEmbedUI()`. Brikker og merkelappar legg til `.eo-inline` (standard er
+  `flex`, som `.btn`).
+- **Logikk:** `inPi()` — éin gate. Sann først etter `sxi:init`, aldri berre av
+  at vi ligg i ein iframe. Ikkje gjenta `window.EntroHost&&…active()`.
+- **Verdiar frå bygget:** `piBygg` (adresse, byggeår) held det EntroPi sender i
+  `sxi:init`; brua er einaste skrivar. `_fyllFraPi()` fyller **berre tomme**
+  felt — brukaren sitt tal vert aldri overskrive. Verdiane vert ikkje
+  serialiserte (dei kjem på nytt ved kvar opning), så dei slepp den femdelte
+  lagringsregelen. Nytt felt av same slag: `piBygg` + `_fyllFraPi()`, pluss
+  `finishZone()` om nye soner skal arve det.
+  NB: `floors[activeFloor].zones` er ikkje same array som `zones` før eit
+  `saveFloorState()`/`syncFloorState()` har gått, så `_fyllFraPi()` les
+  `i===activeFloor?zones:fl.zones`. Andre løkker over alle soner har same
+  fella, men vert i praksis redda av autolagringa som flusher kvart minutt.
+- Ny melding = ny metode på `window.EntroHost`; `postMessage` bur berre i brua.
+  Kvar melding inn i tre filer: brua, protokolltabellen i doc-en, og testverten.
+- Test **begge** modus: `index.html` direkte (skal vere uendra) og
+  `docs/entropi-test-host.html`.
 
 - Verktøyet eig **inga** lagring og har ingen API-nøklar. Vertssida gjer all
   autentisering og opplasting — difor kan hostinga på GitHub Pages stå som ho er.
