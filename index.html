@@ -708,7 +708,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.8.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.8.1</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -8748,9 +8748,13 @@ function sfpLookup(y){
   const yr=parseInt(y);
   if(yr<2000)return 4.0;if(yr<=2009)return 3.0;if(yr<=2019)return 2.5;return 2.0;
 }
+// SIMIEN godtek berre desse fire kodane i building_code. TEK17 finst ikkje som
+// eigen kode der — energikrava i TEK17 er dei same som kom i TEK10 §14 frå 2016,
+// og SIMIEN kallar dei 'tek16'. Ein 'tek17' her gjer at SIMIEN nektar å opne
+// energimerket: «Value must be one of: tek16, tek10, tek07, tek97».
 function tekKode(y){
   const yr=parseInt(y);
-  if(yr<=2006)return'tek97';if(yr<=2009)return'tek07';if(yr<=2015)return'tek10';return'tek17';
+  if(yr<=2006)return'tek97';if(yr<=2009)return'tek07';if(yr<=2015)return'tek10';return'tek16';
 }
 
 // ── Bygningstype-konfigurasjon for SXI — nøklar = z.bygkat-verdiar ──
