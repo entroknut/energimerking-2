@@ -708,7 +708,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.8.1</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.8.2</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -3119,17 +3119,19 @@ function draw(){
         ctx.fillText('~'+fmtM2(a),lx+10,ly+4);
       }
     }
-    // Snap indicator
-    if(drawSnap&&!drawSnap._ortho){
-      drawSnapMarker(i2s(drawSnap.x,drawSnap.y),drawSnap.type,
-        drawSnap.type==='imgcorner'?'rgb(219,39,119)':drawSnap.type==='edge'?'rgb(124,58,237)':'rgb(26,122,110)');
-    }
     curPts.forEach((p,i)=>{
       const pp=i2s(p.x,p.y);
       ctx.beginPath();ctx.arc(pp.x,pp.y,i===0?7:4,0,Math.PI*2);
       ctx.fillStyle=i===0?'#1d4ed8':'#3b82f6';ctx.fill();
       if(i===0){ctx.strokeStyle='#f1f5f9';ctx.lineWidth=2;ctx.stroke();}
     });
+  }
+  // Snap-markør for soneteikning. MÅ liggje utanfor curPts-vakta over:
+  // snappen verkar frå første klikk, men utan markør trur brukaren at han er av
+  // heilt til det første punktet er sett.
+  if(mode==='draw'&&drawSnap&&!drawSnap._ortho){
+    drawSnapMarker(i2s(drawSnap.x,drawSnap.y),drawSnap.type,
+      drawSnap.type==='imgcorner'?'rgb(219,39,119)':drawSnap.type==='edge'?'rgb(124,58,237)':'rgb(26,122,110)');
   }
 
   // Tegn-takflate: live polygon under teikning
@@ -3155,6 +3157,11 @@ function draw(){
       ctx.fillStyle=i===0?'#b45309':'#f59e0b';ctx.fill();
       if(i===0){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();}
     });
+  }
+  // Same som for soneteikning — markøren må stå frå første klikk.
+  if(mode==='tegn-takflate'&&drawSnap&&!drawSnap._ortho){
+    drawSnapMarker(i2s(drawSnap.x,drawSnap.y),drawSnap.type,
+      drawSnap.type==='imgcorner'?'rgb(219,39,119)':drawSnap.type==='edge'?'rgb(124,58,237)':'rgb(217,119,6)');
   }
 
   // Window drawing mode
@@ -3260,11 +3267,6 @@ function draw(){
       ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);
       ctx.fillStyle='#d97706';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
     });
-    if(calSnap&&calPts.length<2&&!calSnap._ortho){
-      const _si=i2s(calSnap.x,calSnap.y);
-      ctx.beginPath();
-      drawSnapMarker(_si,calSnap.type,calSnap.type==='imgcorner'?'rgb(219,39,119)':calSnap.type==='edge'?'rgb(184,106,10)':'rgb(217,119,6)');
-    }
     if(mouse&&calPts.length===1){
       const d=Math.hypot(ex-_cp0.x,ey-_cp0.y);
       const imgD=(d/sc).toFixed(0);
@@ -3275,6 +3277,11 @@ function draw(){
       ctx.fillStyle='rgba(217,119,6,.9)';ctx.beginPath();ctx.roundRect(ex+8,ey-11,tw,18,4);ctx.fill();
       ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(lbl,ex+14,ey);
     }
+  }
+  // Snap-markør for kalibrering — også før første klikk.
+  if(mode==='calibrate'&&calMode==='length'&&calSnap&&calPts.length<2&&!calSnap._ortho){
+    drawSnapMarker(i2s(calSnap.x,calSnap.y),calSnap.type,
+      calSnap.type==='imgcorner'?'rgb(219,39,119)':calSnap.type==='edge'?'rgb(184,106,10)':'rgb(217,119,6)');
   }
 
   // ── Måleverktøy ─────────────────────────────────────────────
@@ -5921,20 +5928,11 @@ function orthoSnapAngle(sx, sy, prevScreenPt){
   return ((deg%180)+180)%180;
 }
 
-// ── Canvas interaction ─────────────────────────────────────────
-cwrap.addEventListener('mousemove',e=>{
-  const r=cv.getBoundingClientRect();
-  mouse={x:e.clientX-r.left,y:e.clientY-r.top};
-  if(dragging&&dragSt){offX=lastOff.x+(mouse.x-dragSt.x);offY=lastOff.y+(mouse.y-dragSt.y);}
-  if(dragCorner){const pt=s2i(mouse.x,mouse.y);zones[dragCorner.zoneIdx].pts[dragCorner.ptIdx]={x:pt.x,y:pt.y};}
-  if(dragZone){
-    const pt=s2i(mouse.x,mouse.y);
-    const dx=pt.x-dragZone.startIx,dy=pt.y-dragZone.startIy;
-    const z=zones[dragZone.zoneIdx];
-    z.pts=dragZone.origPts.map(p=>({x:p.x+dx,y:p.y+dy}));
-    cv.style.cursor='grabbing';
-  }
-  if(mode==='navigate')cv.style.cursor=dragging?'grabbing':'grab';
+// Alle snap-utrekningane samla. Må kallast både ved musrørsle og ved zoom:
+// zoom flyttar ikkje musa, så eit snap rekna ut før zoomen peikar på ein
+// annan stad på teikninga etterpå — markøren lyg og klikket hamnar feil.
+function oppdaterSnap(){
+  if(!mouse)return;
   // Live snap preview for window mode
   if(mode==='window'){
     winSnapPreview=snapScreenToSegment(mouse.x,mouse.y);
@@ -5994,6 +5992,23 @@ cwrap.addEventListener('mousemove',e=>{
       delSoneSnap={...s2i(s.x,s.y),_ortho:true};
     }
   } else delSoneSnap=null;
+}
+
+// ── Canvas interaction ─────────────────────────────────────────
+cwrap.addEventListener('mousemove',e=>{
+  const r=cv.getBoundingClientRect();
+  mouse={x:e.clientX-r.left,y:e.clientY-r.top};
+  if(dragging&&dragSt){offX=lastOff.x+(mouse.x-dragSt.x);offY=lastOff.y+(mouse.y-dragSt.y);}
+  if(dragCorner){const pt=s2i(mouse.x,mouse.y);zones[dragCorner.zoneIdx].pts[dragCorner.ptIdx]={x:pt.x,y:pt.y};}
+  if(dragZone){
+    const pt=s2i(mouse.x,mouse.y);
+    const dx=pt.x-dragZone.startIx,dy=pt.y-dragZone.startIy;
+    const z=zones[dragZone.zoneIdx];
+    z.pts=dragZone.origPts.map(p=>({x:p.x+dx,y:p.y+dy}));
+    cv.style.cursor='grabbing';
+  }
+  if(mode==='navigate')cv.style.cursor=dragging?'grabbing':'grab';
+  oppdaterSnap();
   draw();
 });
 cwrap.addEventListener('mouseleave',()=>{mouse=null;dragging=false;draw();});
@@ -6010,7 +6025,8 @@ cwrap.addEventListener('wheel',e=>{
   const r=cv.getBoundingClientRect();
   const mx=e.clientX-r.left,my=e.clientY-r.top;
   const f=e.deltaY<0?1.1:1/1.1;
-  offX=mx-(mx-offX)*f;offY=my-(my-offY)*f;sc*=f;draw();
+  offX=mx-(mx-offX)*f;offY=my-(my-offY)*f;sc*=f;
+  oppdaterSnap();draw();
 },{passive:false});
 let hoveredWin=null;
 let dragWin=null;      // {w, wi, z, zi, seg, dragOffsetT}
