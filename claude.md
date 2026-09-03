@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.8.0 | Single-file HTML applikasjon
+**Versjon:** 3.8.3 | Single-file HTML applikasjon
 
 ---
 
@@ -562,5 +562,8 @@ Viktig bughistorikk:
 - Vindaugsbreidde: bruk fitSpanT/winSpanPx, ALDRI w.t1-w.t0 (som berre er senteret)
 - Omkalibrering må skalere w.breddeMm og rekne gavlflater på nytt — elles slutta
   vindauga å følgje bygget, og glasandelen i SXI vart stille feil
+- PDF-renderskala er adaptiv (pdfRenderScale): eit fast 4.0 gav 288 DPI uansett
+  papirformat, så ei tett teikning pressa ned på 800×600 pt fekk berre 3200×2400 px
+  og strekar på 0,07 pt vart blass gråtone. No siktar vi på ~48 Mpx uansett format
 - renderFasadeView() er daud kode: det finst ingen #fasadeWrap i DOM-en
 ```
