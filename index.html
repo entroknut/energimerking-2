@@ -708,7 +708,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.8.2</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.8.3</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -1510,10 +1510,37 @@ async function pdfSidePapirMm(doc,n){
   }catch(e){return null;}
 }
 
+// Renderskala for PDF ────────────────────────────────
+// Ein fast skala gir vilt ulik oppløysing avhengig av papirformatet: 4.0 er
+// 288 DPI uansett, så ei A1-side får 6736×9536 px medan ei tett teikning
+// pressa ned på 800×600 pt (≈A4+) berre får 3200×2400 px. Småformata
+// arkitektteikningar vart då uleselege — strekbreidder rundt 0,07 pt hamnar
+// under ein tredjedels piksel og canvas teiknar dei som blass gråtone.
+// Vi siktar på eit pikselbudsjett i staden, så alle format får like mange
+// pikslar å zoome i. PDF_MIN_SCALE = den gamle faste skalaen, slik at ingen
+// storformatteikning blir dårlegare enn før.
+const PDF_TARGET_PX=48e6;   // ~48 Mpx — same orden som A1 fekk med skala 4
+const PDF_MAX_PX=124e6;     // hardt tak — Firefox nektar canvas over 124 Mpx
+const PDF_MAX_SIDE=16000;   // under dimensjonstaket i alle nettlesarar
+const PDF_MIN_SCALE=4.0;
+const PDF_MAX_SCALE=10.0;
+function pdfRenderScale(w1,h1){
+  const px=w1*h1;
+  if(!(px>0))return PDF_MIN_SCALE;
+  const budsjett=Math.sqrt(PDF_TARGET_PX/px);
+  const tak=Math.min(PDF_MAX_SIDE/w1,PDF_MAX_SIDE/h1,Math.sqrt(PDF_MAX_PX/px));
+  const s=Math.max(PDF_MIN_SCALE,Math.min(PDF_MAX_SCALE,budsjett));
+  return Math.max(1,Math.min(s,tak));
+}
+
 async function loadPdfPage_with(doc,n){
   const page=await doc.getPage(n);
-  // Scale 4.0 ≈ 288 DPI for A1 drawings — crisp text and lines
-  const vp=page.getViewport({scale:4.0});
+  const vp1=page.getViewport({scale:1});
+  const skala=pdfRenderScale(vp1.width,vp1.height);
+  const vp=page.getViewport({scale:skala});
+  console.log('PDF s.'+n+': '+Math.round(vp1.width)+'×'+Math.round(vp1.height)+' pt → skala '
+    +skala.toFixed(2)+' ('+Math.round(skala*72)+' DPI, '
+    +Math.round(vp.width)+'×'+Math.round(vp.height)+' px)');
   const tmp=document.createElement('canvas');
   tmp.width=vp.width;tmp.height=vp.height;
   const ctx2d=tmp.getContext('2d',{alpha:false});
