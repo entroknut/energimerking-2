@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.8.3 | Single-file HTML applikasjon
+**Versjon:** 3.9.0 | Single-file HTML applikasjon
 
 ---
 
@@ -314,7 +314,13 @@ mmPerImgPx = (papirbreidde_mm / biletbreidde_px) * målestokk
 
 ## Ytelse
 
-Målt med 36 soner. Berre ~2 ms av 110 ms i `updateResults` er rekning — resten er DOM-bygging (~3 ms per sonekort).
+Målt med 36 soner. Berre ~3 ms av tida i `updateResults` er rekning. Av dei
+~180 ms det tok før var ~30 ms DOM-bygging og **~145 ms style/layout**, utløyst
+synkront av scroll-gjenopprettinga på slutten (`_spanel.scrollTop=_savedScroll`
+tvingar fram layout av heile panelet på 5300 noder). Mål alltid der før du
+optimaliserer bygginga — det er layouten som dominerer, ikkje `createElement`.
+
+Etter tiltaka under: **18 ms opne kort, 2 ms samanslegne** ved 36 soner.
 
 Fallgruver som er retta, og som ikkje må innførast på nytt:
 
@@ -322,9 +328,36 @@ Fallgruver som er retta, og som ikkje må innførast på nytt:
 - **Etg.høgde/Nord-felta** bygde alt på kvart tastetrykk. No strupt via `tungOppdateringSnart()` (220 ms), med straks oppdatering på blur/Enter.
 - **Tabellfana** er skjult som standard. `renderTable()` returnerer med ein gong når `#tablePanel` er skjult; fanebytet renderer.
 
-`draw()` og snapping er raske (1–2 ms per musrørsle) — ikkje bruk tid der.
+- **Sonekorta byggjer berre header når kortet er samanslege.** Kroppen ligg som
+  ein `_buildBody`-closure på kortet og vert kalla av chevron-handlaren og
+  `_toggleAllZcards()` fyrste gongen kortet vert opna. Ikkje flytt kode ut av
+  closuren, og hugs at eit `return` på toppnivå der no returnerer frå kroppen,
+  ikkje frå `forEach`-callbacken.
+- **`.zcard{content-visibility:auto}`** lèt nettlesaren hoppe over layout for
+  kort utanfor synsfeltet. Sidan korta vert bygde på nytt kvar gong, forsvinn
+  storleiken nettlesaren hugsar — difor les `updateResults()` `offsetHeight`
+  frå førre runde inn i `window._zcardH` og set `contain-intrinsic-size`
+  eksplisitt. Utan det hoppar rullelista. To følgjer å hugse: `innerText` på
+  eit hoppa-over kort gir tom streng (bruk `textContent`), og
+  `getBoundingClientRect()` gir plasshaldarstorleiken til kortet har vore
+  synleg i eit frame.
+- **Bakgrunnsbiletet vert enkoda éin gong per bilete, ikkje per lagring.**
+  `serialiserProsjekt()` held `f._bgCache={img,nokkel,data}`; nøkkelen er
+  biletobjektet + mime/kvalitet, så eit nytt bilete gir bom av seg sjølv.
+  Éin plass per etasje. Ei PDF-side på ~48 Mpx tek ~600 ms i `toDataURL`, og
+  autolagringa gjekk kvart minutt så lenge noko som helst var endra — det var
+  eit sekundlangt frys per etasje ved kvar autolagring. Feltet vert aldri
+  serialisert (`serFloors` byggjer `obj` felt for felt).
 
-**Står att:** ei vanleg redigering byggjer alle sonekorta på nytt (~96 ms ved 36 soner). Å fikse det krev at berre det endra kortet vert bygd om. Vurdert, men ikkje gjort — ein mellomlagringsmekanisme kan gi utdaterte tal om ein bommar på eit felt (t.d. `getTotalAreaM2`, som avheng av *andre* soner).
+`draw()` og snapping er raske (1–2 ms per musrørsle) — ikkje bruk tid der.
+`drawImage` av bakgrunnen er GPU-akselerert og kostar under 1 ms sjølv ved
+64 Mpx, så den adaptive renderskalaen gjer *ikkje* teikninga treigare.
+
+**Står att:** ei vanleg redigering byggjer framleis alle sonekorta på nytt. Med
+lat kropp + `content-visibility` er det no billeg nok, så det å byggje om berre
+det endra kortet er ikkje verdt risikoen — ein mellomlagringsmekanisme kan gi
+utdaterte tal om ein bommar på eit felt (t.d. `getTotalAreaM2`, som avheng av
+*andre* soner).
 
 ---
 
@@ -504,6 +537,28 @@ Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
   (`EntroHost.autosaves()`). Dei kan ikkje køyre side om side: `autosave()`
   kallar `markClean()`, så lokalkopien ville nulla `isDirty` før lagringa til
   bygget fekk sjå han, og bygget ville aldri blitt oppdatert.
+- **Lokalkopien er eit nett under lagringa til bygget, ikkje eit sidespor.**
+  Heile livsløpet heng saman med `sxi:save`:
+  - `autosave()` stemplar kopien med `_eigar={kjelde,byggId,byggNamn}` frå
+    `_autolagringEigar()`. `localStorage`-nøkkelen er den same for heile
+    nettlesaren, så **utan stempelet kunne arbeid på eitt bygg blitt tilbode
+    att på eit anna**.
+  - `sxi:save-result {ok:true}` ⇒ `slettAutolagring()`. Bygget har fila, og ein
+    kopi som ligg att ville blitt tilbydd som «ulagra arbeid».
+  - `sxi:init`/`sxi:load` ⇒ `tilbyLokalKopi(hostSavedAt)`. Feil bygg: la kopien
+    liggje (han høyrer heime ein annan stad). Eldre enn fila frå verten: slett.
+    Rett bygg og nyare: brikke, og «Hent inn att» kallar `markDirty()` så
+    arbeidet går vidare **til bygget**, ikkje tilbake til localStorage.
+  - Oppstartsstien (`setTimeout` → `restoreAutosave()`) held seg heilt unna når
+    `EntroHost.embedRequested()` er sann. `willLoadProject()` åleine var ikkje
+    nok: eit bygg **utan** prosjekt gjorde han usann, og eit seint `sxi:init`
+    tapte kappløpet mot tidsavbrotet — då kunne brukaren fått tilbod om arbeid
+    frå eit heilt anna bygg. `sxi:init` kallar dessutan `hideToast()` uansett.
+  - `restoreAutosave(opts)` tek `byggId`, `nyareEnn`, `tekst`, `knapp` og
+    `etterpaa`. Utan opts er han som før — det er den frittståande vegen.
+    Utanfor EntroPi vert ein byggstempla kopi framleis tilbydd, men merkt med
+    byggnamnet; å halde brukaren sitt eige arbeid tilbake i stillheit ville
+    vore verre.
 
 ---
 
@@ -566,4 +621,9 @@ Viktig bughistorikk:
   papirformat, så ei tett teikning pressa ned på 800×600 pt fekk berre 3200×2400 px
   og strekar på 0,07 pt vart blass gråtone. No siktar vi på ~48 Mpx uansett format
 - renderFasadeView() er daud kode: det finst ingen #fasadeWrap i DOM-en
+- Autolagringa enkoda bakgrunnsbiletet på nytt ved kvar lagring. Med den
+  adaptive PDF-skalaen (48 Mpx) vart det ~600 ms frys per etasje kvart minutt.
+  Sjå `f._bgCache` i `serialiserProsjekt()`
+- updateResults() sin verkelege kostnad er layout, ikkje DOM-bygging — sjå
+  «Ytelse» før du prøver å optimalisere `createElement`-løkkene
 ```

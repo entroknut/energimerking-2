@@ -348,6 +348,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .zcard.editing{border-color:var(--accent);box-shadow:0 0 0 3px rgba(29,79,79,.08)}
 .zcard-header{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;user-select:none;background:linear-gradient(90deg,color-mix(in srgb,var(--zcard-color,transparent) 8%,transparent),transparent)}
 .zcard-header:hover{background:linear-gradient(90deg,color-mix(in srgb,var(--zcard-color,transparent) 13%,transparent),transparent)}
+/* Kort utanfor synsfeltet treng ikkje layout. Ved 36 soner er sidepanelet
+   ~5300 noder, og eitt fullt layout-pass kosta ~145 av dei ~180 ms
+   updateResults() brukte — utløyst synkront av scroll-gjenopprettinga.
+   contain-intrinsic-size held rullehøgda medan kortet er hoppa over.
+   `auto`-storleiken nettlesaren hugsar hjelper ikkje her, for kvart kort vert
+   bygd på nytt ved kvar oppdatering; difor set updateResults() høgda frå
+   førre runde eksplisitt (sjå _zcardH). */
+.zcard{content-visibility:auto;contain-intrinsic-size:auto 320px}
 .zcard-body{padding:0 12px 12px 12px}
 .zcard.collapsed .zcard-body{display:none}
 .zcard-chevron{margin-left:auto;flex-shrink:0;width:16px;height:16px;color:var(--text3);transition:transform .18s;display:flex;align-items:center;justify-content:center}
@@ -708,7 +716,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.8.3</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.9.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -4350,6 +4358,15 @@ function updateResults(){
   // Bevar scroll-posisjon slik at SK-toggle ikkje hoppar
   const _spanel=document.getElementById('spanel');
   const _savedScroll=_spanel?_spanel.scrollTop:0;
+  // Høgda på kvart kort frå førre runde, så content-visibility kan reservere
+  // rett plass til dei nybygde korta og lista ikkje hoppar under rullinga.
+  // Eit kort som var hoppa over rapporterer den reserverte høgda, altså det
+  // same talet som sist — verdien held seg sjølv ved like.
+  if(!window._zcardH)window._zcardH={};
+  zlist.querySelectorAll('.zcard').forEach(c=>{
+    const k=c.dataset.zkey;
+    if(k&&c.offsetHeight)window._zcardH[k]=c.offsetHeight;
+  });
   zlist.innerHTML='';
   // Sonekorta vert bygde utanfor dokumentet og sette inn i éin operasjon.
   // Å leggje dei inn eitt for eitt i live DOM tvingar fram omrekning av
@@ -4400,6 +4417,9 @@ function updateResults(){
       const card=document.createElement('div');
       card.className='zcard'+(mode==='edit'&&fi===activeFloor&&editZoneIdx===zi?' editing':'')+(isCollapsed?' collapsed':'');
       card.style.setProperty('--zcard-color', COLORS[ci]);
+      card.dataset.zkey=zoneKey;
+      const _hHint=window._zcardH[zoneKey];
+      if(_hHint)card.style.setProperty('contain-intrinsic-size','auto '+_hHint+'px');
 
       // ── Klikkbar header ──
       const cardHeader=document.createElement('div');cardHeader.className='zcard-header';
@@ -4435,6 +4455,7 @@ function updateResults(){
         e.stopPropagation();
         window._zcardCollapsed[zoneKey]=!window._zcardCollapsed[zoneKey];
         card.classList.toggle('collapsed');
+        if(!card.classList.contains('collapsed')&&card._buildBody){card._buildBody();card._buildBody=null;}
         areaPreview.style.display=card.classList.contains('collapsed')?'inline':'none';
         _updateCollapseAllBtn();
       };
@@ -4449,6 +4470,12 @@ function updateResults(){
       card.appendChild(cardBody);
       // nameRow alias — all vidare kode append til cardBody
       const nameRow=cardBody;
+      // Sjølve innhaldet i kortet er det dyre: ~130 av dei ~5300 nodene i
+      // panelet ved 36 soner ligg her, og eit samanslege kort viser dei aldri
+      // (`.zcard.collapsed .zcard-body{display:none}`). Difor byggjer vi berre
+      // opne kort no, og lagrar byggjaren på kortet til brukaren opnar det.
+      // Chevron-handlaren over og `_toggleAllZcards` kallar han.
+      const _buildBody=()=>{
 
       // ── Grouped zone badge + breakdown ──
       if(isGrouped){
@@ -5215,6 +5242,8 @@ function updateResults(){
         });
         cardBody.appendChild(facSection);
       }
+      };
+      if(isCollapsed)card._buildBody=_buildBody;else _buildBody();
 
       _zfrag.appendChild(card);
     });
@@ -5234,7 +5263,7 @@ window._toggleAllZcards=function(){
   const allCollapsed=[...cards].every(c=>c.classList.contains('collapsed'));
   // Toggle: viss alle er collapsed → vis alle, elles → slå saman alle
   cards.forEach(c=>{
-    if(allCollapsed)c.classList.remove('collapsed');
+    if(allCollapsed){c.classList.remove('collapsed');if(c._buildBody){c._buildBody();c._buildBody=null;}}
     else c.classList.add('collapsed');
     // Sync areaPreview
     const ap=c.querySelector('.zcard-header span[style*="DM Mono"]');
@@ -7263,12 +7292,27 @@ function serialiserProsjekt(opts){
       zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]}))
     };
     if(f.bgImg){
-      try{
-        const tmp=document.createElement('canvas');
-        tmp.width=f.bgImg.width;tmp.height=f.bgImg.height;
-        tmp.getContext('2d').drawImage(f.bgImg,0,0);
-        obj.bgImgData=o.qual!=null?tmp.toDataURL(mime,o.qual):tmp.toDataURL(mime);
-      }catch(e){/* tainted canvas — hopp over */}
+      // Enkodinga er det dyre her: ei PDF-side på ~48 Mpx tek rundt 0,7 s i
+      // toDataURL, og han blokkerer hovudtråden. Bakgrunnen endrar seg berre
+      // når brukaren lastar opp ei ny fil eller byter PDF-side, medan
+      // autolagringa går kvart minutt så lenge noko som helst er endra — utan
+      // mellomlagring betalte vi altså full enkoding for kvar sonejustering.
+      // Nøkkelen inneheld sjølve biletobjektet, så eit nytt bilete gir bom av
+      // seg sjølv. Éin plass per etasje, så minnebruken er den same som den
+      // strengen vi uansett måtte lage.
+      const nokkel=mime+'|'+(o.qual!=null?o.qual:'');
+      const buf=f._bgCache;
+      if(buf&&buf.img===f.bgImg&&buf.nokkel===nokkel){
+        obj.bgImgData=buf.data;
+      } else {
+        try{
+          const tmp=document.createElement('canvas');
+          tmp.width=f.bgImg.width;tmp.height=f.bgImg.height;
+          tmp.getContext('2d').drawImage(f.bgImg,0,0);
+          obj.bgImgData=o.qual!=null?tmp.toDataURL(mime,o.qual):tmp.toDataURL(mime);
+          f._bgCache={img:f.bgImg,nokkel,data:obj.bgImgData};
+        }catch(e){/* tainted canvas — hopp over */}
+      }
     }
     return obj;
   });
@@ -7332,16 +7376,43 @@ function foreslaaFilnamn(){
   return base+'.entro';
 }
 
+// Kven lokalkopien høyrer til. I EntroPi er lagringa PÅ BYGGET den eigentlege
+// lagringa, og localStorage berre eit nett for det som ikkje rakk fram. Då må
+// kopien vite kva bygg han gjeld: utan stempelet kunne arbeid på eitt bygg
+// blitt tilbode att på eit anna, sidan nøkkelen er den same for heile
+// nettlesaren. Utanfor EntroPi står kjelda som 'lokal' og byggId er tom.
+function _autolagringEigar(){
+  const H=window.EntroHost;
+  if(H&&H.active&&H.active())
+    return {kjelde:'entropi',byggId:H.byggId()||'',byggNamn:H.byggNamn()||''};
+  return {kjelde:'lokal',byggId:'',byggNamn:''};
+}
+// Lokalkopien finst berre for det som ikkje har nådd fram. Har bygget (eller
+// brukaren) fått lagringa, skal han vekk — elles ville han bli tilbydd att
+// som «ulagra arbeid» sjølv om alt låg trygt på bygget.
+function slettAutolagring(){
+  try{localStorage.removeItem(AUTOSAVE_KEY);}catch(e){}
+}
+
 function autosave(){
   try{
     // JPEG 85 % — autolagringa må vere liten nok til localStorage
     const proj=serialiserProsjekt({mime:'image/jpeg',qual:0.85});
+    proj._eigar=_autolagringEigar();
     localStorage.setItem(AUTOSAVE_KEY,JSON.stringify(proj));
     markClean(); // elles re-enkodar autolagringa alle bileta kvart minutt for alltid
   }catch(e){/* localStorage full */}
 }
 
-function restoreAutosave(){
+// opts (alle valfrie — utan dei er åtferda som før):
+//   byggId    berre tilby ein kopi som høyrer til dette bygget. '' = berre ein
+//             kopi utan byggstempel. Utelaten = kva som helst.
+//   nyareEnn  ISO-tid frå fila som alt er lasta; ein eldre kopi er berre støy.
+//   tekst     teksten i brikka, knapp = teksten på knappen
+//   etterpaa  vert kalla når kopien er henta inn (EntroPi markerer skitten,
+//             slik at arbeidet går vidare til bygget)
+function restoreAutosave(opts){
+  const o=opts||{};
   try{
     const raw=localStorage.getItem(AUTOSAVE_KEY);
     if(!raw)return false;
@@ -7349,9 +7420,23 @@ function restoreAutosave(){
     if(!proj.floors||!Array.isArray(proj.floors))return false;
     const hasZones=proj.floors.some(f=>(f.zones||[]).some(z=>(z.pts||[]).length>=3));
     if(!hasZones){localStorage.removeItem(AUTOSAVE_KEY);return false;}
+    const eigar=proj._eigar||null;
+    // Feil bygg: la kopien liggje. Han er ikkje søppel — han høyrer berre
+    // heime ein annan stad, og vert tilbydd der.
+    if(o.byggId!=null&&String((eigar&&eigar.byggId)||'')!==String(o.byggId))return false;
+    // Fila vi alt har er like ny eller nyare ⇒ kopien har ingenting å tilføre.
+    // Marginen dekkjer ei lagring som var undervegs då sida vart lukka.
+    if(o.nyareEnn){
+      const t=new Date(proj.savedAt).getTime(),h=new Date(o.nyareEnn).getTime();
+      if(!(t>h+5000)){slettAutolagring();return false;}
+    }
     const savedAt=new Date(proj.savedAt);
     const mins=Math.round((Date.now()-savedAt)/60000);
     const label=mins<2?'akkurat no':mins<60?mins+' min sidan':Math.round(mins/60)+' t sidan';
+    // Utanfor EntroPi kan kopien likevel komme frå eit bygg. Då seier vi kva
+    // bygg — å halde arbeidet tilbake i stillheit ville vore verre.
+    const frå=(o.byggId==null&&eigar&&eigar.byggNamn)?' · '+eigar.byggNamn:'';
+    const tekst=(o.tekst||'Autolaga prosjekt frå '+label)+(o.tekst?' · '+label:frå);
 
     // Show non-intrusive toast instead of confirm()
     const toast=document.createElement('div');
@@ -7365,8 +7450,8 @@ function restoreAutosave(){
     `;
     toast.innerHTML=`
       <span style="font-size:16px">💾</span>
-      <span style="color:#94a3b8;font-size:12px">Autolaga prosjekt frå ${label}</span>
-      <button id="toast-restore" style="padding:5px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;white-space:nowrap">Gjenopprett</button>
+      <span style="color:#94a3b8;font-size:12px">${tekst}</span>
+      <button id="toast-restore" style="padding:5px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;white-space:nowrap">${o.knapp||'Gjenopprett'}</button>
       <button id="toast-dismiss" style="padding:5px 10px;background:rgba(255,255,255,.1);color:#94a3b8;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px">Ignorer</button>
     `;
     document.body.appendChild(toast);
@@ -7388,7 +7473,8 @@ function restoreAutosave(){
       toast.remove();
       try{
         await lastProsjekt(proj,{fit:false});
-        hintText.textContent='Autolaga prosjekt gjenoppretta.';
+        if(o.etterpaa)o.etterpaa();
+        else hintText.textContent='Autolaga prosjekt gjenoppretta.';
       }catch(e){
         hintText.textContent='Kunne ikkje gjenopprette autolagringa: '+e.message;
       }
@@ -7409,15 +7495,24 @@ function restoreAutosave(){
 setInterval(()=>{
   if(isDirty&&!(window.EntroHost&&window.EntroHost.autosaves()))autosave();
 },AUTOSAVE_INTERVAL);
-// Also autosave when user leaves. Her tek vi lokalkopien uansett: dette er
-// siste sjanse, og postMessage til verten rekk ikkje fram når iframen forsvinn.
+// Also autosave when user leaves. Her tek vi lokalkopien uansett — også i
+// EntroPi: dette er siste sjanse, og ein postMessage rekk ikkje fram når
+// iframen forsvinn. Kopien er stempla med bygget (_autolagringEigar), så brua
+// kan tilby han att på rett bygg neste gong. Den lokale lagringa er altså
+// ikkje eit sidespor i EntroPi, men eit nett under lagringa til bygget:
+// han vert skriven berre når noko er ulagra, og sletta straks bygget har fått
+// det (sxi:save-result).
 window.addEventListener('pagehide',()=>{if(isDirty)autosave();});
 // Restore on load (after a short delay so DOM is ready).
-// I EntroPi kjem prosjektet frå vertssida — då ventar vi litt lenger, slik at
-// sxi:init får komme fram før vi tilbyr den lokale autolagringa.
+// I EntroPi eig brua heile tilbodet: han er den einaste som veit kva bygg vi
+// står på, og ein lokalkopi frå eit ANNA bygg skal aldri tilbydast her. Difor
+// held vi oss heilt unna når verten har bede om innbygd modus (?embed=1) —
+// også når bygget ikkje har noko prosjekt frå før. Elles ville eit seint
+// sxi:init tapt kappløpet mot dette tidsavbrotet, og brukaren fått tilbod om
+// arbeid frå eit heilt anna bygg.
 setTimeout(()=>{
   const H=window.EntroHost;
-  if(H&&H.framed&&H.willLoadProject())return;
+  if(H&&H.framed&&(H.embedRequested()||H.willLoadProject()))return;
   restoreAutosave();
 // Brua vert definert lenger ned i fila, så «er vi i ein iframe» vert rekna
 // direkte her — window.EntroHost finst ikkje enno på dette tidspunktet.
@@ -7441,6 +7536,7 @@ setTimeout(()=>{
   ];
   const hostWin=(window.parent&&window.parent!==window)?window.parent:(window.opener||null);
   const framed=!!hostWin;
+  const embedRequested=framed&&new URLSearchParams(location.search).has('embed');
   let hostOrigin=null;              // sett fyrst når ei godkjend melding har kome
   let bygg=null,wantsSxi=false,saveLabel='Lagre på bygget';
   let hasProject=false,autosaveTimer=null,inited=false;
@@ -7664,6 +7760,32 @@ setTimeout(()=>{
     await lastProsjekt(proj,{fit:true});
     markClean();
     if(!silent)hint('Prosjektet er henta frå '+((bygg&&(bygg.namn||bygg.adresse))||'EntroPi')+'.');
+    return proj;
+  }
+
+  const byggId=()=>bygg?String(bygg.id||''):'';
+
+  // Lokalkopien er eit nett for det som ikkje rakk fram til bygget — han vert
+  // sletta så snart bygget har fått lagringa (sjå sxi:save-result). Ligg det
+  // likevel ein kopi her når vi opnar, betyr det at førre økta enda utan at
+  // arbeidet nådde fram: nettlesaren vart lukka, fana krasja, eller EntroPi
+  // fjerna iframen mellom to autolagringar. Då tilbyr vi han att — men berre
+  // for DETTE bygget, og berre om han er nyare enn fila som låg der.
+  // «Hent inn att» markerer prosjektet skittent, så det går vidare til bygget
+  // ved neste autolagring i staden for å bli liggjande lokalt igjen.
+  function tilbyLokalKopi(hostSavedAt){
+    if(!active())return;
+    restoreAutosave({
+      byggId:byggId(),
+      nyareEnn:hostSavedAt||null,
+      tekst:'Ulagra arbeid som ikkje nådde bygget',
+      knapp:'Hent inn att',
+      etterpaa(){
+        markDirty();   // kallar notifyDirty() sjølv ⇒ går til bygget herfrå
+        hint('Arbeidet er henta inn att, og vert lagra på '
+          +((bygg&&(bygg.namn||bygg.adresse))||'bygget')+'.');
+      }
+    });
   }
 
   // ── Meldingar frå verten ──
@@ -7695,10 +7817,13 @@ setTimeout(()=>{
               byggeaar:(_by>=1800&&_by<=2100)?_by:null};
       // Utan prosjekt teiknar vi sjølve; med prosjekt gjer lastProsjekt() det.
       if(_fyllFraPi()&&!d.project){updateResults();renderTable();}
+      // Eit tilbod som kom opp før init må vekk uansett: det var reist utan å
+      // vite kva bygg vi står på. Rett tilbod kjem frå tilbyLokalKopi() under.
+      hideToast();
+      let hostSavedAt=null;
       if(d.project){
         hasProject=true;
-        hideToast();
-        try{await loadFromHost(d.project,true);}
+        try{const hp=await loadFromHost(d.project,true);hostSavedAt=hp&&hp.savedAt;}
         catch(e){hint('Kunne ikkje opne prosjektet frå EntroPi: '+e.message);}
       }
       // Utelate autosaveMs ⇒ standardintervallet. Eksplisitt 0 ⇒ av.
@@ -7711,12 +7836,16 @@ setTimeout(()=>{
       }
       lastDirty=isDirty;
       post({type:'sxi:state',dirty:isDirty,ready:true,version:appVersion()});
+      tilbyLokalKopi(hostSavedAt);
       return;
     }
     if(!hostOrigin)return;                           // init må komme fyrst
     if(d.type==='sxi:load'){
       hasProject=true;hideToast();
-      try{await loadFromHost(d.project);}
+      try{
+        const hp=await loadFromHost(d.project);
+        tilbyLokalKopi(hp&&hp.savedAt);
+      }
       catch(e){hint('Kunne ikkje opne prosjektet frå EntroPi: '+e.message);}
       return;
     }
@@ -7733,6 +7862,9 @@ setTimeout(()=>{
       pending=null;setBusy(false);
       if(d.ok){
         markClean();
+        // Bygget har fila no. Lèt vi lokalkopien liggje, ville han bli tilbydd
+        // som «ulagra arbeid» ved neste opning sjølv om alt låg trygt der.
+        slettAutolagring();
         if(!auto)hint(d.message||('Lagra på '+((bygg&&(bygg.namn||bygg.adresse))||'bygget')+'.'));
       }else{
         hint('EntroPi kunne ikkje lagre: '+(d.message||'ukjend feil'));
@@ -7759,6 +7891,13 @@ setTimeout(()=>{
     framed:framed,
     active:active,
     willLoadProject:()=>hasProject,
+    // Har verten bede om innbygd modus? Sann alt før sxi:init, i motsetnad til
+    // active() — oppstartsstien treng å vite at brua kjem til å ta over
+    // tilbodet om lokalkopien, ikkje at ho alt har gjort det.
+    embedRequested:()=>embedRequested,
+    // Bygget lagringa går til. Stemplar lokalkopien, slik at han berre vert
+    // tilbydd att på det same bygget.
+    byggId:byggId,
     // Lagrar vi til bygget av oss sjølve? Den lokale autolagringa står ned då.
     autosaves:()=>!!(active()&&autosaveTimer),
     // Lèt verten vise ulagra-endringar før modalen vert lukka
@@ -7796,7 +7935,7 @@ setTimeout(()=>{
   // Handtrykket vert berre kringkasta når verten har bede om det med ?embed=1.
   // Utan det ligg brua heilt stille — ingen meldingar ut, ingen UI-endring —
   // men lyttaren står klar, så ein vert kan òg opne samtalen med sxi:hello.
-  if(framed&&new URLSearchParams(location.search).has('embed')){
+  if(embedRequested){
     // Verten kan montere lyttaren sin etter at iframen er lasta — prøv fleire gonger
     [0,250,750,2000,5000].forEach(ms=>setTimeout(announce,ms));
   }
