@@ -13,6 +13,10 @@ Utvikla i Entro AS. Versjon 3.0.2.
 
 ## Arbeidsflyt
 
+Brukar du verktøyet inne i **EntroPi**, sjå
+[docs/bruksrettleiing.md](docs/bruksrettleiing.md) — der står lagring på bygget,
+autolagring og tekniske system frå bygget forklart steg for steg.
+
 1. **Last opp** planteikninga (`↑ Last opp`) — PDF eller bilete.
 2. **Kalibrer** (`⊕ Kalibrer`) så programmet veit kor mange millimeter éin
    biletpiksel er. Utan dette blir alle areal feil.
