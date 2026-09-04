@@ -68,7 +68,9 @@ nok til å vise «3 etasjar · 12 soner · 2 480 m²» på byggkortet utan å op
 Felta i `sxi:init`:
 
 - `bygg: {id, namn, adresse, byggeaar}` — `namn` vert vist som brikke i
-  verktøylinja, så brukaren ser kvar lagringa hamnar. `adresse` og `byggeaar`
+  verktøylinja, så brukaren ser kvar lagringa hamnar. `id` **må vere stabil for
+  same bygg**: han stemplar den lokale sikkerheitskopien, slik at ulagra arbeid
+  berre vert tilbydd att på det bygget det høyrer til. `adresse` og `byggeaar`
   er **framlegg** som vert fylte inn i verktøyet (sjå under). `byggeaar` må
   vere eit årstal mellom 1800 og 2100; alt anna vert ignorert, sidan eit
   vrøvltal ville gitt feil standard-U-verdiar utan at nokon såg det.
@@ -104,9 +106,44 @@ ville nulla «ulagra endringar» før lagringa til bygget fekk sjå det, og bygg
 ville aldri blitt oppdatert. Slår verten autolagringa av med `autosaveMs: 0`,
 tek den lokale over att, slik at det ikkje står heilt utan.
 
-Ved `pagehide` (iframen vert fjerna) vert lokalkopien skriven uansett — det er
-siste sjanse, og ein `postMessage` rekk ikkje fram når iframen forsvinn. Det er
-difor `sxi:state {dirty}` finst: bruk han til å åtvare før modalen vert lukka.
+### Lokalkopien er eit nett under lagringa til bygget
+
+I innbygd modus er fila på bygget den eigentlege lagringa. `localStorage` er
+berre eit nett for det som **ikkje rakk fram**, og heile livsløpet til kopien
+heng saman med lagringa på bygget:
+
+| når | kva skjer med lokalkopien |
+|---|---|
+| ved `pagehide` med ulagra endringar | han vert skriven, stempla med `bygg.id` |
+| ved `autosaveMs: 0` (verten har slått av) | den lokale autolagringa tek over, òg stempla |
+| ved `sxi:save-result {ok:true}` | han vert **sletta** — bygget har fila no |
+| ved `sxi:init` / `sxi:load` | han vert vurdert (sjå under) og enten tilbydd, sletta eller lagd att |
+
+Stempelet er nødvendig fordi `localStorage`-nøkkelen er **den same for heile
+nettlesaren**. Utan det kunne arbeid på eitt bygg blitt tilbode att på eit anna.
+
+Ved opning vurderer brua kopien slik:
+
+- **Feil bygg** ⇒ ingen ting skjer. Kopien vert liggjande, så han kan tilbydast
+  der han høyrer heime.
+- **Eldre enn `project` frå verten** ⇒ sletta i stillheit. Bygget har alt ein
+  nyare versjon, og då er kopien berre støy. (Marginen er 5 sekund, så ei
+  lagring som var undervegs då sida vart lukka ikkje blir tolka som nytt
+  arbeid.)
+- **Rett bygg og nyare** ⇒ brikka «Ulagra arbeid som ikkje nådde bygget» med
+  knappen «Hent inn att». Å hente inn markerer prosjektet ulagra, så arbeidet
+  går vidare til bygget ved neste autolagring — det blir ikkje liggjande lokalt
+  ein gong til.
+
+Verten treng ikkje gjere noko for dette; det einaste kravet er at `bygg.id` er
+stabil for same bygg.
+
+Er tilbodet reist før `sxi:init` rakk fram, vert det fjerna ved init og
+vurdert på nytt med bygget kjent. Verktøyet held seg heilt unna det lokale
+tilbodet så lenge `?embed=1` står i URL-en — då eig brua det.
+
+Det er `sxi:state {dirty}` som gir verten grunnlag for å åtvare før modalen
+vert lukka; `postMessage` rekk ikkje fram når iframen forsvinn.
 
 ### Åtvaring om ulagra endringar
 
