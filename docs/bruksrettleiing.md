@@ -1,6 +1,6 @@
 # Bruksrettleiing — SXI-generatoren i EntroPi
 
-Versjon 3.9.0 · Entro AS
+Versjon 3.10.0 · Entro AS
 
 SXI-generatoren er oppmålingsverktøyet for energimerking: du tek inn ei
 planteikning, teiknar sonene i bygget, og får ut ei `.sxi`-fil som opnar rett i
@@ -238,6 +238,39 @@ sida av knappen, og **↺** nullstillar.
 
 BRA-summen for heile bygget står i etasjelinja.
 
+### Kopiere ei etasje til eit anna prosjekt
+
+Har du teikna ei etasje som skal brukast i eit anna bygg (eller i eit anna
+prosjekt på same bygget), treng du ikkje teikne ho på nytt.
+
+1. **Høgreklikk på etasjefana** → **Kopier etasje**. Heile etasjen — teikning,
+   kalibrering, soner, vindauge, skiljeveggar og kontrollmål — blir lagd på eit
+   klippbord i nettlesaren.
+2. Opne det andre prosjektet (i EntroPi: gå til det andre bygget og opne
+   verktøyet der).
+3. **+ Etasje** → **Lim inn kopiert etasje**. Etasjen kjem inn som ei ny fane.
+
+Klippbordet ligg i nettlesaren, så det held seg mellom to bygg og tåler at sida
+blir lasta på nytt. Det tømmer seg ikkje — du kan lime inn same etasjen i fleire
+prosjekt.
+
+**Skal etasjen til ei anna maskin** (eller ein annan nettlesar), går det gjennom
+fila i staden: last ned `.entro`-fila (`Ctrl+Shift+S`) frå det eine prosjektet,
+og vel **+ Etasje** → **Hent etasje frå prosjektfil** i det andre. Der plukkar
+du kva etasje du vil ha — eller alle.
+
+Tre ting å vite:
+
+- **Måla følgjer etasjen.** Var skalaen i kjeldeprosjektet ein annan enn her,
+  får etasjen si **eiga kalibrering** (badgen viser «Eiga»). Areala blir dei
+  same som dei var — dei endrar seg ikkje av at prosjektet rundt har ein annan
+  målestokk.
+- **Nord er globalt.** Stod nordpila annleis i kjeldeprosjektet, seier meldinga
+  det. Sjekk kompasset, elles peikar fasadane feil veg.
+- **Tekniske system frå EntroPi blir ikkje med til eit anna bygg.** Dei peikar
+  på anlegg på bygget dei vart henta frå, og luftmengdene deira går rett inn i
+  energimerket. Kopierer du innanfor same bygget, følgjer dei med.
+
 ---
 
 ## 5. Lagring i EntroPi
@@ -319,6 +352,7 @@ Trykk **?** i programmet for full liste.
 | `Ctrl+C` / `Ctrl+V` | Kopier og lim inn sone eller vindauge |
 | Scroll / klikk+dra | Zoom / flytt teikninga |
 | Høgreklikk sone | Kontekstmeny |
+| Høgreklikk etasjefane | Kopier etasjen, eller hent ein frå eit anna prosjekt |
 
 ---
 
@@ -354,5 +388,4 @@ taktypen stemmer med kva sona faktisk grensar mot.
 - Validering av overlappande soner
 - Snap til skrå veggar
 - PDF-rapport og eksport til rekneark
-- Kopiering av ei heil etasje (må gjerast sone for sone)
 - Offline-modus (3D og PDF-lesing hentar bibliotek frå CDN)

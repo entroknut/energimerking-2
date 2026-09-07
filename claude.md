@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.9.0 | Single-file HTML applikasjon
+**Versjon:** 3.10.0 | Single-file HTML applikasjon
 
 ---
 
@@ -417,7 +417,10 @@ Vindauge fordelast til den sona veggen deira hamna i. `takflater`, `gavlflater`,
 
 All serialisering går gjennom **to** delte funksjonar — `serialiserProsjekt(opts)`
 og `lastProsjekt(proj, opts)`. Manuell lagring, autolagring og EntroPi-brua
-brukar dei same to, så dei kan ikkje lenger komme i utakt.
+brukar dei same to, så dei kan ikkje lenger komme i utakt. Per etasje kallar dei
+`serialiserEtasje(f, opts)` / `deserialiserEtasje(f)`, som etasje-klippbordet òg
+brukar — eit nytt etasje- eller sonefelt skal difor leggjast der, ikkje i
+prosjektfunksjonane.
 
 **Manuell (.entro):** `showSaveFilePicker` der nettlesaren støttar det, så brukaren vel mappe og namn. Framlegg til filnamn er `foreslaaFilnamn()` (adressa utan postnummer/poststad). Fallback til vanleg nedlasting.
 
@@ -425,7 +428,12 @@ brukar dei same to, så dei kan ikkje lenger komme i utakt.
 
 **EntroPi (iframe):** brua sender PNG — fila på bygget er den einaste kopien, og JPEG ville tapt kvalitet på nytt for kvar opne-lagre-runde.
 
-Alle felt som skal overleve må leggjast til **fem** stader: `snapshot()`, `applyHistoryState()`, `getCurrentState()`, `serialiserProsjekt()` og `lastProsjekt()`.
+Alle felt som skal overleve må leggjast til **fem** stader: `snapshot()`, `applyHistoryState()`, `getCurrentState()`, `serialiserEtasje()` og `deserialiserEtasje()` (eller `serialiserProsjekt()`/`lastProsjekt()` for felt på prosjektnivå).
+
+`.entro`-fila og lokalkopien er stempla med `_eigar {kjelde,byggId,byggNamn}`
+frå `serialiserProsjekt()`. Det er både lokalkopi-stempelet (sjå EntroPi-brua)
+og den einaste måten etasje-importen kan sjå om tekniske system i fila framleis
+høyrer til bygget vi står på.
 
 ---
 
@@ -562,13 +570,56 @@ Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
 
 ---
 
+## Kopier etasje mellom prosjekt
+
+Ein heil etasje kan hentast frå eitt prosjekt inn i eit anna (`// ── 2a.`).
+Inne i EntroPi ligg prosjekta på kvart sitt bygg og kan ikkje vere opne
+samstundes, så det må gå gjennom eit lager som lever mellom to sideopningar.
+Difor to berarar, som begge endar i `importerEtasjar(serFloors, meta)`:
+
+- **Klippbord** — IndexedDB (`sxiEtasjeKlipp`) på vårt eige origin. Høgreklikk
+  på etasjefana → «Kopier etasje»; `+ Etasje` → «Lim inn kopiert etasje».
+  `localStorage` duger **ikkje**: ei PDF-side på 48 Mpx sprengjer 5 MB-kvoten,
+  og eit JPEG-mellomsteg ville blassa ut dei tynne strekane `imgLineSnap`
+  leitar etter. IndexedDB tek ein PNG-Blob direkte. Nettlesaren partisjonerer
+  lageret på **toppnivå-sida** (EntroPi), ikkje på iframe-URL-en, så det same
+  klippbordet gjeld frå bygg til bygg. Er lageret blokkert, seier meldinga frå
+  og peikar på fil-vegen — ingen stille andre-mekanisme.
+- **Prosjektfil** — `+ Etasje` → «Hent etasje frå prosjektfil»: vel ei
+  `.entro`-fil, plukk éin eller alle etasjar. Einaste vegen mellom to maskiner.
+
+`importerEtasjar` eig alle omreknings-reglane, og desse er dei som har gjort
+skade om dei blir gjorde feil:
+
+- **Kalibreringa som gjaldt for etasjen i kjeldeprosjektet er den einaste som
+  gir rette mål.** Er ho ulik den globale her, får etasjen `ownCal=true` med
+  kjelde-skalaen. Utan det ville alle areala endra seg i det etasjen kom inn —
+  utan at nokon rørte teikninga. Same skala som den globale ⇒ `ownCal=false`,
+  så badgen ikkje lyg om at etasjen er spesiell.
+- **`groupId` er berre meiningsfull innanfor eitt prosjekt.** Ei kopling som
+  ligg heilt inne i importen vert med under nye id-ar; peikar ho ut av det vi
+  hentar, fell ho bort (som ved sletting av ei etasje). Å ta id-ane med som dei
+  er ville kopla soner til framande grupper i målprosjektet.
+- **`tekniskeSystem` vert tekne bort med mindre byggId er stadfesta lik.** Dei
+  peikar på system-id-ar på eit bestemt bygg, og ventilasjonstala som ligg
+  lagra på sona går rett inn i SXI-en — energimerket ville blitt rekna med
+  luftmengder frå ein heilt annan bygning. Talet vert vist, aldri stille.
+- **Nord er globalt per prosjekt.** Vi endrar det ikkje, men melder avviket:
+  fasadane står no mot andre himmelretningar enn dei gjorde i kjeldeprosjektet.
+- Namnekollisjonar på etasje og sone går gjennom `_unikNamn` («Sone 7 (2)»),
+  og `_nextZoneId` vert dregen forbi importerte «Sone N» så neste nye sone
+  ikkje får same namnet.
+- `snapshot()` fyrst, så heile importen er eitt angre-steg (og markerer
+  prosjektet ulagra, slik at det går vidare til bygget i EntroPi).
+- Eit heilt tomt startprosjekt («Etasje 1», ingen soner, inga teikning) vert
+  fjerna når importen kjem inn.
+
 ## Kjende manglar / ikkje implementert
 
 - Import av eksisterande SXI
 - Validering av overlappande soner
 - Snap til skrå veggar (krev både vassrett og loddrett strek)
 - PDF-rapport / eksport til rekneark
-- Kopier heile etasjen (må gjerast sone for sone)
 - Offline-modus (Three.js og pdf.js krev CDN)
 
 ---
@@ -626,4 +677,7 @@ Viktig bughistorikk:
   Sjå `f._bgCache` i `serialiserProsjekt()`
 - updateResults() sin verkelege kostnad er layout, ikkje DOM-bygging — sjå
   «Ytelse» før du prøver å optimalisere `createElement`-løkkene
+- Etasje henta inn frå eit anna prosjekt må ta med skalaen sin (ownCal), elles
+  endrar areala seg av seg sjølve. groupId og tekniskeSystem må IKKJE følgje
+  med som dei er — sjå «Kopier etasje mellom prosjekt»
 ```
