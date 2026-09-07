@@ -716,7 +716,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.10.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.0.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -9856,8 +9856,107 @@ function ventSpesLuft(sys,v){
 // same forma opp eller ned i staden for å finne opp ei ny kurve.
 const VENT_EFF_KURVE=[0.79/0.80,0.81/0.80,0.83/0.80,0.81/0.80,0.76/0.80];
 
+// ── Tiltak i SXI-eksporten ───────────────────────────────────
+// Eit <measure> er ein syskin til <zone> som inneheld KOPIAR av dei elementa
+// tiltaket råkar. Kopien har ein ny unik id, ein `measure_id` som peikar på
+// originalen, og éin endra verdi (u-verdi eller n50). Alt anna — areal,
+// retning, konstruksjon — står ord for ord som i originalen; SIMIEN les kopien
+// som «slik blir elementet etter tiltaket». Formatet og verdiane er henta frå
+// referansefila «Heiane 2» (SIMIEN 8.1.1.12), som byggjer på TEK17-krava.
+//
+// Berre dei elementtypane som er stadfesta i referansefila vert kopierte:
+// <facade>, <roof>, <floor>, <window>, <door> og <zone>. Ei sone med himling
+// eller gulv mot ei anna sone ligg som <partition>, og eit kjellargolv som
+// <cellar> — dei vert ståande urørte, og tiltaket melder frå når det gjer at
+// han ikkje fann noko. Ikkje gjett på eit format som ikkje er verifisert;
+// SIMIEN er kresen på feltnamn.
+const SXI_TILTAK=[
+  {key:'fasade',navn:'Etterisolere fasader',tag:'facade',attr:'uvalue',verdi:'0.18',
+   hint:'U 0,18',merk:'ingen ytterveggar (fasadar) i prosjektet'},
+  {key:'tak',   navn:'Etterisolere tak',    tag:'roof',  attr:'uvalue',verdi:'0.13',
+   hint:'U 0,13',merk:'ingen tak mot det fri — himling mot anna sone ligg som partisjon'},
+  {key:'gulv',  navn:'Etterisolere gulv',   tag:'floor', attr:'uvalue',verdi:'0.1',
+   hint:'U 0,10',merk:'ingen gulv på grunn — gulv mot anna sone og kjellar ligg som partisjon/kjellar'},
+  {key:'vindu', navn:'Bytte vindu',         tag:'window',attr:'uvalue',verdi:'0.8',
+   hint:'U 0,80',merk:'ingen vindauge teikna'},
+  {key:'dor',   navn:'Bytte dører',         tag:'door',  attr:'uvalue',verdi:'1.2',
+   hint:'U 1,20',merk:'ingen dører teikna'},
+  {key:'n50',   navn:'Lekkasjetall 1,5',    tag:'zone',  attr:'n50',   verdi:'1.5',
+   hint:'n50 1,5',merk:'ingen soner'},
+];
+
+function _sxiAttrStr(pairs){
+  return pairs.map(([n,v])=>n+'="'+xesc(v)+'"').join(' ');
+}
+
+// zonesXml er nettopp generert av oss, så han er gyldig XML. Vi les han tilbake
+// i staden for å føre eit register gjennom heile sonebygginga — då kan ikkje
+// registeret og fila komme i utakt, og ingen av dei mange `facXml+=`-greinene
+// treng å hugse å melde seg på.
+function buildTiltakXml(zonesXml,valgte,nextId,info){
+  if(!Array.isArray(valgte)||!valgte.length)return {xml:'',ids:[]};
+  const doc=new DOMParser().parseFromString('<r>'+zonesXml+'</r>','application/xml');
+  if(doc.getElementsByTagName('parsererror').length)
+    throw new Error('kunne ikkje lese sonene på nytt for tiltak');
+  const root=doc.documentElement;
+  const bitar=[],ids=[];
+  SXI_TILTAK.forEach(t=>{
+    if(valgte.indexOf(t.key)<0)return;
+    const els=Array.prototype.slice.call(root.getElementsByTagName(t.tag));
+    if(!els.length){ if(info)info.tomme.push(t); return; }
+    const mId=nextId('measure');
+    ids.push(mId);
+    const kopiar=els.map(el=>{
+      const orig=el.getAttribute('id')||'';
+      const nyId=nextId(t.tag);
+      // Attributtane i original rekkjefølgje. id-en står ikkje alltid først
+      // (i <door> ligg han mellom `gate` og `name`), så vi byter verdien på
+      // plassen han står i staden for å fjerne og leggje til på nytt.
+      let pairs=Array.prototype.map.call(el.attributes,a=>[a.name,
+        a.name==='id'?nyId:(a.name===t.attr?t.verdi:a.value)]);
+      if(t.tag==='door'){
+        // Fasadekopiane i tiltaket er tomme, så ei dør må sjølv fortelje kva
+        // fasade ho høyrer til. `postfix` er berre eit lesbart namnetillegg.
+        const fac=el.parentNode,zn=fac&&fac.parentNode;
+        const facId=(fac&&fac.getAttribute&&fac.getAttribute('id'))||'';
+        const facNm=(fac&&fac.getAttribute&&fac.getAttribute('name'))||'';
+        const znNm=(zn&&zn.getAttribute&&zn.getAttribute('name'))||'';
+        pairs=[['measure_id',orig],['parentId',facId],
+               ['postfix','('+znNm+' , '+facNm+')']].concat(pairs);
+      } else if(t.tag==='floor'||t.tag==='window'){
+        const i=pairs.findIndex(p=>p[0]==='id');
+        pairs.splice(i+1,0,['measure_id',orig]);
+      } else {
+        pairs.push(['measure_id',orig]);
+      }
+      return '    <'+t.tag+' '+_sxiAttrStr(pairs)+'></'+t.tag+'>';
+    });
+    bitar.push('  <measure id="'+mId+'" name="'+xesc(t.navn)+'" comment="" status="evaluert"'
+      +' investment="10000" maintenance="0" lifespan="15">\n'+kopiar.join('\n')+'\n  </measure>');
+  });
+  return {xml:bitar.length?bitar.join('\n')+'\n':'',ids};
+}
+
+// Lønnsomhetsvurderinga står som eit <profitsim> heilt til slutt, etter
+// energimerka. Merk at id-PREFIKSET er `profit-evaluation`, ikkje taggnamnet —
+// SIMIEN slår opp elementtype på prefikset (same felle som partition/roof).
+// Verdiane er SIMIEN sine eigne standardverdiar, kopierte frå referansefila;
+// vi finn ikkje opp kalkrente eller inflasjon på brukaren sin vegne.
+function buildProfitsimXml(nextId){
+  return '  <profitsim id="'+nextId('profit-evaluation')+'" name="Lønnsomhetsvurdering 1"'
+    +' comment="" user_defined_lifespan_accepted="no" lifespan_accepted="20.00" language="nb"'
+    +' discount_rate_input="gitt_kalkrente" discount_rate="4.00" equity_rate="20.00"'
+    +' equity_interest="3.00" loan_interest="5.00" tax_interest="20.00" inflation="2.00"'
+    +' energy_inflation="3.00" result_present_value_table="yes"'
+    +' result_present_value_allowance_table="yes" result_payback_table="yes"'
+    +' result_internal_rate_table="yes" result_energy_savings_table="yes"'
+    +' result_saved_amount_table="yes" result_co2_reduction_table="yes"'
+    +' result_input_doc_table="yes" result_input_tables="yes"></profitsim>';
+}
+
 function buildSXI(proj){
   const {prosjektnamn,adresse,klimasted,byggeaar,kommunenr} = proj;
+  const tiltakValgte = Array.isArray(proj.tiltak)?proj.tiltak:[];
   const k=KLIMA[klimasted];
   const today=new Date().toISOString().slice(0,10);
   const sfp=sfpLookup(byggeaar);
@@ -10171,6 +10270,12 @@ ${kjellerXml}${facXml}${takXml}${gulvXml}    <ventilation id="${nextId('cav')}" 
   </zone>\n`;
   });
 
+  // Tiltak (<measure>) — kopiar av dei elementa kvart valt tiltak råkar.
+  // Må byggjast etter sonene (han les dei tilbake) og før energymerket,
+  // som må vite om det finst tiltak å inkludere.
+  const {xml:tiltakXml,ids:tiltakIds}=buildTiltakXml(zonesXml,tiltakValgte,nextId,
+    proj.tiltakInfo||null);
+
   // energymark26 — éin per unik building_type
   const totalBra=logicalZones.reduce((s,{instances})=>s+instances.reduce((ss,lz)=>{const a=getAreaM2(lz);return ss+(a||0);},0),0);
 
@@ -10199,13 +10304,24 @@ ${kjellerXml}${facXml}${takXml}${gulvXml}    <ventilation id="${nextId('cav')}" 
   const emXml=[...byBT.entries()].map(([bt,{zoneIds:emZids,bra:emBra}])=>{
     const emId=nextId('energymark26');
     const emName=`Energimerke ${btShortName(bt)}`;
-    const incl=emZids.map(id=>`    <included_zone id="${id}"></included_zone>`).join('\n');
-    return `  <energymark26 id="${emId}" name="${emName}" comment="" language="nb" units="1" project_type="old_building" building_code="${tek}" built="${byggeaar}" company="Entro AS" company_id="" person="Knut Nedkvitne" personal_id="7b009268-c247-4c34-beb2-d587272fb229" energy_measured="no" infiltration_measured="no" measure_date_n50="${today}" unheated_floor_area="0" tech_check="yes" section_description="" matrikkelenhet_ident="" bygg_ident="" bruksenhet_ident="" adresse_ident="" vegadresse_ident="" lighting_system="normal" ventilation_system="cav" ventilation_input="real" lowered_temperature="no" distr_system_space_heating_detailed="no" distr_system_heating_coil_detailed="no" distr_system_space_cooling_detailed="no" distr_system_cooling_coil_detailed="no" distr_system_tap_water_detailed="no" spp_space_heating_detailed="no" spp_heating_coil_detailed="no" spp_space_cooling_detailed="no" spp_cooling_coil_detailed="no" spp_tap_water_detailed="no" json_file="no" red_factor_lighting="0.70" description_no_measures="" include_measures="no" total_floor_area="${emBra.toFixed(2)}">
+    // Kvart energimerke må sjølv liste tiltaka det skal rekne med. Eit tiltak
+    // dekkjer element frå ALLE soner, så alle tiltaka vert lista i alle
+    // energimerka — det er SIMIEN som plukkar ut dei elementa som høyrer til
+    // sonene i merket.
+    const incl=emZids.map(id=>`    <included_zone id="${id}"></included_zone>`)
+      .concat(tiltakIds.map(id=>
+        `    <included_measures_ids tiltak_id="${id}"></included_measures_ids>`))
+      .join('\n');
+    return `  <energymark26 id="${emId}" name="${emName}" comment="" language="nb" units="1" project_type="old_building" building_code="${tek}" built="${byggeaar}" company="Entro AS" company_id="" person="Knut Nedkvitne" personal_id="7b009268-c247-4c34-beb2-d587272fb229" energy_measured="no" infiltration_measured="no" measure_date_n50="${today}" unheated_floor_area="0" tech_check="yes" section_description="" matrikkelenhet_ident="" bygg_ident="" bruksenhet_ident="" adresse_ident="" vegadresse_ident="" lighting_system="normal" ventilation_system="cav" ventilation_input="real" lowered_temperature="no" distr_system_space_heating_detailed="no" distr_system_heating_coil_detailed="no" distr_system_space_cooling_detailed="no" distr_system_cooling_coil_detailed="no" distr_system_tap_water_detailed="no" spp_space_heating_detailed="no" spp_heating_coil_detailed="no" spp_space_cooling_detailed="no" spp_cooling_coil_detailed="no" spp_tap_water_detailed="no" json_file="no" red_factor_lighting="0.70" description_no_measures="" include_measures="${tiltakXml?'yes':'no'}" total_floor_area="${emBra.toFixed(2)}">
     <measured_energy single_year="no" energy_measure_year1="2023" energy_measure_year2="2024" energy_measure_year3="2025"></measured_energy>
     <building_id id_type="matrikkel" municipality="${klimasted}" municipality_no="${kommunenr}" zip_address="" zip_number="0"></building_id>
 ${incl}
   </energymark26>`;
   }).join('\n');
+
+  // Utan tiltak er det ingenting å vurdere lønnsemda av, og fila skal vere
+  // teikn for teikn som før.
+  const profitXml=tiltakIds.length?'\n'+buildProfitsimXml(nextId):'';
 
   const sxi=`<?xml version="1.0" encoding="utf-8"?>
 <simien_project id="project#1" name="${xesc(prosjektnamn)}" comment="${xesc(adresse)}" person="Knut H. Nedkvitne" user="Knut Nedkvitne" company="Entro AS" version="8.1.0.15">
@@ -10220,7 +10336,7 @@ ${klimaBlock(k,klimasted)}
       <power_step power="20.0" cost="638.0"></power_step>
     </power_steps>
   </global_vars>
-${zonesXml}${emXml}
+${zonesXml}${tiltakXml}${emXml}${profitXml}
 </simien_project>`;
   return sxi;
 }
@@ -10263,6 +10379,14 @@ ${zonesXml}${emXml}
         <input id="sxi_kommunenr" type="text" placeholder="4601" maxlength="6" style="flex:1;padding:8px 11px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:'DM Mono',monospace;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
       </div>
     </div>
+    <div style="margin-top:17px;border-top:1px solid var(--border);padding-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:12px;color:var(--text3);font-weight:600">Tiltak (valfritt)</span>
+        <button type="button" id="sxi_tiltak_alle" style="padding:3px 9px;border:1px solid var(--border2);border-radius:6px;background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;font-size:11px;font-weight:500">Vel alle</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--text3);margin-bottom:10px;line-height:1.6">Kvart valt tiltak vert lagt inn i SIMIEN med alle elementa det r&aring;kar, og u-verdien sett til TEK17-kravet.</div>
+      <div id="sxi_tiltak" style="display:grid;grid-template-columns:1fr 1fr;gap:7px 14px"></div>
+    </div>
     <div id="sxi_err" style="display:none;background:#fef0ef;border:1px solid #f2b8b5;border-radius:7px;padding:9px 12px;font-size:12px;color:#c0302a;margin-top:14px"></div>
     <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:20px">
       <button id="sxi_cancel" style="padding:9px 18px;border:1px solid var(--border2);border-radius:8px;background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:500">Avbryt</button>
@@ -10270,6 +10394,43 @@ ${zonesXml}${emXml}
     </div>
   </div>`;
   document.body.appendChild(dlg);
+
+  // Tiltaka kjem frå SXI_TILTAK, så lista i dialogen og lista i eksporten
+  // aldri kan komme i utakt. Alle er av som standard — eit tiltak endrar
+  // energimerket, så det skal vere eit val brukaren tek.
+  (function(){
+    const box=document.getElementById('sxi_tiltak');
+    SXI_TILTAK.forEach(t=>{
+      const l=document.createElement('label');
+      l.style.cssText='display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);cursor:pointer;user-select:none';
+      const cb=document.createElement('input');
+      cb.type='checkbox';cb.dataset.tiltak=t.key;
+      cb.style.cssText='cursor:pointer;accent-color:var(--accent);margin:0;flex-shrink:0';
+      const sp=document.createElement('span');
+      sp.textContent=t.navn;
+      sp.style.cssText='overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+      sp.title=t.navn+' — '+t.hint;
+      const hi=document.createElement('span');
+      hi.textContent=t.hint;
+      hi.style.cssText="font-family:'DM Mono',monospace;font-size:10.5px;color:var(--text3);flex-shrink:0";
+      l.appendChild(cb);l.appendChild(sp);l.appendChild(hi);
+      box.appendChild(l);
+    });
+    // Merkelappen på knappen må følgje avkryssingane, ikkje berre eigne klikk —
+    // elles står det «Vel alle» medan alle er valde, og klikket fjernar dei.
+    const alleBtn=document.getElementById('sxi_tiltak_alle');
+    const syncAlle=()=>{
+      const cbs=[...box.querySelectorAll('input[data-tiltak]')];
+      alleBtn.textContent=cbs.every(c=>c.checked)?'Fjern alle':'Vel alle';
+    };
+    box.addEventListener('change',syncAlle);
+    alleBtn.onclick=()=>{
+      const cbs=[...box.querySelectorAll('input[data-tiltak]')];
+      const paa=cbs.every(c=>c.checked);
+      cbs.forEach(c=>{c.checked=!paa;});
+      syncAlle();
+    };
+  })();
 
   // Auto-fill kommunenr when klimasted changes
   document.getElementById('sxi_klima').addEventListener('change',function(){
@@ -10314,11 +10475,22 @@ ${zonesXml}${emXml}
     if(uncalFloors.length)errs.push('Skalaen er ikkje kalibrert ('+uncalFloors.map(f=>f.name).join(', ')+') — kalibrer før eksport.');
     if(errs.length){errEl.textContent=errs.join(' ');errEl.style.display='block';return;}
     errEl.style.display='none';
+    const tiltak=[...document.querySelectorAll('#sxi_tiltak input[data-tiltak]:checked')]
+      .map(i=>i.dataset.tiltak);
+    const tiltakInfo={tomme:[]};
     let sxi;
     try{
-      sxi=buildSXI({prosjektnamn:namn,adresse,klimasted,byggeaar:parseInt(byggeaar),kommunenr});
+      sxi=buildSXI({prosjektnamn:namn,adresse,klimasted,byggeaar:parseInt(byggeaar),kommunenr,
+        tiltak,tiltakInfo});
     }catch(e){
       errEl.textContent='Feil ved generering: '+e.message;errEl.style.display='block';return;
+    }
+    // Eit valt tiltak som ikkje fann eitt einaste element vert ikkje lagt inn.
+    // Sil aldri i stillheit — då ville brukaren tru tiltaket var med i fila.
+    if(tiltakInfo.tomme.length){
+      const liste=tiltakInfo.tomme.map(t=>'• '+t.navn+' — '+t.merk).join('\n');
+      if(!confirm('Desse tiltaka fann ingen element og vert ikkje lagde inn:\n\n'
+        +liste+'\n\nLast ned SXI-fila likevel?'))return;
     }
     // Download
     const blob=new Blob([sxi],{type:'application/xml'});

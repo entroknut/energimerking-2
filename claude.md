@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 3.10.0 | Single-file HTML applikasjon
+**Versjon:** 4.0.0 | Single-file HTML applikasjon
 
 ---
 
@@ -393,6 +393,73 @@ Siste slot MÅ vere `2345-0000`, IKKJE `2345-2400`. Feil her gjer at SIMIEN ikkj
 
 ---
 
+### Tiltak (`<measure>`)
+
+Seks tiltak kan veljast i eksportdialogen. Eit `<measure>` er ein **syskin til
+`<zone>`** som inneheld KOPIAR av dei elementa tiltaket råkar. Kopien har ein ny
+unik id, ein `measure_id` som peikar på originalen, og éin endra verdi. Alt anna
+— areal, retning, konstruksjon — står ord for ord som i originalen. Kjelde:
+`_Copy_Heiane 2` (SIMIEN 8.1.1.12), som byggjer på TEK17-krava.
+
+| Tiltak | Element | Verdi |
+|---|---|---|
+| Etterisolere fasader | `<facade>` | `uvalue="0.18"` |
+| Etterisolere tak | `<roof>` | `uvalue="0.13"` |
+| Etterisolere gulv | `<floor>` | `uvalue="0.1"` |
+| Bytte vindu | `<window>` | `uvalue="0.8"` |
+| Bytte dører | `<door>` | `uvalue="1.2"` |
+| Lekkasjetall 1,5 | `<zone>` | `n50="1.5"` |
+
+Lista er **éin** konstant, `SXI_TILTAK`, som både dialogen og eksporten les —
+dei kan ikkje komme i utakt.
+
+`buildTiltakXml()` **les zonesXml tilbake med DOMParser** i staden for å føre
+eit register gjennom sonebygginga. Det er med vilje: `facXml+=`-greinene er
+mange (samanslegne YV-grupper, gavlflater, kjellervegg-hopp, kopla soner over
+fleire etasjar), og eit register ville før eller seinare mista ei av dei. Fila
+er nettopp generert av oss, så ho er gyldig XML.
+
+Invariantar:
+
+- **Kopiane har ingen born.** Fasadekopien tek ikkje med vindauga sine — difor
+  ber dørkopien `parentId` (fasade-id) og `postfix="(Sonenamn , Fasadenamn)"`
+  slik SIMIEN skriv dei. Vindaugskopiane har det **ikkje**; det er asymmetrisk
+  i referansefila, og vi speglar referansefila.
+- **Attributtrekkjefølgja er ulik per tag** og er kopiert frå referansefila:
+  `measure_id` sist på `facade`/`roof`/`zone`, rett etter `id` på
+  `floor`/`window`, og heilt først på `door` (der `id`-en dessutan står midt i
+  lista, mellom `gate` og `name`). Difor byter vi verdien på den plassen
+  `id` faktisk står, i staden for å fjerne og leggje til på nytt.
+- **Berre verifiserte elementtypar vert kopierte.** Ei sone med himling eller
+  gulv mot ei anna sone ligg som `<partition>`, og eit kjellargolv som
+  `<cellar>` — dei står urørte. Eit valt tiltak som ikkje fann eitt einaste
+  element vert **ikkje** lagt inn, og brukaren får ein `confirm()` som seier
+  kva som mangla og kvifor. Aldri sil i stillheit.
+- **Tre ting utanfor sjølve `<measure>` må følgje med**, elles reknar SIMIEN
+  ikkje på tiltaka:
+  1. `include_measures="yes"` i `<energymark26>`.
+  2. Eitt `<included_measures_ids tiltak_id="measure#N">` per tiltak, inne i
+     kvart `<energymark26>`, etter `<included_zone>`. Attributtet heiter
+     `tiltak_id` (norsk), ikkje `measure_id`.
+  3. Eitt `<profitsim>` (lønnsemdvurdering) på slutten av fila.
+     `buildProfitsimXml()`. **id-prefikset er `profit-evaluation`, ikkje
+     taggnamnet** — SIMIEN slår opp elementtype på prefikset, same felle som
+     `partition`/`roof`. Verdiane (kalkrente 4 %, inflasjon 2 %, levetid 20 år
+     …) er SIMIEN sine eigne standardverdiar frå referansefila; vi finn dei
+     ikkje opp for brukaren.
+  Difor må tiltaka byggjast **før** energimerket (og etter sonene), og
+  `buildTiltakXml()` returnerer `{xml, ids}` — id-ane treng energimerket.
+- Rekkjefølgja i fila er `zone*`, `measure*`, `energymark26*`, `profitsim`.
+- Eit tiltak dekkjer element frå **alle** soner, så alle tiltaka vert lista i
+  **alle** energimerka når prosjektet har fleire bygningskategoriar. Det er
+  SIMIEN som plukkar ut dei elementa som høyrer til sonene i kvart merke.
+  Det finst berre **eitt** `<profitsim>` uansett kor mange energimerke.
+- **Utan valde tiltak er fila teikn for teikn den same som før** — `tiltakXml`
+  og `profitXml` er tomme strengar, `include_measures="no"`, ingen
+  `included_measures_ids`.
+- Valet er per eksport og vert **ikkje** lagra — det slepp den femdelte
+  lagringsregelen.
+
 ## Kopling av soner (groupId)
 
 - `groupId` er ein string (`'g1'`, `'g2'` osv.)
@@ -680,4 +747,10 @@ Viktig bughistorikk:
 - Etasje henta inn frå eit anna prosjekt må ta med skalaen sin (ownCal), elles
   endrar areala seg av seg sjølve. groupId og tekniskeSystem må IKKJE følgje
   med som dei er — sjå «Kopier etasje mellom prosjekt»
+- Tiltak (<measure>) les zonesXml tilbake med DOMParser i staden for eit
+  register. Kopiane har ingen born, og attributtrekkjefølgja er ulik per tag —
+  sjå «Tiltak (<measure>)». <partition>/<cellar> vert ikkje råka; eit tomt
+  tiltak skal meldast, aldri silast bort i stillheit
+- Tiltak utan included_measures_ids + <profitsim> blir ståande urekna i SIMIEN.
+  profitsim har id-prefiks `profit-evaluation`, ikkje taggnamnet
 ```
