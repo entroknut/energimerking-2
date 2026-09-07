@@ -67,6 +67,11 @@ teikningane har ulik målestokk.
 **Fleire etasjar**
 - `+ Etasje` legg til ei ny etasje med eiga teikning og eiga etasjehøgd.
 - Etasjen under blir vist som ghost, og kan forskyvast til å ligge rett.
+- Høgreklikk på ei etasjefane kopierer heile etasjen — teikning, kalibrering,
+  soner, vindauge og mål — og `+ Etasje` limer han inn i eit **anna prosjekt**.
+  Klippbordet ligg i nettlesaren, så det held seg frå bygg til bygg i EntroPi.
+  Mellom to maskiner går det gjennom `.entro`-fila: «Hent etasje frå
+  prosjektfil». Etasjen tek med skalaen sin, så areala blir dei same.
 
 **Visualisering**
 - `⬡ 3D` byggjer ein 3D-modell av bygget, stakka etter etasjehøgdene, med
@@ -127,6 +132,7 @@ Trykk `?` i programmet for same oversikt.
 | `Ctrl+C` over vindauge/dør | Kopier vindauget/døra |
 | `Ctrl+V` over sone | Lim inn sone på aktiv etasje |
 | `Ctrl+V` over fasade | Lim inn vindauge/dør på fasaden |
+| Høgreklikk på etasjefane | Kopier etasjen, eller hent ein frå eit anna prosjekt |
 
 **Navigering**
 
@@ -192,7 +198,6 @@ Mapbox-tokenen i kjeldekoden er ein offentleg `pk.`-token, som Mapbox er meint
 - Validering av overlappande soner
 - Snap til skrå veggar
 - PDF-rapport og eksport til rekneark
-- Kopiering av ei heil etasje (må gjerast sone for sone)
 - Offline-modus
 
 ## Utvikling

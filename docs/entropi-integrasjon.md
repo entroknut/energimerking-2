@@ -643,8 +643,23 @@ undertrykt når verten sender eit prosjekt, og at `?silent=1` framleis lastar ne
 - `serialiserProsjekt(opts)` og `lastProsjekt(proj, opts)` er nye delte
   funksjonar. Manuell `.entro`-lagring, autolagringa til localStorage og brua
   brukar alle desse — dei tre kopiane av serialiseringskoden er borte.
-  **Nye felt som skal overleve, skal no leggjast til i `serialiserProsjekt`,
-  `lastProsjekt`, `snapshot()`, `applyHistoryState()` og `getCurrentState()`.**
+  Kvar av dei går gjennom `serialiserEtasje(f, opts)` /
+  `deserialiserEtasje(f)` per etasje, som etasje-klippbordet òg brukar.
+  **Nye felt som skal overleve, skal no leggjast til i `serialiserEtasje`,
+  `deserialiserEtasje`, `snapshot()`, `applyHistoryState()` og
+  `getCurrentState()`** (prosjektnivå-felt i `serialiserProsjekt`/`lastProsjekt`).
+- `.entro`-fila og lokalkopien er stempla med `_eigar {kjelde, byggId,
+  byggNamn}` frå `_autolagringEigar()`. Stempelet er den einaste måten
+  etasje-importen kan sjå om tekniske system i fila framleis peikar på det
+  bygget vi står på — er byggId ein annan (eller ukjend), vert dei tekniske
+  systema tekne bort ved import, og brukaren får det opp.
+- **Kopier etasje mellom prosjekt** (`// ── 2a.`) er ny. Klippbordet ligg i
+  IndexedDB (`sxiEtasjeKlipp`) på vårt origin, ikkje i localStorage: bakgrunnen
+  går som PNG-Blob, så ei PDF-side på 48 Mpx både får plass og held
+  strekkvaliteten. Nettlesaren partisjonerer lageret på **toppnivå-sida**
+  (EntroPi), ikkje på iframe-URL-en, så same klippbordet gjeld frå bygg til
+  bygg. Blir lageret blokkert, seier meldinga frå og peikar på
+  «Hent etasje frå prosjektfil» — verten treng ikkje gjere noko.
 - Brua ligg i `index.html` under `// ── 2b. EntroPi-bru`. Utanfor ein iframe er
   ho heilt passiv.
 - Lagreknappen sender til verten i innbygd modus, og viser «Lagre på bygget»

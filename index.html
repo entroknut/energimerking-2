@@ -704,7 +704,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
   <div id="floor-wrap" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-width:0">
   <div id="floor-tabs-bar">
     <div id="floor-tabs"></div>
-    <button id="addFloorBtn" class="add-floor-btn" title="Legg til ny etasje — drag fanane for å endre rekkjefølge">+ Etasje</button>
+    <button id="addFloorBtn" class="add-floor-btn" title="Legg til ny etasje, eller hent ein inn frå eit anna prosjekt — drag fanane for å endre rekkjefølge">+ Etasje</button>
     <div id="ghostWidget" style="display:none;align-items:center;gap:0;margin-left:8px;flex-shrink:0;border:1px solid var(--border2);border-radius:7px;overflow:hidden;background:var(--surface2)">
       <button id="ghostBtn" title="Vis nabeetasje som ghost for justering av forskyving" style="font-size:11px;padding:4px 10px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px;border-right:1px solid var(--border2)">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v11M1 6.5h5.5" stroke="currentColor" stroke-width="1.2" opacity=".5"/><circle cx="6.5" cy="6.5" r="2.5" fill="currentColor" opacity=".25"/></svg>
@@ -716,7 +716,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.9.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v3.10.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -1225,6 +1225,7 @@ function renderFloorTabs(){
   floors.forEach((f,fi)=>{
     const tab=document.createElement('button');
     tab.className='floor-tab'+(fi===activeFloor?' active':'');
+    tab.title='Høgreklikk: kopier etasjen, eller hent ein inn frå eit anna prosjekt';
     tab.draggable=true;
     tab.style.cssText+='cursor:grab;';
 
@@ -1268,6 +1269,11 @@ function renderFloorTabs(){
     // Prevent drag from starting on the text
     nameEl.addEventListener('mousedown',e=>e.stopPropagation());
     tab.onclick=(e)=>{if(e.target===nameEl&&fi===activeFloor)return;if(fi!==activeFloor)switchFloor(fi);};
+    // Høgreklikk: kopier etasjen, eller hent ein inn frå eit anna prosjekt
+    tab.oncontextmenu=e=>{
+      e.preventDefault();e.stopPropagation();
+      showFloorContextMenu(e.clientX,e.clientY,floors[fi]);
+    };
 
     const badge=document.createElement('span');
     badge.className='floor-tab-badge';
@@ -1312,8 +1318,12 @@ function switchFloor(fi){
 
 document.getElementById('addFloorBtn').onclick=async()=>{
   // Show a small menu: blank floor, copy from PDF page, copy from file
-  const choice=await showAddFloorMenu();
+  const choice=await showAddFloorMenu(await klippbordInfo());
   if(!choice)return;
+  // Å hente ein etasje frå eit anna prosjekt byggjer ikkje ein tom etasje —
+  // importerEtasjar() eig heile innsetjinga (og angre-steget).
+  if(choice==='clip'){await limInnEtasjeFraKlippbord();return;}
+  if(choice==='from-file'){await hentEtasjeFraFil();return;}
   saveFloorState();
   // Inherit calibration from current floor
   const newFloor={
@@ -1416,8 +1426,10 @@ document.addEventListener('keydown',e=>{
 },{capture:false});
 
 
-function showAddFloorMenu(){
+function showAddFloorMenu(klipp){
   return new Promise(resolve=>{
+    // Etasjenamn og byggnamn er brukar-/vertsstyrt tekst, og går inn i innerHTML
+    const hesc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const overlay=document.createElement('div');
     overlay.style.cssText='position:fixed;inset:0;background:rgba(13,27,42,.4);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
     const box=document.createElement('div');
@@ -1427,14 +1439,20 @@ function showAddFloorMenu(){
       {key:'blank',icon:'⬡',label:'Tom etasje','desc':'Last opp teikning seinare'},
       {key:'file',icon:'↑',label:'Last opp fil','desc':'PDF eller bilete for ny etasje'},
       {key:'pdf-page',icon:'⊕',label:'Neste side i same PDF','desc':pdfDoc?`Side ${curPage+1} av ${totalPages}`:'Ingen PDF lasta'},
+      {key:'clip',icon:'⧈',label:'Lim inn kopiert etasje',
+        'desc':klipp?('«'+klipp.namn+'» · '+klipp.soner+' soner'
+                      +(klipp.kjelde?' · '+klipp.kjelde:'')+(klipp.alder?' · '+klipp.alder:''))
+                    :'Klippbordet er tomt'},
+      {key:'from-file',icon:'↧',label:'Hent etasje frå prosjektfil','desc':'Vel ei .entro-fil og plukk etasje'},
     ];
     opts.forEach(o=>{
       const btn=document.createElement('button');
       btn.style.cssText='width:100%;display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;text-align:left;margin-bottom:8px;font-family:inherit;transition:all .12s';
-      btn.innerHTML=`<span style="font-size:20px;width:28px;text-align:center">${o.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--text)">${o.label}</div><div style="font-size:11.5px;color:var(--text3);margin-top:1px">${o.desc}</div></div>`;
+      btn.innerHTML=`<span style="font-size:20px;width:28px;text-align:center">${o.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--text)">${hesc(o.label)}</div><div style="font-size:11.5px;color:var(--text3);margin-top:1px">${hesc(o.desc)}</div></div>`;
       btn.onmouseenter=()=>{btn.style.borderColor='var(--accent)';btn.style.background='var(--accent-dim)';};
       btn.onmouseleave=()=>{btn.style.borderColor='var(--border)';btn.style.background='#fff';};
-      if(o.key==='pdf-page'&&(!pdfDoc||curPage>=totalPages))btn.style.opacity='.4',btn.style.cursor='default',btn.onclick=null;
+      const av=(o.key==='pdf-page'&&(!pdfDoc||curPage>=totalPages))||(o.key==='clip'&&!klipp);
+      if(av)btn.style.opacity='.4',btn.style.cursor='default',btn.onclick=null;
       else btn.onclick=()=>{document.body.removeChild(overlay);resolve(o.key);};
       box.appendChild(btn);
     });
@@ -6303,7 +6321,22 @@ function pointInPolygon(pt,pts){
   return inside;
 }
 
-// ── Sone kontekstmeny ─────────────────────────────────────────
+// ── Kontekstmenyar ────────────────────────────────────────────
+// Stilen vert lagd inn ved fyrste meny, uansett kva meny det er — både
+// sonemenyen og etasjemenyen brukar desse klassene.
+function _ensureCtxStyle(){
+  if(document.getElementById('ctx-style'))return;
+  const s=document.createElement('style');
+  s.id='ctx-style';
+  s.textContent=`@keyframes ctxIn{from{opacity:0;transform:scale(.95) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
+  .ctx-menu-item{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:12.5px;cursor:pointer;color:var(--text2);transition:background .1s;border:none;background:none;width:100%;text-align:left;font-family:inherit}
+  .ctx-menu-item:hover{background:var(--surface2);color:var(--text)}
+  .ctx-menu-item.danger:hover{background:var(--red-dim);color:var(--red)}
+  .ctx-menu-sep{height:1px;background:var(--border);margin:3px 0}
+  .ctx-menu-header{padding:7px 14px 4px;font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}`;
+  document.head.appendChild(s);
+}
+
 function showZoneContextMenu(clientX,clientY,z,zi,f,fi){
   // Remove any existing context menus
   document.querySelectorAll('.ctx-menu').forEach(m=>m.remove());
@@ -6316,18 +6349,7 @@ function showZoneContextMenu(clientX,clientY,z,zi,f,fi){
     z-index:600;min-width:200px;overflow:hidden;font-family:inherit;
     animation:ctxIn .12s ease`;
 
-  // Inject animation if not present
-  if(!document.getElementById('ctx-style')){
-    const s=document.createElement('style');
-    s.id='ctx-style';
-    s.textContent=`@keyframes ctxIn{from{opacity:0;transform:scale(.95) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
-    .ctx-menu-item{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:12.5px;cursor:pointer;color:var(--text2);transition:background .1s;border:none;background:none;width:100%;text-align:left;font-family:inherit}
-    .ctx-menu-item:hover{background:var(--surface2);color:var(--text)}
-    .ctx-menu-item.danger:hover{background:var(--red-dim);color:var(--red)}
-    .ctx-menu-sep{height:1px;background:var(--border);margin:3px 0}
-    .ctx-menu-header{padding:7px 14px 4px;font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}`;
-    document.head.appendChild(s);
-  }
+  _ensureCtxStyle();
 
   const mkItem=(icon,label,action,cls='')=>{
     const btn=document.createElement('button');
@@ -7273,83 +7295,102 @@ const AUTOSAVE_KEY='sxi_generator_autosave';
 const AUTOSAVE_INTERVAL=60000; // 1 min
 
 // ── Prosjekt-serialisering (delt) ────────────────────────────
-// Manuell lagring (.entro), autolagringa til localStorage og EntroPi-brua
-// brukar alle desse to funksjonane, slik at dei tre aldri kjem i utakt om
-// eit nytt felt kjem til. bgImg kan ikkje serialiserast direkte og vert lagra
-// som dataURL; pdfDoc vert hoppa over (brukaren lastar opp PDF-en på nytt).
-function serialiserProsjekt(opts){
+// Manuell lagring (.entro), autolagringa til localStorage, EntroPi-brua og
+// etasje-klippbordet går alle gjennom dei fire funksjonane her, slik at dei
+// aldri kjem i utakt om eit nytt felt kjem til. bgImg kan ikkje serialiserast
+// direkte og vert lagra som dataURL (eller Blob, for klippbordet); pdfDoc vert
+// hoppa over (brukaren lastar opp PDF-en på nytt).
+
+// Éin etasje ut av prosjektet. Prosjektlagringa og etasje-klippbordet brukar
+// same funksjonen, så eit nytt felt ikkje kan bli med i den eine og gløymast i
+// den andre. opts.mime/qual styrer enkodinga av bakgrunnen; opts.utanBilete
+// hoppar over biletet heilt — klippbordet legg det ved som Blob i staden.
+function serialiserEtasje(f,opts){
   const o=opts||{};
   const mime=o.mime||'image/png';
-  saveFloorState();
-  const serFloors=floors.map(f=>{
-    const obj={
-      id:f.id,name:f.name,
-      mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-      sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
-      pdfPage:f.pdfPage,totalPages:f.totalPages,
-      paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-      measurements:normMaal(f.measurements),
-      zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]}))
-    };
-    if(f.bgImg){
-      // Enkodinga er det dyre her: ei PDF-side på ~48 Mpx tek rundt 0,7 s i
-      // toDataURL, og han blokkerer hovudtråden. Bakgrunnen endrar seg berre
-      // når brukaren lastar opp ei ny fil eller byter PDF-side, medan
-      // autolagringa går kvart minutt så lenge noko som helst er endra — utan
-      // mellomlagring betalte vi altså full enkoding for kvar sonejustering.
-      // Nøkkelen inneheld sjølve biletobjektet, så eit nytt bilete gir bom av
-      // seg sjølv. Éin plass per etasje, så minnebruken er den same som den
-      // strengen vi uansett måtte lage.
-      const nokkel=mime+'|'+(o.qual!=null?o.qual:'');
-      const buf=f._bgCache;
-      if(buf&&buf.img===f.bgImg&&buf.nokkel===nokkel){
-        obj.bgImgData=buf.data;
-      } else {
-        try{
-          const tmp=document.createElement('canvas');
-          tmp.width=f.bgImg.width;tmp.height=f.bgImg.height;
-          tmp.getContext('2d').drawImage(f.bgImg,0,0);
-          obj.bgImgData=o.qual!=null?tmp.toDataURL(mime,o.qual):tmp.toDataURL(mime);
-          f._bgCache={img:f.bgImg,nokkel,data:obj.bgImgData};
-        }catch(e){/* tainted canvas — hopp over */}
-      }
+  const obj={
+    id:f.id,name:f.name,
+    mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
+    sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
+    pdfPage:f.pdfPage,totalPages:f.totalPages,
+    paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
+    measurements:normMaal(f.measurements),
+    zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]}))
+  };
+  if(f.bgImg&&!o.utanBilete){
+    // Enkodinga er det dyre her: ei PDF-side på ~48 Mpx tek rundt 0,7 s i
+    // toDataURL, og han blokkerer hovudtråden. Bakgrunnen endrar seg berre
+    // når brukaren lastar opp ei ny fil eller byter PDF-side, medan
+    // autolagringa går kvart minutt så lenge noko som helst er endra — utan
+    // mellomlagring betalte vi altså full enkoding for kvar sonejustering.
+    // Nøkkelen inneheld sjølve biletobjektet, så eit nytt bilete gir bom av
+    // seg sjølv. Éin plass per etasje, så minnebruken er den same som den
+    // strengen vi uansett måtte lage.
+    const nokkel=mime+'|'+(o.qual!=null?o.qual:'');
+    const buf=f._bgCache;
+    if(buf&&buf.img===f.bgImg&&buf.nokkel===nokkel){
+      obj.bgImgData=buf.data;
+    } else {
+      try{
+        const tmp=document.createElement('canvas');
+        tmp.width=f.bgImg.width;tmp.height=f.bgImg.height;
+        tmp.getContext('2d').drawImage(f.bgImg,0,0);
+        obj.bgImgData=o.qual!=null?tmp.toDataURL(mime,o.qual):tmp.toDataURL(mime);
+        f._bgCache={img:f.bgImg,nokkel,data:obj.bgImgData};
+      }catch(e){/* tainted canvas — hopp over */}
     }
-    return obj;
-  });
+  }
+  return obj;
+}
+
+function serialiserProsjekt(opts){
+  saveFloorState();
+  const serFloors=floors.map(f=>serialiserEtasje(f,opts));
   return {version:1,savedAt:new Date().toISOString(),activeFloor,globalNorth,globalMmPerImgPx,
-    prosjektAdresse,_nextFloorId,_nextGroupId,_nextZoneId,floors:serFloors};
+    prosjektAdresse,_nextFloorId,_nextGroupId,_nextZoneId,
+    // Kva bygg fila kjem frå. Stemplar lokalkopien (sjå _autolagringEigar), og
+    // lèt etasje-importen sjå om tekniske system framleis peikar på rett bygg.
+    _eigar:_autolagringEigar(),
+    floors:serFloors};
 }
 
 // Byggjer heile tilstanden opp att frå eit serialisert prosjekt.
 // opts.fit=true → zoom til biletet (som ved opning av fil); elles vert lagra
 // zoom/pan frå prosjektet ståande (som ved gjenoppretting av autolagring).
+// Éin serialisert etasje tilbake til eit etasjeobjekt. Bakgrunnen kjem anten
+// som dataURL (prosjektfila) eller som Blob (klippbordet) — begge endar i eit
+// vanleg Image, slik at resten av koden ikkje ser skilnad.
+async function deserialiserEtasje(f){
+  const floor={
+    id:f.id,name:f.name,
+    mmPerImgPx:f.mmPerImgPx??null,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
+    // floorDxImg er biletpikslar. Gamle filer har floorDx i skjermpikslar — migrer via sc.
+    floorDxImg:f.floorDxImg!=null?f.floorDxImg:(f.floorDx||0)/(f.sc||1),
+    floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
+    sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
+    pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
+    paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
+    pdfDoc:null,bgImg:null,
+    measurements:normMaal(f.measurements),
+    zones:(f.zones||[]).map(z=>{const nz={...z,skillevegg:new Set(z.skillevegg||[])};sanitizeZoneSegRefs(nz);return nz;})
+  };
+  const kilde=f.bgImgData||(f.bgBlob?URL.createObjectURL(f.bgBlob):null);
+  if(kilde){
+    await new Promise(res=>{
+      const img=new Image();
+      img.onload=()=>{floor.bgImg=img;res();};
+      img.onerror=()=>res();
+      img.src=kilde;
+    });
+    if(f.bgBlob)URL.revokeObjectURL(kilde);
+  }
+  return floor;
+}
+
 async function lastProsjekt(proj,opts){
   const o=opts||{};
   if(!proj||!Array.isArray(proj.floors))throw new Error('Ugyldig prosjektfil.');
-  const newFloors=await Promise.all(proj.floors.map(async f=>{
-    const floor={
-      id:f.id,name:f.name,
-      mmPerImgPx:f.mmPerImgPx??null,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-      // floorDxImg er biletpikslar. Gamle filer har floorDx i skjermpikslar — migrer via sc.
-      floorDxImg:f.floorDxImg!=null?f.floorDxImg:(f.floorDx||0)/(f.sc||1),
-      floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
-      sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
-      pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
-      paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-      pdfDoc:null,bgImg:null,
-      measurements:normMaal(f.measurements),
-      zones:(f.zones||[]).map(z=>{const nz={...z,skillevegg:new Set(z.skillevegg||[])};sanitizeZoneSegRefs(nz);return nz;})
-    };
-    if(f.bgImgData){
-      await new Promise(res=>{
-        const img=new Image();
-        img.onload=()=>{floor.bgImg=img;res();};
-        img.onerror=()=>res();
-        img.src=f.bgImgData;
-      });
-    }
-    return floor;
-  }));
+  const newFloors=await Promise.all(proj.floors.map(f=>deserialiserEtasje(f)));
   floors=newFloors;
   activeFloor=Math.min(proj.activeFloor??0,floors.length-1);
   globalNorth=proj.globalNorth??0;
@@ -7397,8 +7438,8 @@ function slettAutolagring(){
 function autosave(){
   try{
     // JPEG 85 % — autolagringa må vere liten nok til localStorage
+    // _eigar-stempelet kjem frå serialiserProsjekt — sjå _autolagringEigar
     const proj=serialiserProsjekt({mime:'image/jpeg',qual:0.85});
-    proj._eigar=_autolagringEigar();
     localStorage.setItem(AUTOSAVE_KEY,JSON.stringify(proj));
     markClean(); // elles re-enkodar autolagringa alle bileta kvart minutt for alltid
   }catch(e){/* localStorage full */}
@@ -7517,6 +7558,369 @@ setTimeout(()=>{
 // Brua vert definert lenger ned i fila, så «er vi i ein iframe» vert rekna
 // direkte her — window.EntroHost finst ikkje enno på dette tidspunktet.
 },(window.parent&&window.parent!==window)||window.opener?1500:300);
+
+// ── 2a. Kopier etasje mellom prosjekt ────────────────────────
+// Ein heil etasje — bakgrunnsteikning, kalibrering, soner, vindauge, mål — kan
+// hentast frå eitt prosjekt inn i eit anna. Inne i EntroPi ligg prosjekta på
+// kvart sitt bygg og kan ikkje vere opne samstundes, så det må gå gjennom eit
+// lager som lever mellom to sideopningar. Difor to vegar, som begge endar i
+// importerEtasjar():
+//
+//   Klippbord    IndexedDB på vårt eige origin: kopier i eitt prosjekt, lim inn
+//                i det neste. Nettlesaren partisjonerer lageret på toppnivå-
+//                sida (EntroPi), ikkje på kvar iframe-URL, så det same
+//                klippbordet gjeld frå bygg til bygg. localStorage duger ikkje:
+//                ei PDF-side på ~48 Mpx sprengjer 5 MB-kvoten, og eit JPEG-
+//                mellomsteg ville blassa ut dei tynne strekane linjesnappinga
+//                leitar etter. IndexedDB tek imot ein PNG-Blob direkte.
+//   Prosjektfil  Vel ei .entro-fil og hent etasjar ut av ho. Einaste vegen
+//                mellom to maskiner eller to nettlesarar — i EntroPi lastar ein
+//                først ned ein .entro-kopi (Ctrl+Shift+S) frå det andre bygget.
+const KLIPP_DB='sxiEtasjeKlipp',KLIPP_STORE='klipp',KLIPP_KEY='etasje';
+
+function _klippDb(){
+  return new Promise((res,rej)=>{
+    if(!window.indexedDB){rej(new Error('IndexedDB er ikkje tilgjengeleg'));return;}
+    let r;
+    try{r=indexedDB.open(KLIPP_DB,1);}catch(e){rej(e);return;}
+    r.onupgradeneeded=()=>{
+      const db=r.result;
+      if(!db.objectStoreNames.contains(KLIPP_STORE))db.createObjectStore(KLIPP_STORE);
+    };
+    r.onsuccess=()=>res(r.result);
+    r.onerror=()=>rej(r.error||new Error('kunne ikkje opne klippbordet'));
+    r.onblocked=()=>rej(new Error('klippbordet er i bruk i ei anna fane'));
+  });
+}
+async function _klippTx(mode,fn){
+  const db=await _klippDb();
+  try{
+    return await new Promise((res,rej)=>{
+      const tx=db.transaction(KLIPP_STORE,mode);
+      const req=fn(tx.objectStore(KLIPP_STORE));
+      tx.oncomplete=()=>res(req?req.result:undefined);
+      tx.onerror=()=>rej(tx.error||new Error('klippbord-feil'));
+      tx.onabort=()=>rej(tx.error||new Error('klippbordet vart avbrote'));
+    });
+  } finally { try{db.close();}catch(e){} }
+}
+const klippSkriv=o=>_klippTx('readwrite',st=>st.put(o,KLIPP_KEY));
+const klippLes=()=>_klippTx('readonly',st=>st.get(KLIPP_KEY));
+const klippSlett=()=>_klippTx('readwrite',st=>st.delete(KLIPP_KEY));
+
+// Namn som ikkje kolliderer med noko som alt finst. Same mønster som
+// uniqueWinName: «Etasje 2» → «Etasje 2 (2)».
+function _unikNamn(namn,tatt){
+  const base=String(namn||'').trim()||'Utan namn';
+  if(!tatt.has(base))return base;
+  const rot=base.replace(/\s*\((\d+)\)$/,'');
+  let n=2;
+  while(tatt.has(rot+' ('+n+')'))n++;
+  return rot+' ('+n+')';
+}
+
+// Kva bygg ein etasje kjem frå, og kva bygg vi står på no. Tekniske system
+// peikar på system-ID-ar PÅ eit bestemt bygg, og ventilasjonstala som ligg
+// lagra på sona går rett inn i SXI-en. Kan vi ikkje stadfeste at det er same
+// bygget, må dei bort — elles ville energimerket blitt rekna med luftmengder
+// frå ein heilt annan bygning.
+function _sameBygg(kjeldeByggId){
+  if(!kjeldeByggId||!inPi())return false;
+  const her=window.EntroHost.byggId();
+  return !!her&&String(her)===String(kjeldeByggId);
+}
+function _tellSystem(serFloors){
+  let n=0;
+  serFloors.forEach(f=>(f.zones||[]).forEach(z=>{
+    if(Array.isArray(z.tekniskeSystem))n+=z.tekniskeSystem.length;
+  }));
+  return n;
+}
+
+// Hentar serialiserte etasjar inn i det opne prosjektet.
+//   meta.globalMpp    den globale kalibreringa i KJELDEprosjektet
+//   meta.globalNorth  nord i kjeldeprosjektet (berre til varsling)
+//   meta.byggId       bygget etasjen vart kopiert frå, '' om ukjent
+// Returnerer eit samandrag til meldinga til brukaren.
+async function importerEtasjar(serFloors,meta){
+  const m=meta||{};
+  if(!serFloors||!serFloors.length)return null;
+  saveFloorState();
+  snapshot();                     // markDirty følgjer med (patcha snapshot)
+
+  const tatteEtg=new Set(floors.map(f=>f.name));
+  const tatteSoner=new Set(floors.flatMap(f=>f.zones.map(z=>z.name)));
+  const beholdSystem=_sameBygg(m.byggId);
+  // Eit heilt tomt startprosjekt skal ikkje sitje att med ei blank «Etasje 1»
+  // framfor den importerte.
+  const tomStart=floors.length===1&&!floors[0].bgImg&&!floors[0].zones.length
+                 &&!(floors[0].measurements||[]).length;
+
+  // groupId er berre meiningsfull innanfor eitt prosjekt. Ei kopling som ligg
+  // heilt inne i importen vert med (under nye id-ar); peikar ho ut av det vi
+  // hentar, fell ho bort — som ved sletting av ei etasje.
+  const gidTal={};
+  serFloors.forEach(f=>(f.zones||[]).forEach(z=>{
+    if(z.groupId)gidTal[z.groupId]=(gidTal[z.groupId]||0)+1;
+  }));
+  const gidNy={};
+
+  let utanSystem=0,egenKal=0;
+  const nye=[];
+  for(const sf of serFloors){
+    const fl=await deserialiserEtasje(sf);
+    fl.id=_nextFloorId++;
+    fl.name=_unikNamn(sf.name,tatteEtg);tatteEtg.add(fl.name);
+    // Kalibreringa som GJALDT for etasjen i kjeldeprosjektet er den einaste som
+    // gir rette mål. Er ho ulik den globale her, må etasjen ha eiga
+    // kalibrering — elles ville alle areala endra seg i det han vart henta inn.
+    const srcMpp=sf.ownCal?sf.mmPerImgPx:(m.globalMpp??sf.mmPerImgPx);
+    if(srcMpp==null){fl.ownCal=false;fl.mmPerImgPx=null;}
+    else if(globalMmPerImgPx!=null&&Math.abs(srcMpp-globalMmPerImgPx)<=1e-9*Math.abs(srcMpp)){
+      fl.ownCal=false;fl.mmPerImgPx=srcMpp;
+    } else {fl.ownCal=true;fl.mmPerImgPx=srcMpp;egenKal++;}
+    fl.zones.forEach(z=>{
+      z.name=_unikNamn(z.name,tatteSoner);tatteSoner.add(z.name);
+      // Heiter sona «Sone 12», må teljaren forbi 12 — elles gir neste nye sone
+      // same namnet.
+      const mn=/^Sone\s+(\d+)$/.exec(z.name);
+      if(mn)_nextZoneId=Math.max(_nextZoneId,+mn[1]);
+      const g=z.groupId;
+      if(g&&gidTal[g]>1)z.groupId=gidNy[g]||(gidNy[g]='g'+(++_nextGroupId));
+      else delete z.groupId;
+      if(!beholdSystem&&Array.isArray(z.tekniskeSystem)&&z.tekniskeSystem.length){
+        utanSystem+=z.tekniskeSystem.length;
+        delete z.tekniskeSystem;
+      }
+    });
+    nye.push(fl);
+  }
+
+  nye.forEach(fl=>floors.push(fl));
+  activeFloor=floors.length-nye.length;
+  if(tomStart){floors.splice(0,1);activeFloor--;}
+  syncFloorState();
+  editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
+  renderFloorTabs();updateResults();renderTable();
+  if(bgImg)fitImage();else draw();
+  return {n:nye.length,namn:nye.map(f=>f.name),utanSystem,egenKal,
+    // Nord er globalt per prosjekt. Var det noko anna i kjeldeprosjektet, står
+    // fasadane no mot andre himmelretningar enn dei gjorde der.
+    nordAvvik:(m.globalNorth!=null&&Math.round(m.globalNorth)!==Math.round(globalNorth))
+              ?Math.round(m.globalNorth):null};
+}
+
+function _meldImport(r,kjelde){
+  if(!r)return;
+  const d=['✓ Henta '+(r.n===1?'«'+r.namn[0]+'»':r.n+' etasjar')+' frå '+kjelde];
+  if(r.egenKal)d.push(r.egenKal===1?'etasjen har eiga kalibrering (annan skala enn den globale her)'
+                                   :r.egenKal+' etasjar har eiga kalibrering');
+  if(r.utanSystem)d.push(r.utanSystem+' tekniske system vart ikkje med (annan bygning)');
+  if(r.nordAvvik!=null)d.push('nord var '+r.nordAvvik+'° i kjeldeprosjektet, '+Math.round(globalNorth)+'° her — sjekk kompasset');
+  hintText.textContent=d.join(' · ');
+}
+
+// ── Klippbordet ──
+async function kopierEtasjeTilKlippbord(f){
+  saveFloorState();   // bgImg/zoom/mål for den aktive etasjen bur i variablane
+  const pakke={
+    v:1,lagraTid:new Date().toISOString(),
+    // Bakgrunnen ligg ved som PNG-Blob i staden for dataURL: klippbordet skal
+    // tåle ei PDF-side på 48 Mpx utan tapt strekkvalitet.
+    etasje:serialiserEtasje(f,{utanBilete:true}),bgBlob:null,
+    globalMpp:globalMmPerImgPx,globalNorth:globalNorth,
+    byggId:(inPi()&&window.EntroHost.byggId())||'',
+    kjelde:(inPi()&&window.EntroHost.byggNamn())||prosjektAdresse||''
+  };
+  if(f.bgImg){
+    pakke.bgBlob=await new Promise(res=>{
+      try{
+        const c=document.createElement('canvas');
+        c.width=f.bgImg.width;c.height=f.bgImg.height;
+        c.getContext('2d').drawImage(f.bgImg,0,0);
+        if(c.toBlob)c.toBlob(b=>res(b),'image/png');else res(null);
+      }catch(e){res(null);}   // tainted canvas — etasjen går utan bilete
+    });
+  }
+  await klippSkriv(pakke);
+  return pakke;
+}
+
+async function limInnEtasjeFraKlippbord(){
+  let p=null;
+  try{p=await klippLes();}
+  catch(e){
+    hintText.textContent='Klippbordet er ikkje tilgjengeleg ('+e.message+') — bruk «Hent etasje frå prosjektfil» i staden.';
+    return;
+  }
+  if(!p||!p.etasje){
+    hintText.textContent='Klippbordet er tomt. Høgreklikk på ei etasjefane i det andre prosjektet og vel «Kopier etasje» først.';
+    return;
+  }
+  const sf={...p.etasje};
+  if(p.bgBlob)sf.bgBlob=p.bgBlob;
+  const r=await importerEtasjar([sf],{globalMpp:p.globalMpp,globalNorth:p.globalNorth,byggId:p.byggId});
+  _meldImport(r,'klippbordet'+(p.kjelde?' ('+p.kjelde+')':''));
+}
+
+// Kva som ligg på klippbordet, til menyteksten. Feil eller tomt lager gir null.
+async function klippbordInfo(){
+  try{
+    const p=await klippLes();
+    if(!p||!p.etasje)return null;
+    const soner=(p.etasje.zones||[]).length;
+    const min=Math.round((Date.now()-new Date(p.lagraTid).getTime())/60000);
+    const alder=!isFinite(min)?'':min<2?'akkurat no':min<60?min+' min sidan':
+                min<1440?Math.round(min/60)+' t sidan':Math.round(min/1440)+' d sidan';
+    return {namn:p.etasje.name||'Etasje',soner,alder,kjelde:p.kjelde||''};
+  }catch(e){return null;}
+}
+
+// ── Frå ei .entro-fil ──
+function _velProsjektfil(){
+  return new Promise(res=>{
+    const inp=document.createElement('input');
+    inp.type='file';inp.accept='.entro,application/json';
+    inp.onchange=()=>res(inp.files[0]||null);
+    inp.click();
+  });
+}
+async function hentEtasjeFraFil(){
+  const file=await _velProsjektfil();
+  if(!file)return;
+  let proj=null;
+  try{proj=JSON.parse(await file.text());}
+  catch(e){alert('Kunne ikkje lese prosjektfila: '+e.message);return;}
+  if(!proj||!Array.isArray(proj.floors)||!proj.floors.length){
+    alert('Fila inneheld ingen etasjar.');return;
+  }
+  const meta={globalMpp:proj.globalMmPerImgPx??null,globalNorth:proj.globalNorth??null,
+    byggId:(proj._eigar&&proj._eigar.byggId)||''};
+  const valde=await velEtasjarDialog(proj.floors,file.name,meta);
+  if(!valde||!valde.length)return;
+  const r=await importerEtasjar(valde.map(i=>proj.floors[i]),meta);
+  _meldImport(r,'«'+file.name+'»');
+}
+
+// Vel kva etasjar som skal hentast. Klikk på ei rad hentar den eine; knappen
+// under hentar alle. Returnerer ei liste med indeksar.
+function velEtasjarDialog(serFloors,filnamn,meta){
+  return new Promise(resolve=>{
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(13,27,42,.4);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+    const box=document.createElement('div');
+    box.style.cssText='background:#fff;border-radius:14px;padding:24px;width:380px;max-height:82vh;overflow:auto;box-shadow:0 12px 40px rgba(13,27,42,.15)';
+    const h=document.createElement('div');
+    h.style.cssText='font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px';
+    h.textContent='Hent etasje frå prosjektfil';
+    const sub=document.createElement('div');
+    sub.style.cssText='font-size:11.5px;color:var(--text3);margin-bottom:16px;word-break:break-all';
+    sub.textContent=filnamn||'';
+    box.appendChild(h);box.appendChild(sub);
+
+    const lukk=svar=>{document.body.removeChild(overlay);resolve(svar);};
+    serFloors.forEach((sf,i)=>{
+      const mpp=sf.ownCal?sf.mmPerImgPx:((meta&&meta.globalMpp)??sf.mmPerImgPx);
+      const zs=sf.zones||[];
+      const areal=zs.reduce((a,z)=>a+(z.areaOverride!=null?z.areaOverride:(calcAreaM2(z.pts||[],mpp)||0)),0);
+      const vindauge=zs.reduce((a,z)=>a+((z.windows||[]).length),0);
+      const detalj=[zs.length+(zs.length===1?' sone':' soner')]
+        .concat(areal>0?[areal.toFixed(1).replace('.',',')+' m²']:[])
+        .concat(vindauge?[vindauge+' vindauge/dør']:[])
+        .concat(sf.bgImgData?[]:['utan teikning']).join(' · ');
+      const btn=document.createElement('button');
+      btn.style.cssText='width:100%;display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;text-align:left;margin-bottom:8px;font-family:inherit;transition:all .12s';
+      btn.innerHTML='<span style="font-size:18px;width:24px;text-align:center">⬓</span><div style="min-width:0"><div style="font-size:13px;font-weight:600;color:var(--text)"></div><div style="font-size:11.5px;color:var(--text3);margin-top:1px"></div></div>';
+      btn.children[1].children[0].textContent=sf.name||('Etasje '+(i+1));
+      btn.children[1].children[1].textContent=detalj;
+      btn.onmouseenter=()=>{btn.style.borderColor='var(--accent)';btn.style.background='var(--accent-dim)';};
+      btn.onmouseleave=()=>{btn.style.borderColor='var(--border)';btn.style.background='#fff';};
+      btn.onclick=()=>lukk([i]);
+      box.appendChild(btn);
+    });
+
+    if(_tellSystem(serFloors)&&!_sameBygg(meta&&meta.byggId)){
+      const adv=document.createElement('div');
+      adv.style.cssText='font-size:11px;color:var(--text3);margin:2px 0 12px;line-height:1.45';
+      adv.textContent='Tekniske system frå EntroPi vert ikkje med — dei høyrer til bygget dei vart henta på.';
+      box.appendChild(adv);
+    }
+    if(serFloors.length>1){
+      const alle=document.createElement('button');
+      alle.textContent='Hent alle '+serFloors.length+' etasjane';
+      alle.style.cssText='width:100%;padding:9px;border:1px solid var(--accent);border-radius:8px;background:var(--accent-dim);color:var(--accent);cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;margin-bottom:8px';
+      alle.onclick=()=>lukk(serFloors.map((_,i)=>i));
+      box.appendChild(alle);
+    }
+    const avbryt=document.createElement('button');
+    avbryt.textContent='Avbryt';
+    avbryt.style.cssText='width:100%;padding:8px;border:1px solid var(--border2);border-radius:8px;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;font-size:13px';
+    avbryt.onclick=()=>lukk(null);
+    box.appendChild(avbryt);
+    overlay.appendChild(box);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)lukk(null);});
+    document.body.appendChild(overlay);
+  });
+}
+
+// ── Kontekstmeny på etasjefana ──
+async function showFloorContextMenu(clientX,clientY,f){
+  document.querySelectorAll('.ctx-menu').forEach(m=>m.remove());
+  _ensureCtxStyle();
+  const info=await klippbordInfo();
+  const menu=document.createElement('div');
+  menu.className='ctx-menu';
+  menu.style.cssText='position:fixed;left:'+clientX+'px;top:'+clientY+'px;'+
+    'background:#fff;border:1px solid var(--border);border-radius:10px;'+
+    'box-shadow:0 8px 30px rgba(13,27,42,.18),0 2px 8px rgba(13,27,42,.1);'+
+    'z-index:600;min-width:240px;overflow:hidden;font-family:inherit;'+
+    'animation:ctxIn .12s ease';
+  const close=()=>{menu.remove();document.removeEventListener('mousedown',utanfor);};
+  const utanfor=ev=>{if(!menu.contains(ev.target))close();};
+  const mkItem=(icon,label,under,action)=>{
+    const btn=document.createElement('button');
+    btn.className='ctx-menu-item';
+    btn.style.alignItems='flex-start';
+    btn.innerHTML='<span style="font-size:14px;width:18px;text-align:center;flex-shrink:0">'+icon+'</span><span></span>';
+    const t=btn.children[1];
+    t.textContent=label;
+    if(under){
+      const u=document.createElement('div');
+      u.style.cssText='font-size:10.5px;color:var(--text3);margin-top:1px;white-space:normal';
+      u.textContent=under;
+      t.appendChild(u);
+    }
+    if(action)btn.onclick=()=>{close();action();};
+    else {btn.style.opacity='.45';btn.style.cursor='default';}
+    return btn;
+  };
+  const hdr=document.createElement('div');
+  hdr.className='ctx-menu-header';
+  hdr.textContent=f.name+' · '+f.zones.length+' soner';
+  menu.appendChild(hdr);
+  const sep=document.createElement('div');sep.className='ctx-menu-sep';menu.appendChild(sep);
+
+  menu.appendChild(mkItem('⧉','Kopier etasje','Til klippbordet — kan hentast inn i eit anna prosjekt',async()=>{
+    hintText.textContent='Kopierer «'+f.name+'»…';
+    try{
+      await kopierEtasjeTilKlippbord(f);
+      hintText.textContent='✓ «'+f.name+'» ligg på klippbordet. Opne det andre prosjektet og vel «+ Etasje» → «Lim inn kopiert etasje».';
+    }catch(e){
+      hintText.textContent='Kunne ikkje kopiere etasjen: '+e.message+' — last ned prosjektet som .entro-fil og hent etasjen derifrå i staden.';
+    }
+  }));
+  menu.appendChild(mkItem('⧈','Lim inn kopiert etasje',
+    info?('«'+info.namn+'», '+info.soner+' soner'+(info.kjelde?' · '+info.kjelde:'')+(info.alder?' · '+info.alder:''))
+        :'Klippbordet er tomt',
+    info?(()=>limInnEtasjeFraKlippbord()):null));
+  menu.appendChild(mkItem('↧','Hent etasje frå prosjektfil…','Vel ei .entro-fil og plukk etasje',()=>hentEtasjeFraFil()));
+
+  document.body.appendChild(menu);
+  const rect=menu.getBoundingClientRect();
+  if(rect.right>window.innerWidth)menu.style.left=Math.max(4,clientX-rect.width)+'px';
+  if(rect.bottom>window.innerHeight)menu.style.top=Math.max(4,clientY-rect.height)+'px';
+  setTimeout(()=>document.addEventListener('mousedown',utanfor),10);
+}
 
 // ── 2b. EntroPi-bru — lagre prosjektet rett på bygget ────────
 // Programmet kan køyre som verktøy i ein iframe inne i EntroPi. Då skal
@@ -8566,6 +8970,7 @@ setTimeout(()=>{
       ['Ctrl+V over sone','Lim inn sone på aktiv etasje'],
       ['Ctrl+V over fasade','Lim inn vindauge/dør på fasaden'],
       ['Høgreklikk på fasade','Lim inn-meny (med noko i utklippstavla)'],
+      ['Høgreklikk på etasjefane','Kopier etasje, eller hent ein frå eit anna prosjekt'],
       ['',''],
       ['Redigering av sone',''],
       ['Dra hjørne','Flytt hjørne'],
