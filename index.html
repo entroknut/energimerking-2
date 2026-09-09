@@ -716,7 +716,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.0.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.0.1</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -1194,7 +1194,8 @@ function syncFloorState(){
   zones=f.zones;
   if(!f.measurements)f.measurements=[];
   measureResults=f.measurements;
-  pdfDoc=f.pdfDoc;curPage=f.pdfPage;totalPages=f.totalPages;
+  pdfDoc=f.pdfDoc;curPage=f.pdfPage||1;totalPages=f.totalPages||1;
+  updatePdfSideUI();
   northI.value=globalNorth;
   const _nl=document.getElementById('northLabel');if(_nl)_nl.textContent=globalNorth+'°';
   // Synkroniser etasjehøgde-feltet med aktiv etasje
@@ -2537,8 +2538,7 @@ async function handleFile(f){
   f2.mmPerImgPx=null;f2.zones=[];
   syncFloorState();
   curPts=[];editZoneIdx=null;draftZones=[];winPts=[];
-  pgctrl.style.display=(result.pdfDoc&&result.totalPages>1)?'flex':'none';
-  pgLbl.textContent='1/'+result.totalPages;
+  updatePdfSideUI();
   renderFloorTabs();updateResults();fitImage();
 }
 function fitImage(){
@@ -2555,13 +2555,26 @@ fi.onchange=async e=>{await handleFile(e.target.files[0]);e.target.value='';};
 dropz.onclick=()=>fi.click();
 cwrap.addEventListener('dragover',e=>e.preventDefault());
 cwrap.addEventListener('drop',async e=>{e.preventDefault();await handleFile(e.dataTransfer.files[0]);});
+// Sidebla-kontrollen høyrer til den AKTIVE etasjen — ein etasje kan ha si eiga
+// PDF (t.d. lasta inn med «+ Etasje → Last opp fil»), og ein annan ingen.
+// Difor er dette den einaste staden som styrer synlegheita, og han vert kalla
+// frå syncFloorState() så etasjebyte, ny etasje, prosjektlasting og
+// etasjeimport alle får han med seg.
+function updatePdfSideUI(){
+  const f=curFloor();
+  const n=f.totalPages||1;
+  pgctrl.style.display=(f.pdfDoc&&n>1)?'flex':'none';
+  pgLbl.textContent=(f.pdfPage||1)+'/'+n;
+}
 async function _byttPdfSide(nyPg){
-  curPage=nyPg;pgLbl.textContent=curPage+'/'+totalPages;
+  curPage=nyPg;
   bgImg=await loadPdfPage(curPage);
   const f=curFloor();
   f.pdfPage=curPage;f.bgImg=bgImg;
   const pm=await pdfSidePapirMm(pdfDoc,curPage);
   if(pm){f.paperWMm=pm.w;f.paperHMm=pm.h;f.paperSource='pdf';}
+  updatePdfSideUI();
+  markDirty();
   fitImage();
 }
 document.getElementById('prevPg').onclick=async()=>{if(!pdfDoc||curPage<=1)return;await _byttPdfSide(curPage-1);};
