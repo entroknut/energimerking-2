@@ -681,6 +681,27 @@ skade om dei blir gjorde feil:
 - Eit heilt tomt startprosjekt («Etasje 1», ingen soner, inga teikning) vert
   fjerna når importen kjem inn.
 
+## Skjulte soner
+
+`z.skjult` tek sona ut av **visinga**: planteikninga (inkludert ghost-laget frå
+naboetasjen), 3D-modellen og kartet. Tabellen, BRA-summane, sonekortet og
+SXI-eksporten er urørte — å skjule er eit visingsval, ikkje ei sletting.
+
+- **Snapping og treff-testing må hoppe over skjulte soner** òg (`unifiedSnap`,
+  `snapToSegment`, `findWindowAtScreen`, hover/Ctrl+C, høgreklikk-oppslaget,
+  arealkalibreringa). Elles snappar eller treff brukaren ei sone han ikkje ser.
+- Ei skjult sone kan ikkje redigerast: `setSkjult()` går ut av edit-modus om
+  sona som vert skjult er den som ligg i `editZoneIdx`.
+- Feltet vert med i lagring og angre av seg sjølv — soner vert serialiserte
+  med spread (`{...z}`) i alle fem stadene. Som dei andre felta i sonekortet
+  lagar toggelen **ikkje** eit eige angre-steg, men han kallar `markDirty()`.
+- UI: auge-ikon i headeren på sonekortet (per sone) og «Skjul alle soner /
+  Vis alle (n skjulte)» i verktøylinja over sonelista, pluss «Skjul sona» i
+  høgreklikk-menyen. Kortet vert dempa med `.zcard.skjult` og namnet
+  overstroke, så det aldri ser ut som ein feil at sona manglar i teikninga.
+- 3D-legenda og verdssentrum i 3D/kart reknast frå dei synlege sonene, så
+  modellen sentrerer på det som faktisk vert vist.
+
 ## Kjende manglar / ikkje implementert
 
 - Import av eksisterande SXI

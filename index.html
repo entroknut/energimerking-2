@@ -360,6 +360,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .zcard.collapsed .zcard-body{display:none}
 .zcard-chevron{margin-left:auto;flex-shrink:0;width:16px;height:16px;color:var(--text3);transition:transform .18s;display:flex;align-items:center;justify-content:center}
 .zcard.collapsed .zcard-chevron{transform:rotate(-90deg)}
+/* Skjult sone: kortet står att i lista (tala gjeld framleis), men det er
+   dempa og namnet overstroke, slik at det ikkje ser ut som ein feil at
+   sona manglar i teikninga. */
+.zcard.skjult{opacity:.5}
+.zcard.skjult:hover{opacity:.75}
+.zcard.skjult .zname-input{text-decoration:line-through}
+.zeye{flex-shrink:0;width:20px;height:20px;padding:0;display:flex;align-items:center;justify-content:center;border:none;border-radius:4px;background:none;color:var(--text3);cursor:pointer}
+.zeye:hover{background:var(--surface2);color:var(--accent)}
 /* Kollapsbar underseksjon i sonekortet (vindauge/dører) */
 .sub-hdr{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
   font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;
@@ -716,7 +724,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.0.1</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.1.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -1001,7 +1009,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div id="spanel">
       <div id="zonesPanel">
         <div class="empty" id="empty"><div class="empty-icon">⬡</div>Teikn ei sone på plantegningen<br>for å sjå areal og fasadar</div>
-        <div id="zlistToolbar" style="display:none;justify-content:flex-end;padding:0 2px 6px 2px"><button id="collapseAllBtn" onclick="window._toggleAllZcards()" style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit" title="Slå saman / vis alle sonekort">Slå saman alle ▾</button></div>
+        <div id="zlistToolbar" style="display:none;justify-content:flex-end;gap:6px;padding:0 2px 6px 2px"><button id="skjulAllBtn" onclick="window._toggleAllSkjul()" style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit" title="Skjul / vis alle soner i planteikninga og 3D-modellen">Skjul alle soner</button><button id="collapseAllBtn" onclick="window._toggleAllZcards()" style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit" title="Slå saman / vis alle sonekort">Slå saman alle ▾</button></div>
         <div id="zlist"></div>
       </div>
       <div id="tablePanel" style="display:none">
@@ -2866,7 +2874,7 @@ function draw(){
       // Teikn ghost-soner med fyllt farge og stipla kontur
       if(gf){
         gf.zones.forEach(gz=>{
-          if(gz.pts.length<3)return;
+          if(gz.pts.length<3||gz.skjult)return;
           ctx.beginPath();
           const gp0=i2sFloor(gz.pts[0].x,gz.pts[0].y,gf);ctx.moveTo(gp0.x,gp0.y);
           gz.pts.forEach((p,i)=>{if(i>0){const gp=i2sFloor(p.x,p.y,gf);ctx.lineTo(gp.x,gp.y);}});
@@ -2891,7 +2899,7 @@ function draw(){
 
   // Completed zones
   zones.forEach((z,zi)=>{
-    if(z.pts.length<2)return;
+    if(z.pts.length<2||z.skjult)return;
     // Grupperte soner deler farge — bruk global indeks for konsistens
     let ci;
     {
@@ -3235,6 +3243,7 @@ function draw(){
     // Highlight all segments with a subtle glow to show they're clickable
     if(winPts.length===0){
       zones.forEach((z,zi)=>{
+        if(z.skjult)return;
         const segs=calcSegments(z.pts)||[];
         segs.forEach(seg=>{
           const s0=i2s(seg.p1.x,seg.p1.y),s1=i2s(seg.p2.x,seg.p2.y);
@@ -4279,15 +4288,16 @@ function unifiedSnap(sx,sy,ownPts){
     if(b)return b;
   }
   bd=SNAP_R.corner;b=null;
-  zones.forEach(z=>z.pts.forEach(p=>{
+  zones.forEach(z=>{if(z.skjult)return;z.pts.forEach(p=>{
     const sp=i2s(p.x,p.y),dd=Math.hypot(sx-sp.x,sy-sp.y);
     if(dd<bd){bd=dd;b={x:p.x,y:p.y,type:'corner',sx:sp.x,sy:sp.y};}
-  }));
+  });});
   if(b)return b;
   const il=imgLineSnap(sx,sy);
   if(il&&Math.hypot(sx-il.sx,sy-il.sy)<=SNAP_R.imgcorner)return il;
   bd=SNAP_R.edge;b=null;
   zones.forEach(z=>{
+    if(z.skjult)return;
     for(let i=0;i<z.pts.length;i++){
       const p1=z.pts[i],p2=z.pts[(i+1)%z.pts.length];
       const s1=i2s(p1.x,p1.y),s2=i2s(p2.x,p2.y);
@@ -4327,6 +4337,7 @@ function snapToSegment(sx,sy){
   const ip=s2i(sx,sy);
   let best=null,bestD=Infinity;
   zones.forEach((z,zi)=>{
+    if(z.skjult)return;
     const segs=calcSegments(z.pts)||[];
     segs.forEach(seg=>{
       // Distance from point to infinite line of segment
@@ -4446,7 +4457,7 @@ function updateResults(){
       const isCollapsed=!!window._zcardCollapsed[zoneKey];
 
       const card=document.createElement('div');
-      card.className='zcard'+(mode==='edit'&&fi===activeFloor&&editZoneIdx===zi?' editing':'')+(isCollapsed?' collapsed':'');
+      card.className='zcard'+(mode==='edit'&&fi===activeFloor&&editZoneIdx===zi?' editing':'')+(isCollapsed?' collapsed':'')+(z.skjult?' skjult':'');
       card.style.setProperty('--zcard-color', COLORS[ci]);
       card.dataset.zkey=zoneKey;
       const _hHint=window._zcardH[zoneKey];
@@ -4473,6 +4484,21 @@ function updateResults(){
       areaPreview.style.cssText=`font-size:10.5px;color:var(--text3);font-family:'DM Mono',monospace;white-space:nowrap;flex-shrink:0;display:${isCollapsed?'inline':'none'}`;
       areaPreview.textContent=dispArea!=null?dispArea.toFixed(1)+' m²':'—';
       cardHeader.appendChild(areaPreview);
+      const eye=document.createElement('button');
+      eye.className='zeye';eye.type='button';
+      const _syncEye=()=>{
+        eye.innerHTML=z.skjult?EYE_OFF_SVG:EYE_SVG;
+        eye.title=z.skjult?'Sona er skjult i planteikninga og modellen — klikk for å vise':'Skjul sona i planteikninga og modellen';
+      };
+      _syncEye();
+      eye.onclick=e=>{
+        e.stopPropagation();
+        setSkjult(z,fi,zi,!z.skjult);
+        card.classList.toggle('skjult',!!z.skjult);
+        _syncEye();_updateSkjulAllBtn();
+        markDirty();draw();_rebuild3DDebounced();
+      };
+      cardHeader.appendChild(eye);
       const chevron=document.createElement('div');chevron.className='zcard-chevron';
       chevron.innerHTML=`<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="2,4 6,8 10,4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
       cardHeader.appendChild(chevron);
@@ -5284,6 +5310,7 @@ function updateResults(){
   if(_spanel)_spanel.scrollTop=_savedScroll;
   // Oppdater collapse-all knapp
   _updateCollapseAllBtn();
+  _updateSkjulAllBtn();
   // Live 3D-oppdatering om overlay er open
   _rebuild3DDebounced();
 }
@@ -5316,6 +5343,43 @@ function _updateCollapseAllBtn(){
   const allCollapsed=[...cards].every(c=>c.classList.contains('collapsed'));
   btn.textContent=allCollapsed?'Vis alle ▲':'Slå saman alle ▾';
 }
+
+// ── Skjul soner ──────────────────────────────────────────────
+// `z.skjult` tek sona ut av planteikninga, 3D-modellen og kartet — og av
+// snapping, hover og treff-testing, elles ville brukaren treft ei sone han
+// ikkje ser. Tabellen, BRA-summane og SXI-eksporten er urørte: å skjule er
+// eit visingsval, ikkje ei sletting. Feltet vert med i lagring og angre av
+// seg sjølv (soner vert serialiserte med spread overalt), og som dei andre
+// felta i sonekortet lagar det ikkje eit eige angre-steg.
+const EYE_SVG='<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.2 8S3.6 3.8 8 3.8 14.8 8 14.8 8 12.4 12.2 8 12.2 1.2 8 1.2 8Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.9" stroke="currentColor" stroke-width="1.3"/></svg>';
+const EYE_OFF_SVG='<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1.2 8S3.6 3.8 8 3.8 14.8 8 14.8 8 12.4 12.2 8 12.2 1.2 8 1.2 8Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.9" stroke="currentColor" stroke-width="1.3"/><path d="M2.4 13.6 13.6 2.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+
+function tellSoner(){return floors.reduce((s,f)=>s+f.zones.length,0);}
+function tellSkjulte(){return floors.reduce((s,f)=>s+f.zones.filter(z=>z.skjult).length,0);}
+
+function setSkjult(z,fi,zi,verdi){
+  z.skjult=!!verdi;
+  // Ei skjult sone kan ikkje redigerast — hjørna er ikkje å sjå.
+  if(z.skjult&&mode==='edit'&&fi===activeFloor&&editZoneIdx===zi){editZoneIdx=null;setMode('navigate');}
+}
+
+function _updateSkjulAllBtn(){
+  const btn=document.getElementById('skjulAllBtn');
+  if(!btn)return;
+  const n=tellSkjulte(),tot=tellSoner();
+  btn.textContent=(n>0&&n>=tot)?'Vis alle soner':(n>0?'Vis alle ('+n+' skjulte)':'Skjul alle soner');
+  btn.style.color=n>0?'var(--accent)':'var(--text3)';
+  btn.style.borderColor=n>0?'var(--accent)':'var(--border2)';
+}
+
+window._toggleAllSkjul=function(){
+  // Noko synleg att ⇒ skjul alt. Alt skjult ⇒ vis alt.
+  const skjulNo=tellSkjulte()<tellSoner();
+  floors.forEach((f,fi)=>f.zones.forEach((z,zi)=>setSkjult(z,fi,zi,skjulNo)));
+  markDirty();
+  updateResults();renderTable();draw();
+  hintText.textContent=skjulNo?'Alle soner er skjulte i teikninga og modellen — tal og eksport er uendra.':'Alle soner er synlege igjen.';
+};
 
 // ── Copy/link zone to other floor ────────────────────────────
 function showCopyZoneMenu(z, zi, f, fi){
@@ -6163,6 +6227,7 @@ cwrap.addEventListener('mousemove',e=>{
     const ip2=s2i(sx,sy);
     let hz=null;
     for(let zi=0;zi<zones.length;zi++){
+      if(zones[zi].skjult)continue;
       if(zones[zi].pts.length>=3&&pointInPolygon(ip2,zones[zi].pts)){hz={z:zones[zi],zi,f:curFloor(),fi:activeFloor};break;}
     }
     hoveredZone=hz;
@@ -6303,7 +6368,7 @@ cwrap.addEventListener('contextmenu',e=>{
       const ip={x:_bx-(f.floorDxImg||0),y:_by-(f.floorDyImg||0)};
       for(let zi=0;zi<f.zones.length;zi++){
         const z=f.zones[zi];
-        if(z.pts.length<3)continue;
+        if(z.pts.length<3||z.skjult)continue;
         if(pointInPolygon(ip,z.pts)){
           foundZ=z;foundZi=zi;foundFi=fi;foundF=f;
           break outer;
@@ -6394,6 +6459,11 @@ function showZoneContextMenu(clientX,clientY,z,zi,f,fi){
     draw();
   }));
   menu.appendChild(mkItem('🔍','Zoom til sone',()=>zoomToZone(z)));
+  menu.appendChild(mkItem('👁','Skjul sona',()=>{
+    setSkjult(z,fi,zi,true);
+    markDirty();updateResults();draw();_rebuild3DDebounced();
+    hintText.textContent='«'+z.name+'» er skjult — auge-ikonet i sonekortet viser henne igjen.';
+  }));
   menu.appendChild(mkItem('⬡','Kopier sone… (Ctrl+C)',()=>{
     zoneClipboard=JSON.parse(JSON.stringify(z));
     zoneClipboard.skillevegg=Array.from(z.skillevegg||[]);
@@ -6540,6 +6610,7 @@ function findWindowAtScreen(sx,sy){
   const fl=curFloor();
   const fli=activeFloor;
   fl.zones.forEach((z,zi)=>{
+    if(z.skjult)return;
     const segs=calcSegments(z.pts,getHoyde(z));
     if(!segs)return;
     (z.windows||[]).forEach((w,wi)=>{
@@ -6823,6 +6894,7 @@ cv.addEventListener('click',e=>{
       // Sjekk om brukaren klikka på ein eksisterande sone
       let clickedZone=null;
       for(let zi=0;zi<zones.length;zi++){
+        if(zones[zi].skjult)continue;
         if(zones[zi].pts.length>=3&&pointInPolygon(ip,zones[zi].pts)){
           clickedZone=zones[zi];break;
         }
@@ -10741,7 +10813,7 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     let allPts=[];
     floors.forEach(f=>{
       const _fm=mppForFloor(f);
-      if(_fm)f.zones.forEach(z=>z.pts.forEach(p=>allPts.push({x:p.x*_fm/1000,z:p.y*_fm/1000})));
+      if(_fm)f.zones.forEach(z=>{if(z.skjult)return;z.pts.forEach(p=>allPts.push({x:p.x*_fm/1000,z:p.y*_fm/1000}));});
     });
     let mnX=Infinity,mxX=-Infinity,mnZ=Infinity,mxZ=-Infinity;
     allPts.forEach(p=>{mnX=Math.min(mnX,p.x);mxX=Math.max(mxX,p.x);mnZ=Math.min(mnZ,p.z);mxZ=Math.max(mxZ,p.z);});
@@ -10853,7 +10925,7 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     floors.forEach((f,fi)=>{
       const baseY=floorBaseY[fi];
       f.zones.forEach((z,zi)=>{
-        if(z.pts.length<3)return;
+        if(z.pts.length<3||z.skjult)return;
         const col=getZoneColor3D(z,fi,zi);
         const colHex='#'+col.toString(16).padStart(6,'0');
         const fh=getHoyde(z);
@@ -11852,10 +11924,10 @@ function printFasadeView(){
     let allXm=[],allYm=[];
     floors.forEach(f=>{
       const fm=mppForFloor(f)??mppRef;
-      f.zones.forEach(z=>z.pts.forEach(p=>{
+      f.zones.forEach(z=>{if(z.skjult)return;z.pts.forEach(p=>{
         allXm.push((p.x+(f.floorDxImg??0))*fm/1000);
         allYm.push((p.y+(f.floorDyImg??0))*fm/1000);
-      }));
+      });});
     });
     if(!allXm.length) return {type:'FeatureCollection',features:[]};
     const cxM=(Math.min(...allXm)+Math.max(...allXm))/2;
@@ -11882,7 +11954,7 @@ function printFasadeView(){
       const mppF=mppForFloor(f)??mppRef;
 
       f.zones.forEach((z,zi)=>{
-        if(z.pts.length<3) return;
+        if(z.pts.length<3||z.skjult) return;
         const ci=(floors.slice(0,fi).reduce((s,fl)=>s+fl.zones.length,0)+zi)%COLORS.length;
         const col=COLORS[ci];
         const ring=z.pts.map(p=>pxToLL(p.x,p.y,fdxPx,fdyPx,mppF));
