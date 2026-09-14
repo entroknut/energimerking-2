@@ -541,16 +541,18 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
   display:flex;align-items:center;padding:0 12px;gap:6px;
   background:var(--surface);
   border-bottom:1px solid var(--border);
-  height:38px;flex-shrink:0;overflow-x:auto;
-  scrollbar-width:none;
+  height:38px;flex-shrink:0;
 }
-#floor-tabs-bar::-webkit-scrollbar{display:none}
-/* Fanerada renn over på breidda så snart det er nokre etasjar, og
-   rullefeltet er skjult. Versjonen er difor ankra til høgre kant av
-   rullefeltet — elles glir han ut av syne, og det ser ut som ei
-   publisering ikkje gjekk gjennom. `background:inherit` tek med seg
-   fargen frå bara, òg den Lumon overstyrer. */
-#appVer{position:sticky;right:0;background:inherit;z-index:2}
+/* Fanerada renn over på breidda så snart det er nokre etasjar. Det er berre
+   fanefeltet som rullar — versjonen ligg utanfor det og har si eiga plass i
+   rada. Låg han inni, ville han anten gli ut av syne (og få publiseringa til
+   å sjå mislukka ut) eller — som sticky — leggje seg oppå fanene under. */
+#floor-tabs-scroll{
+  display:flex;align-items:center;gap:6px;
+  flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;
+}
+#floor-tabs-scroll::-webkit-scrollbar{display:none}
+#appVer{flex-shrink:0}
 #floor-tabs{display:flex;gap:2px;align-items:center;flex:1}
 .floor-tab{
   display:flex;align-items:center;gap:5px;
@@ -741,6 +743,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 <div id="main">
   <div id="floor-wrap" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-width:0">
   <div id="floor-tabs-bar">
+   <div id="floor-tabs-scroll">
     <div id="viewSwitch" title="Planteikningar er modellen — soner, 3D og SXI. Fasadeteikningar er eit eige lag som berre vert målt på.">
       <button class="view-sw-btn on" id="viewPlanBtn" title="Planteikningar — soner, 3D-modell og SXI-eksport"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.8" y="1.8" width="12.4" height="12.4" rx="1.2"/><path d="M1.8 6.6h12.4M6.6 6.6v7.6"/></svg> Plan</button>
       <button class="view-sw-btn" id="viewFasadeBtn" title="Fasadeteikningar — eige lag berre for oppmåling. Ingen soner, ingen verknad på modellen eller SXI-eksporten."><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.6 6.6 8 2.2l6.4 4.4v7.6H1.6z"/><rect x="4.4" y="8.4" width="2.4" height="2.4"/><rect x="9.2" y="8.4" width="2.4" height="2.4"/></svg> Fasade</button>
@@ -760,7 +763,8 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.3.1</span>
+   </div>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.3.2</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
