@@ -764,7 +764,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.3.2</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.4.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -1199,7 +1199,12 @@ let winSnapPreview=null;
 let takflatePts=[],activeTakflateZone=null;
 // Klippeverktøy for takflater — kode bevart, DEAKTIVERT (sett KLIPP_TAKFLATE_ENA=true for å aktivere)
 const KLIPP_TAKFLATE_ENA=true;
+// Klippeverktøyet gjeld både takflater og golvflater — `kind` i target seier kva.
 let klippTakflatePts=[],klippTakflateTarget=null,klippSnap=null;
+// Kva lag som vert teikna oppå planteikninga. Berre eitt om gongen: tak- og
+// golvoppdelinga ligg oppå kvarandre i planet, og to fyllfargar over kvarandre
+// er uleseleg. Standard er 'tak' — slik det alltid har vore.
+let flateLag='tak';
 // Del sone: klippelinje som splittar ei sone i to
 let delSonePts=[],delSoneTarget=null,delSoneSnap=null;
 let drawSnap=null;
@@ -2268,7 +2273,83 @@ const WINLIST_AUTO_COLLAPSE=8;
 
 const KJELLER_GULV='Kjeller (golv + yttervegg)';
 const KJELLER_VEGGTJUKN=0.30;   // m — fast inntil vidare
-function isKjeller(z){return (z.gulvtype||'Gulv på grunn')===KJELLER_GULV;}
+
+// ── Tak- og golvflater ────────────────────────────────────────
+// Taket og golvet i ei sone kan delast opp i fleire flater, og KVAR flate har
+// sin eigen konstruksjonstype. Ei sone kan altså ha halve taket mot det fri og
+// halve som himling mot ei uoppvarma sone. Utan oppdeling gjeld sona sin eigen
+// `taktype`/`gulvtype` for heile flata — det er framleis normaltilfellet, og
+// SXI-fila vert då teikn for teikn den same som før.
+const TAK_TYPER=['Tak','Himling mot uoppvarma sone','Himling mot varm sone'];
+const GULV_TYPER=['Gulv på grunn','Gulv mot uoppvarma sone','Gulv mot oppvarma sone',KJELLER_GULV];
+// Alt som skil dei to laga ligg her, så UI, teikning og eksport kan dele kode.
+const FLATE={
+  tak:{arr:'takflater',typar:TAK_TYPER,std:'Tak',zoneFelt:'taktype',uFelt:'uTak',
+       lbl:'Takflate',eining:'taket',ikon:'⌂'},
+  gulv:{arr:'gulvflater',typar:GULV_TYPER,std:'Gulv på grunn',zoneFelt:'gulvtype',uFelt:'uGulv',
+        lbl:'Golvflate',eining:'golvet',ikon:'▭'}
+};
+function flateListe(z,kind){return z[FLATE[kind].arr]||[];}
+// Typen til éi flate. Gamle takflater manglar feltet — dei arvar sona sin
+// taktype, som den gongen alltid var 'Tak'.
+function flateType(z,kind,fl){return (fl&&fl.type)||z[FLATE[kind].zoneFelt]||FLATE[kind].std;}
+function harFlater(z,kind){return flateListe(z,kind).length>0;}
+function flateAreaM2(z,fl){return calcAreaM2(fl.pts,mppForZone(z))??0;}
+// Kortform til merkelappar i teikninga og lista
+function flateTypeKort(t){
+  return {'Tak':'Tak','Himling mot uoppvarma sone':'Himling · uoppv.','Himling mot varm sone':'Himling · varm',
+          'Gulv på grunn':'Mot grunn','Gulv mot uoppvarma sone':'Mot uoppv.','Gulv mot oppvarma sone':'Mot oppv.',
+          [KJELLER_GULV]:'Kjeller'}[t]||t;
+}
+// Lengda (m) av flatekanten som ligg på sona sin ytterkant. `pred(segIdx)`
+// avgrensar til visse veggar. Ei delflate midt inne i sona har ingen ytterkant
+// — då er både perimeteren og kjellerveggen null, og det er rett svar.
+function flateKantLenM(z,fl,pred){
+  const mpp=mppForZone(z);
+  if(!mpp||!fl||!(fl.pts||[]).length)return 0;
+  const segs=calcSegments(z.pts,getHoyde(z),mpp)||[];
+  let sum=0;
+  const pts=fl.pts;
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i],b=pts[(i+1)%pts.length];
+    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    for(const s of segs){
+      const dx=s.p2.x-s.p1.x,dy=s.p2.y-s.p1.y,L2=dx*dx+dy*dy;
+      if(L2<1)continue;
+      let t=((mx-s.p1.x)*dx+(my-s.p1.y)*dy)/L2;
+      if(t<-0.01||t>1.01)continue;
+      t=Math.max(0,Math.min(1,t));
+      if(Math.hypot(mx-(s.p1.x+dx*t),my-(s.p1.y+dy*t))>1.5)continue;
+      if(!pred||pred(s.idx))sum+=Math.hypot(b.x-a.x,b.y-a.y)*mpp/1000;
+      break;
+    }
+  }
+  return sum;
+}
+// Flatene slik eksporten (og tabellen) ser dei: alltid minst éi oppføring, så
+// begge vegane — oppdelt og ikkje — går gjennom same løkka.
+function eksportFlater(z,kind){
+  const F=FLATE[kind];
+  const list=flateListe(z,kind);
+  if(!list.length)return[{fl:null,type:z[F.zoneFelt]||F.std,navn:null,area:getAreaM2(z)??0}];
+  return list.map((fl,i)=>({fl,type:flateType(z,kind,fl),navn:fl.name||(F.lbl+' '+(i+1)),
+                            area:flateAreaM2(z,fl)}));
+}
+// Sum av delflatene mot sonearealet — brukt til å melde frå når noko manglar.
+function flateAvvikM2(z,kind){
+  const list=flateListe(z,kind);
+  if(!list.length)return 0;
+  const a=getAreaM2(z);
+  if(a==null)return 0;
+  return a-list.reduce((s,fl)=>s+flateAreaM2(z,fl),0);
+}
+
+// Ei sone er kjellersone når golvet — heilt eller delvis — er kjellergolv.
+function isKjeller(z){
+  const gf=z.gulvflater||[];
+  if(gf.length)return gf.some(fl=>flateType(z,'gulv',fl)===KJELLER_GULV);
+  return (z.gulvtype||'Gulv på grunn')===KJELLER_GULV;
+}
 // Oppfyllingshøgde: kor djupt kjellaren ligg under terreng. Blank = heile veggen.
 function getOppfylling(z){
   const v=z.oppfylling;
@@ -2562,10 +2643,10 @@ const HINTS={
   window:'Klikk éin ende av vindauget/døra på fasaden, så den andre enden',
   measure:'Klikk startpunkt → klikk endepunkt for å kontrollmåle · Shift for 90°/45° · måla blir lagra · høgreklikk på eit mål for å slette · Esc for å avslutte',
   'tegn-takflate':'Klikk hjørner for å teikne takflate-polygon. Klikk på startpunktet for å lukke. Esc for å avbryte.',
-  'klipp-takflate':'Klikk for å legge til punkt på klippelja · Shift for 90°/45° · Enter eller dobbelklikk for å klippe · Esc for å avbryte',
+  'klipp-takflate':'Klikk for å legge til punkt på klippelinja · Shift for 90°/45° · Enter eller dobbelklikk for å klippe · Esc for å avbryte',
   'del-sone':'Teikn ei linje tvers gjennom sona · Shift for 90°/45° · Enter eller dobbelklikk for å dele · Esc for å avbryte',
 };
-const MODELABELS={navigate:'Naviger',draw:'Tegn sone',edit:'Rediger',calibrate:'Kalibrer',window:'Vindauge/dør',measure:'Kontrollmål','tegn-takflate':'Teikn takflate','klipp-takflate':'Klipp takflate','del-sone':'Del sone'};
+const MODELABELS={navigate:'Naviger',draw:'Tegn sone',edit:'Rediger',calibrate:'Kalibrer',window:'Vindauge/dør',measure:'Kontrollmål','tegn-takflate':'Teikn takflate','klipp-takflate':'Klipp flate','del-sone':'Del sone'};
 
 function setMode(m){
   mode=m;drawSnap=null;calSnap=null;measureSnap=null;measureGeoSnap=null;
@@ -3571,26 +3652,34 @@ function draw(){
       }
     });
 
-    // Takflate-overlay på canvas
-    const TF_FILLS=['rgba(251,191,36,0.28)','rgba(99,102,241,0.28)','rgba(236,72,153,0.28)','rgba(34,197,94,0.28)','rgba(251,146,60,0.28)','rgba(20,184,166,0.28)'];
-    const TF_STROKES2=['#f59e0b','#6366f1','#ec4899','#22c55e','#f97316','#14b8a6'];
-    (z.takflater||[]).forEach((tf,tfi)=>{
-      if(tf.pts.length<3)return;
-      const isActive=mode==='tegn-takflate'&&activeTakflateZone===z;
+    // Flate-overlay på canvas — tak eller golv, aldri begge samstundes.
+    // Varm palett for taket, kald for golvet, så det aldri er tvil om kva
+    // ein ser når ein har delt opp begge.
+    const FL_PAL=flateLag==='gulv'
+      ?['#0ea5e9','#8b5cf6','#10b981','#f43f5e','#3b82f6','#a855f7']
+      :['#f59e0b','#6366f1','#ec4899','#22c55e','#f97316','#14b8a6'];
+    const _hex2rgba=(h,a)=>`rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${a})`;
+    const RDLBL=['N','NØ','Ø','SØ','S','SV','V','NV'];
+    flateListe(z,flateLag).forEach((fl,fli)=>{
+      if((fl.pts||[]).length<3)return;
+      const isActive=flateLag==='tak'&&mode==='tegn-takflate'&&activeTakflateZone===z;
       ctx.beginPath();
-      const tp0=i2s(tf.pts[0].x,tf.pts[0].y);ctx.moveTo(tp0.x,tp0.y);
-      tf.pts.slice(1).forEach(p=>{const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);});
+      const tp0=i2s(fl.pts[0].x,fl.pts[0].y);ctx.moveTo(tp0.x,tp0.y);
+      fl.pts.slice(1).forEach(p=>{const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);});
       ctx.closePath();
-      ctx.fillStyle=TF_FILLS[tfi%TF_FILLS.length];ctx.fill();
-      const sc2=TF_STROKES2[tfi%TF_STROKES2.length];
-      ctx.strokeStyle=isActive?'#fff':sc2;ctx.lineWidth=isActive?2.5:1.8;ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);
-      // Label
-      const tcx=tf.pts.reduce((s,p)=>s+p.x,0)/tf.pts.length;
-      const tcy=tf.pts.reduce((s,p)=>s+p.y,0)/tf.pts.length;
+      const sc2=FL_PAL[fli%FL_PAL.length];
+      ctx.fillStyle=_hex2rgba(sc2,0.24);ctx.fill();
+      ctx.strokeStyle=isActive?'#fff':sc2;ctx.lineWidth=isActive?2.5:1.8;
+      ctx.setLineDash(flateLag==='gulv'?[2,3]:[5,3]);ctx.stroke();ctx.setLineDash([]);
+      // Merkelapp: namn + type (og vinkel/retning på eit skrått tak)
+      const tcx=fl.pts.reduce((s,p)=>s+p.x,0)/fl.pts.length;
+      const tcy=fl.pts.reduce((s,p)=>s+p.y,0)/fl.pts.length;
       const tcp=i2s(tcx,tcy);
-      const RDLBL=['N','NØ','Ø','SØ','S','SV','V','NV'];
-      const rdDir=RDLBL[Math.round(((tf.retning||0)+360)%360/45)%8];
-      const tlbl=`${tf.name} ${tf.vinkel||0}° ${rdDir}`;
+      const ftype=flateType(z,flateLag,fl);
+      let tlbl=(fl.name||FLATE[flateLag].lbl)+' · ';
+      if(flateLag==='tak'&&ftype==='Tak'){
+        tlbl+=(fl.vinkel||0)+'° '+RDLBL[Math.round(((fl.retning||0)+360)%360/45)%8];
+      } else tlbl+=flateTypeKort(ftype);
       ctx.font='bold 9px Inter,sans-serif';
       const tw2=ctx.measureText(tlbl).width+8;
       ctx.fillStyle='rgba(255,255,255,0.9)';ctx.beginPath();ctx.roundRect(tcp.x-tw2/2,tcp.y-8,tw2,16,3);ctx.fill();
@@ -3858,7 +3947,7 @@ function draw(){
     // Marker mål-takflata
     if(klippTakflateTarget){
       const{z:kz,tfi:ktfi}=klippTakflateTarget;
-      const ktf=(kz.takflater||[])[ktfi];
+      const ktf=flateListe(kz,klippTakflateTarget.kind||'tak')[ktfi];
       if(ktf&&ktf.pts.length>=3){
         ctx.beginPath();
         const kp0=i2s(ktf.pts[0].x,ktf.pts[0].y);ctx.moveTo(kp0.x,kp0.y);
@@ -4328,7 +4417,7 @@ function autoSkilleveggForNySone(nz){
 function finishZone(){
   if(curPts.length<3)return;
   snapshot();markDirty();
-  const nz={name:'Sone '+(++_nextZoneId),pts:[...curPts],windows:[],skillevegg:new Set(),takflater:[],gavlflater:[]};
+  const nz={name:'Sone '+(++_nextZoneId),pts:[...curPts],windows:[],skillevegg:new Set(),takflater:[],gulvflater:[],gavlflater:[]};
   if(piBygg.byggeaar)nz.byggeaar=piBygg.byggeaar;   // byggeåret frå EntroPi
   zones.push(nz);
   curPts=[];
@@ -4342,7 +4431,7 @@ function finishTakflate(){
   snapshot();markDirty();
   if(!activeTakflateZone.takflater)activeTakflateZone.takflater=[];
   const idx=activeTakflateZone.takflater.length+1;
-  activeTakflateZone.takflater.push({id:'tf_'+Date.now(),pts:[...takflatePts],vinkel:30,retning:180,name:'Takflate '+idx});
+  activeTakflateZone.takflater.push({id:'tf_'+Date.now(),pts:[...takflatePts],type:'Tak',vinkel:30,retning:180,name:'Takflate '+idx});
   takflatePts=[];activeTakflateZone=null;
   updateResults();renderTable();draw();
   setMode('navigate');
@@ -4391,8 +4480,8 @@ function _adjustPtsForFloorOffset(copy, srcFloor, dstFloor){
   const dy=(srcFloor.floorDyImg||0)-(dstFloor.floorDyImg||0);
   if(!dx&&!dy)return;
   copy.pts=(copy.pts||[]).map(p=>({x:p.x+dx,y:p.y+dy}));
-  (copy.takflater||[]).forEach(tf=>{
-    tf.pts=(tf.pts||[]).map(p=>({x:p.x+dx,y:p.y+dy}));
+  [...(copy.takflater||[]),...(copy.gulvflater||[])].forEach(fl=>{
+    fl.pts=(fl.pts||[]).map(p=>({x:p.x+dx,y:p.y+dy}));
   });
 }
 
@@ -4484,6 +4573,8 @@ function _calcGavlflater(z){
       let maxH=0;
       (z.takflater||[]).forEach(tf=>{
         if(!tf.pts||tf.pts.length<3)return;
+        // Ei himling mot ei anna sone er flat og gir ingen gavl
+        if(flateType(z,'tak',tf)!=='Tak')return;
         if(!pointInPolygon({x:testX,y:testY},tf.pts))return;
         const tanV=Math.tan((tf.vinkel||0)*Math.PI/180);
         if(tanV<0.001)return;
@@ -4536,28 +4627,424 @@ function _autoRetningForTakflate(roofPts,zone,segs){
   return Math.round(bestSeg.normalAz/45)*45%360;
 }
 
-// Avsluttar klipp-takflate-operasjonen og splittar polygon
+// Startar oppdelinga: éi flate som dekkjer heile sona, med sona sin eigen type.
+// Vinkelen vert arva frå `z.takvinkel` — eit flatt tak skal ikkje plutseleg bli
+// skrått av at brukaren deler det opp.
+function initFlater(z,kind){
+  const F=FLATE[kind];
+  if((z.pts||[]).length<3)return false;
+  const flate={id:kind+'_'+Date.now(),pts:z.pts.map(p=>({...p})),
+               type:z[F.zoneFelt]||F.std,name:F.lbl+' 1'};
+  if(kind==='tak'){
+    const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
+    flate.vinkel=getTakvinkel(z);
+    flate.retning=_autoRetningForTakflate(z.pts,z,segs);
+  }
+  z[F.arr]=[flate];
+  if(kind==='tak')z.gavlflater=[];
+  return true;
+}
+
+// Startar klippemodus på ei flate
+function startKlippFlate(z,kind,tfi,fi){
+  if(fi!=null&&fi!==activeFloor){saveFloorState();activeFloor=fi;syncFloorState();renderFloorTabs();}
+  const fl=flateListe(z,kind)[tfi];
+  if(!fl)return;
+  flateLag=kind;
+  klippTakflateTarget={z,tfi,kind};
+  klippTakflatePts=[];
+  setMode('klipp-takflate');draw();
+  hintText.textContent='Klipp «'+(fl.name||FLATE[kind].lbl)+'» · klikk første punkt for klippelinja. Esc for å avbryte.';
+}
+
+// ── Sonekortet: tak- og golvseksjonen ─────────────────────────
+// Éin funksjon byggjer begge — det er berre FLATE[kind] som skil dei.
+// `fi` er etasjeindeksen sona ligg på; klippeknappen må kunne byte aktiv etasje.
+function byggFlateSeksjon(z,kind,fi){
+  const F=FLATE[kind];
+  const list=flateListe(z,kind);
+  const delt=list.length>0;
+  const std=entroStandard(z.byggeaar);
+  const mkRow=(label,content)=>{
+    const r=document.createElement('div');
+    r.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px';
+    const l=document.createElement('span');
+    l.style.cssText='font-size:11px;color:var(--text3);white-space:nowrap;min-width:72px';
+    l.textContent=label;
+    r.appendChild(l);r.appendChild(content);return r;
+  };
+  const sec=document.createElement('div');
+  sec.style.cssText='margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)';
+
+  // ── Topprad: namn på laget, tal på flater, auge for visinga ──
+  const hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:5px';
+  const hLbl=document.createElement('span');
+  hLbl.style.cssText='font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em';
+  hLbl.textContent=kind==='tak'?'Tak':'Golv';
+  hdr.appendChild(hLbl);
+  if(delt){
+    const cnt=document.createElement('span');
+    cnt.style.cssText='font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:8px;background:var(--accent-dim);color:var(--accent)';
+    cnt.textContent=list.length+' flater';
+    hdr.appendChild(cnt);
+    const eye=document.createElement('button');
+    const paa=flateLag===kind;
+    eye.textContent=paa?'👁 Vist':'👁 Vis';
+    eye.title=paa?'Denne oppdelinga vert teikna oppå planen'
+                 :'Teikn denne oppdelinga oppå planen (tak og golv vert aldri viste samstundes)';
+    eye.style.cssText='margin-left:auto;padding:1px 7px;font-size:10px;border-radius:4px;cursor:pointer;font-family:inherit;transition:all .1s;border:1px solid '
+      +(paa?'var(--accent)':'var(--border2)')+';background:'+(paa?'var(--accent-dim)':'#fff')+';color:'+(paa?'var(--accent)':'var(--text3)');
+    eye.onclick=()=>{flateLag=kind;updateResults();draw();};
+    hdr.appendChild(eye);
+  }
+  sec.appendChild(hdr);
+
+  // ── Udelt: éin type for heile flata, som før ──
+  if(!delt){
+    const sel=document.createElement('select');sel.className='zone-select';
+    sel.style.cssText='padding:3px 6px;font-size:11px;flex:1';
+    F.typar.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;
+      if(o===(z[F.zoneFelt]||F.std))op.selected=true;sel.appendChild(op);});
+    sel.onchange=()=>{z[F.zoneFelt]=sel.value;markDirty();updateResults();renderTable();draw();};
+    sec.appendChild(mkRow('Type',sel));
+    if(kind==='tak'&&(z.taktype||'Tak')==='Tak')sec.appendChild(byggTakvinkelRad(z,mkRow));
+    if(kind==='gulv')byggKjellerBoks(z,sec);
+    const delBtn=document.createElement('button');
+    delBtn.textContent='✂ Del opp '+F.eining;
+    delBtn.title='Del '+F.eining+' i fleire flater som kvar kan ha sin eigen konstruksjonstype';
+    delBtn.style.cssText='width:100%;margin-top:6px;padding:6px;border:1px solid var(--accent);border-radius:6px;background:var(--accent-dim);color:var(--accent);cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .12s';
+    delBtn.onclick=()=>{
+      if((z.pts||[]).length<3){hintText.textContent='Sona har ikkje nok punkt.';return;}
+      snapshot();
+      initFlater(z,kind);
+      flateLag=kind;
+      updateResults();renderTable();
+      startKlippFlate(z,kind,0,fi);
+    };
+    sec.appendChild(delBtn);
+    return sec;
+  }
+
+  // ── Oppdelt: éi rad per flate ──
+  const PAL=kind==='gulv'
+    ?['#0ea5e9','#8b5cf6','#10b981','#f43f5e','#3b82f6','#a855f7']
+    :['#f59e0b','#6366f1','#ec4899','#22c55e','#f97316','#14b8a6'];
+  const RETNING_ALLE=[{v:0,l:'Nord'},{v:45,l:'Nordaust'},{v:90,l:'Aust'},{v:135,l:'Søraust'},
+                      {v:180,l:'Sør'},{v:225,l:'Sørvest'},{v:270,l:'Vest'},{v:315,l:'Nordvest'}];
+  // Berre retningar som finst som ytterfasade i sona, pluss den valde
+  const _segs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
+  const _sk=z.skillevegg||new Set();
+  const _fasadeAz=new Set();
+  _segs.forEach(sg=>{if(!_sk.has(sg.idx))_fasadeAz.add(Math.round(sg.normalAz/45)*45%360);});
+
+  list.forEach((fl,fli)=>{
+    const col=PAL[fli%PAL.length];
+    const ftype=flateType(z,kind,fl);
+    const card=document.createElement('div');
+    card.style.cssText=`margin-bottom:6px;padding:7px 8px;border-radius:6px;border:1px solid ${col}44;background:${col}0d`;
+
+    // Rad 1: farge, namn, areal, klipp, slett
+    const r1=document.createElement('div');r1.style.cssText='display:flex;align-items:center;gap:5px;margin-bottom:4px';
+    const dot=document.createElement('span');dot.style.cssText=`width:8px;height:8px;border-radius:2px;background:${col};flex-shrink:0`;
+    const nInp=document.createElement('input');nInp.type='text';nInp.value=fl.name||(F.lbl+' '+(fli+1));
+    nInp.title='Namnet går rett inn i SIMIEN som elementnamn';
+    nInp.style.cssText="flex:1;min-width:0;font-size:11px;border:1px solid var(--border2);border-radius:4px;padding:2px 5px;font-family:'DM Mono',monospace";
+    nInp.onchange=()=>{fl.name=nInp.value.trim()||fl.name;markDirty();renderTable();draw();};
+    const aLbl=document.createElement('span');
+    aLbl.style.cssText="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;white-space:nowrap";
+    aLbl.textContent=flateAreaM2(z,fl).toFixed(1)+' m²';
+    const klipp=document.createElement('button');klipp.textContent='✂';klipp.title='Del denne flata i to';
+    klipp.style.cssText='background:none;border:1px solid #ef444466;border-radius:4px;color:#dc2626;cursor:pointer;font-size:12px;padding:1px 5px;flex-shrink:0;transition:all .1s';
+    klipp.onmouseenter=()=>{klipp.style.background='#fef2f2';};
+    klipp.onmouseleave=()=>{klipp.style.background='none';};
+    klipp.onclick=()=>startKlippFlate(z,kind,fli,fi);
+    const del=document.createElement('button');del.textContent='✕';del.title='Slett flata';
+    del.style.cssText='background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;flex-shrink:0';
+    del.onclick=()=>{
+      snapshot();
+      z[F.arr].splice(fli,1);
+      if(kind==='tak')z.gavlflater=[];
+      updateResults();renderTable();draw();
+    };
+    r1.appendChild(dot);r1.appendChild(nInp);r1.appendChild(aLbl);r1.appendChild(klipp);r1.appendChild(del);
+    card.appendChild(r1);
+
+    // Rad 2: konstruksjonstype for nett denne flata
+    const tSel=document.createElement('select');
+    tSel.style.cssText='width:100%;font-size:11px;border:1px solid var(--border2);border-radius:4px;padding:2px 4px;background:#fff';
+    F.typar.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;
+      if(o===ftype)op.selected=true;tSel.appendChild(op);});
+    tSel.onchange=()=>{
+      snapshot();
+      fl.type=tSel.value;
+      // Eit tak mot det fri treng vinkel og fallretning — set dei om dei manglar
+      if(kind==='tak'){
+        if(fl.type==='Tak'){
+          if(fl.vinkel==null)fl.vinkel=getTakvinkel(z);
+          if(fl.retning==null)fl.retning=_autoRetningForTakflate(fl.pts,z,_segs);
+        }
+        z.gavlflater=[];
+      }
+      updateResults();renderTable();draw();
+    };
+    card.appendChild(tSel);
+
+    // Rad 3: vinkel og fallretning — berre på tak mot det fri
+    if(kind==='tak'&&ftype==='Tak'){
+      const r3=document.createElement('div');r3.style.cssText='display:flex;align-items:center;gap:6px;margin-top:4px';
+      const vLbl=document.createElement('span');vLbl.style.cssText='font-size:10.5px;color:var(--text3)';vLbl.textContent='Vinkel';
+      const vInp=document.createElement('input');vInp.type='number';vInp.min='0';vInp.max='89';vInp.value=fl.vinkel||0;
+      vInp.title='0° = flatt. Arealet vert korrigert med 1/cos(vinkel).';
+      vInp.style.cssText="width:46px;font-size:11px;border:1px solid var(--border2);border-radius:4px;padding:2px 5px;text-align:right;font-family:'DM Mono',monospace";
+      vInp.onchange=()=>{
+        const v=parseFloat(vInp.value);
+        fl.vinkel=(isNaN(v)||v<0||v>=90)?0:v;
+        vInp.value=fl.vinkel;
+        markDirty();_syncGavlflater(z);updateResults();renderTable();draw();
+      };
+      const rLbl=document.createElement('span');rLbl.style.cssText='font-size:10.5px;color:var(--text3)';rLbl.textContent='Fall mot';
+      const rSel=document.createElement('select');rSel.style.cssText='font-size:11px;border:1px solid var(--border2);border-radius:4px;padding:2px 4px;flex:1;min-width:0;background:#fff';
+      const valgt=fl.retning??180;
+      RETNING_ALLE.filter(o=>_fasadeAz.has(o.v)||o.v===valgt).forEach(o=>{
+        const op=document.createElement('option');op.value=o.v;op.textContent=o.l;
+        if(o.v===valgt)op.selected=true;rSel.appendChild(op);
+      });
+      rSel.onchange=()=>{fl.retning=parseInt(rSel.value);markDirty();_syncGavlflater(z);updateResults();renderTable();draw();};
+      r3.appendChild(vLbl);r3.appendChild(vInp);r3.appendChild(document.createTextNode('°'));
+      r3.appendChild(rLbl);r3.appendChild(rSel);
+      card.appendChild(r3);
+      if(fl.vinkel>0){
+        const sk=document.createElement('div');
+        sk.style.cssText="font-size:10px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace";
+        sk.textContent='Skrått areal '+(flateAreaM2(z,fl)/Math.cos(fl.vinkel*Math.PI/180)).toFixed(2)+' m² (×'+(1/Math.cos(fl.vinkel*Math.PI/180)).toFixed(3)+')';
+        card.appendChild(sk);
+      }
+    }
+
+    // Rad 4: U-verdi berre for denne flata. Ei himling mot ei varm sone har ein
+    // heilt annan U-verdi enn taket ved sida av, så utan dette måtte brukaren
+    // velje éin verdi for begge.
+    if(ftype!==KJELLER_GULV){
+      const uStd=z[F.uFelt]??std?.[F.uFelt];
+      const r4=document.createElement('div');r4.style.cssText='display:flex;align-items:center;gap:6px;margin-top:4px';
+      const uLbl=document.createElement('span');uLbl.style.cssText='font-size:10.5px;color:var(--text3)';uLbl.textContent='U-verdi';
+      const uInp=document.createElement('input');uInp.type='number';uInp.min='0.01';uInp.step='0.01';
+      uInp.value=fl.uverdi!=null?fl.uverdi:'';
+      uInp.placeholder=uStd!=null?uStd.toFixed(2):'—';
+      uInp.title='Eigen U-verdi for denne flata. Blank = sona sin ('+(uStd!=null?uStd.toFixed(2):'ikkje sett')+').';
+      uInp.style.cssText="width:58px;font-size:11px;border:1px solid "+(fl.uverdi!=null?'var(--amber)':'var(--border2)')+";border-radius:4px;padding:2px 5px;text-align:right;font-family:'DM Mono',monospace;background:"+(fl.uverdi!=null?'var(--amber-dim)':'#fff');
+      uInp.onchange=()=>{
+        const v=parseFloat(uInp.value);
+        fl.uverdi=(isNaN(v)||v<=0)?null:v;
+        markDirty();updateResults();renderTable();
+      };
+      const uU=document.createElement('span');uU.style.cssText='font-size:10px;color:var(--text3)';uU.textContent='W/m²K';
+      r4.appendChild(uLbl);r4.appendChild(uInp);r4.appendChild(uU);
+      card.appendChild(r4);
+    }
+    sec.appendChild(card);
+  });
+
+  // ── Sum og avvik ──
+  const sum=list.reduce((t,fl)=>t+flateAreaM2(z,fl),0);
+  const avvik=flateAvvikM2(z,kind);
+  const sumRow=document.createElement('div');
+  sumRow.style.cssText='display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;padding-top:3px;border-top:1px solid var(--border);color:var(--text)';
+  sumRow.innerHTML=`<span>Sum flater</span><span style="font-family:'DM Mono',monospace">${sum.toFixed(2)} m²</span>`;
+  sec.appendChild(sumRow);
+  if(Math.abs(avvik)>0.05){
+    const warn=document.createElement('div');
+    warn.style.cssText='font-size:10px;color:#92400e;background:#fef3c7;border-radius:4px;padding:4px 6px;margin-top:3px;line-height:1.45';
+    warn.innerHTML=avvik>0
+      ?`<b>⚠ ${avvik.toFixed(2)} m² av ${F.eining} er ikkje dekt</b> av nokon flate og kjem ikkje med i SXI-fila.`
+      :`<b>⚠ Flatene overlappar med ${(-avvik).toFixed(2)} m²</b> — arealet vert talt to gonger i SXI-fila.`;
+    sec.appendChild(warn);
+  }
+
+  if(kind==='gulv')byggKjellerBoks(z,sec);
+  if(kind==='tak')byggGavlBoks(z,sec);
+
+  const reset=document.createElement('button');
+  reset.textContent='↺ Slå saman til éi flate';
+  reset.title='Fjern oppdelinga — heile '+F.eining+' får igjen éin type';
+  reset.style.cssText='width:100%;padding:5px;border:1px solid var(--border2);border-radius:6px;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;font-size:11px;margin-top:5px;transition:all .12s';
+  reset.onmouseenter=()=>{reset.style.background='var(--surface2)';};
+  reset.onmouseleave=()=>{reset.style.background='transparent';};
+  reset.onclick=()=>{
+    snapshot();
+    // Typen til den største flata vert sona sin type, så oppdelinga ikkje
+    // forsvinn stilt inn i ein type brukaren aldri valde
+    let best=null,bestA=-1;
+    flateListe(z,kind).forEach(fl=>{const a=flateAreaM2(z,fl);if(a>bestA){bestA=a;best=fl;}});
+    if(best){
+      const bt=flateType(z,kind,best);
+      z[F.zoneFelt]=bt;
+      if(kind==='tak')z.takvinkel=(bt==='Tak'&&best.vinkel>0)?best.vinkel:null;
+    }
+    z[F.arr]=[];
+    if(kind==='tak')z.gavlflater=[];
+    updateResults();renderTable();draw();
+    hintText.textContent=F.eining[0].toUpperCase()+F.eining.slice(1)+' er slege saman til éi flate av typen «'+(z[F.zoneFelt]||F.std)+'».';
+  };
+  sec.appendChild(reset);
+  return sec;
+}
+
+// Takvinkel-raden for eit udelt tak (uendra åtferd)
+function byggTakvinkelRad(z,mkRow){
+  const w=document.createElement('div');w.style.cssText='display:flex;align-items:center;gap:5px;flex:1';
+  const cb=document.createElement('input');cb.type='checkbox';cb.style.cssText='cursor:pointer;accent-color:var(--accent)';
+  cb.checked=z.takvinkel!=null&&z.takvinkel>0;
+  const cbL=document.createElement('span');cbL.style.cssText='font-size:10.5px;color:var(--text3)';cbL.textContent='Skråtak';
+  const inp=document.createElement('input');inp.type='number';inp.min='1';inp.max='89';inp.step='1';inp.value=z.takvinkel||30;
+  inp.title='Takvinkel i grader frå horisontalt (0°=flatt, 30°=vanleg, 45°=bratt)';
+  inp.style.cssText=`width:48px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace;display:${cb.checked?'block':'none'}`;
+  const u=document.createElement('span');u.style.cssText=`font-size:11px;color:var(--text3);display:${cb.checked?'inline':'none'}`;u.textContent='°';
+  const prev=document.createElement('span');
+  const oppdater=()=>{
+    const deg=parseFloat(inp.value)||0;
+    if(deg>0&&deg<90){
+      prev.textContent='×'+(1/Math.cos(deg*Math.PI/180)).toFixed(3);
+      prev.style.cssText="font-size:10px;color:var(--accent);font-family:'DM Mono',monospace;display:inline";
+    } else prev.style.display='none';
+  };
+  cb.onchange=()=>{
+    if(cb.checked){inp.style.display='block';u.style.display='inline';z.takvinkel=parseFloat(inp.value)||30;oppdater();}
+    else{inp.style.display='none';u.style.display='none';prev.style.display='none';z.takvinkel=null;}
+    markDirty();updateResults();renderTable();
+  };
+  inp.onchange=()=>{
+    const v=parseFloat(inp.value);const ok=!isNaN(v)&&v>0&&v<90;
+    z.takvinkel=ok?v:null;
+    if(!ok&&inp.value.trim()!==''){inp.value='';hintText.textContent='⚠ Takvinkel må vere mellom 1 og 89 grader — sett til flatt tak.';}
+    oppdater();markDirty();updateResults();renderTable();
+  };
+  inp.oninput=oppdater;
+  if(cb.checked)oppdater();
+  w.appendChild(cb);w.appendChild(cbL);w.appendChild(inp);w.appendChild(u);w.appendChild(prev);
+  return mkRow('Takvinkel',w);
+}
+
+// Oppfylling + oppsummering av kjellerelementet. Gjeld både udelt golv og
+// oppdelt golv der minst éi flate er kjellergolv.
+function byggKjellerBoks(z,sec){
+  if(!isKjeller(z))return;
+  const wrap=document.createElement('div');wrap.style.cssText='display:flex;align-items:center;gap:5px;flex:1';
+  const inp=document.createElement('input');inp.type='number';inp.min='0.1';inp.step='0.1';
+  inp.value=z.oppfylling!=null?z.oppfylling:'';
+  inp.placeholder=getHoyde(z).toFixed(2);
+  inp.title='Kor djupt kjellaren ligg under terreng. Blank = heile veggen er under terreng (= etasjehøgda).';
+  inp.style.cssText="width:60px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace";
+  const u=document.createElement('span');u.style.cssText='font-size:11px;color:var(--text3)';u.textContent='m';
+  inp.onchange=()=>{const v=parseFloat(inp.value);z.oppfylling=(isNaN(v)||v<=0)?null:v;markDirty();updateResults();renderTable();};
+  wrap.appendChild(inp);wrap.appendChild(u);
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px';
+  const l=document.createElement('span');l.style.cssText='font-size:11px;color:var(--text3);white-space:nowrap;min-width:72px';l.textContent='Oppfylling';
+  row.appendChild(l);row.appendChild(wrap);
+  sec.appendChild(row);
+
+  const note=document.createElement('div');
+  note.style.cssText='font-size:10px;color:var(--text2);line-height:1.5;margin:4px 0 2px;padding:5px 7px;background:var(--surface3);border-radius:4px';
+  const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
+  const nKj=segs.filter(sg=>isKjellervegg(z,sg.idx)).length;
+  const nWinKj=(z.windows||[]).filter(w=>isKjellervegg(z,w.segIdx)).length;
+  // Med oppdelt golv gjeld kjellerelementet berre sin eigen del av golvet og
+  // den delen av KJ-veggane som ligg langs nett den flata.
+  const kjFlater=flateListe(z,'gulv').filter(fl=>flateType(z,'gulv',fl)===KJELLER_GULV);
+  const kjArea=kjFlater.length?kjFlater.reduce((t,fl)=>t+flateAreaM2(z,fl),0):(getAreaM2(z)??0);
+  const kjLen=kjFlater.length
+    ?kjFlater.reduce((t,fl)=>t+flateKantLenM(z,fl,i=>isKjellervegg(z,i)),0)
+    :(getKjellerVeggLen(z)??0);
+  const kstd=entroStandard(z.byggeaar);
+  const ukv=z.uKjVegg??kstd?.uKjVegg,ukg=z.uKjGulv??kstd?.uKjGulv;
+  const uT=v=>v!=null?v.toFixed(2):'—';
+  note.innerHTML='<b>Kjellerelement</b>'+(kjFlater.length>1?' ('+kjFlater.length+' flater)':'')
+    +': golv '+kjArea.toFixed(1)+' m², vegg '+kjLen.toFixed(1)+' m ('+nKj+' av '+segs.length+'), høgd '
+    +getHoyde(z).toFixed(2)+' m, veggtjukn '+KJELLER_VEGGTJUKN.toFixed(2)+' m.'
+    +'<br>U-verdi vegg '+uT(ukv)+' · gulv '+uT(ukg)+' W/m²K'
+    +(z.uKjVegg!=null||z.uKjGulv!=null?' <b>(manuell)</b>':' (standard '+(z.byggeaar||'—')+')')
+    +(nKj===0?'<br><b>⚠ Ingen veggar er merkte KJ</b> — kjellaren får 0 m yttervegg.':'')
+    +(kjFlater.length&&nKj>0&&kjLen<0.05?'<br><b>⚠ Kjellergolvflata rører ingen KJ-vegg</b> — elementet får 0 m yttervegg.':'')
+    +(nWinKj?'<br><b>⚠ '+nWinKj+' vindauge/dør</b> står på ein KJ-vegg og vert ikkje med — kjellerelementet har ingen opningar.':'')
+    +'<br>Klikk ein vegg i lista under for å sykle <b>KJ → YV → SK</b>.';
+  sec.appendChild(note);
+}
+
+// Gavlflater — trekantane over veggtoppen. Berre meiningsfulle når minst éi
+// takflate er eit skrått tak mot det fri.
+function byggGavlBoks(z,sec){
+  if(!mmPerImgPx)return;
+  const harSkraa=flateListe(z,'tak').some(fl=>flateType(z,'tak',fl)==='Tak'&&(fl.vinkel||0)>0);
+  if(!harSkraa&&!(z.gavlflater||[]).length)return;
+  const box=document.createElement('div');
+  box.style.cssText='margin-top:8px;padding-top:6px;border-top:1px dashed var(--border)';
+  const hdr=document.createElement('div');hdr.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:5px';
+  const lbl=document.createElement('span');
+  lbl.style.cssText='font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em';
+  lbl.textContent='Gavlflater';
+  const btn=document.createElement('button');btn.textContent='⊿ Berekn';
+  btn.title='Berekn trekantforma gavlveggar frå takflatene';
+  btn.style.cssText='padding:2px 7px;font-size:10px;border:1px solid var(--border2);border-radius:4px;background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .1s';
+  btn.onmouseenter=()=>{btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';};
+  btn.onmouseleave=()=>{btn.style.borderColor='var(--border2)';btn.style.color='var(--text2)';};
+  btn.onclick=()=>{
+    snapshot();
+    z.gavlflater=_calcGavlflater(z);
+    if(!z.gavlflater.length)hintText.textContent='Ingen gavlflater funne — sjekk at sona har takflater av typen «Tak» med vinkel > 0°';
+    updateResults();renderTable();draw();
+  };
+  hdr.appendChild(lbl);hdr.appendChild(btn);box.appendChild(hdr);
+  const liste=z.gavlflater||[];
+  if(liste.length){
+    liste.forEach(gf=>{
+      const r=document.createElement('div');
+      r.style.cssText='display:flex;justify-content:space-between;align-items:center;font-size:10.5px;padding:2px 0;color:var(--text2)';
+      r.innerHTML=`<span>⊿ ${gf.dir||'Gavl'}</span><span style="font-family:'DM Mono',monospace;color:var(--text)">${gf.area.toFixed(2)} m²</span>`;
+      box.appendChild(r);
+    });
+    const tot=liste.reduce((t,g)=>t+g.area,0);
+    const tr=document.createElement('div');
+    tr.style.cssText='display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;padding-top:3px;border-top:1px solid var(--border);margin-top:2px;color:var(--text)';
+    tr.innerHTML=`<span>Totalt</span><span style="font-family:'DM Mono',monospace">${tot.toFixed(2)} m²</span>`;
+    box.appendChild(tr);
+  } else {
+    const n=document.createElement('div');n.style.cssText='font-size:10.5px;color:var(--text3)';
+    n.textContent='Ikkje berekna — klikk ⊿ Berekn';
+    box.appendChild(n);
+  }
+  sec.appendChild(box);
+}
+
+// Avsluttar klippeoperasjonen og splittar polygonet i to flater
 function _finishKlipp(){
   if(!klippTakflateTarget||klippTakflatePts.length<2)return;
   const{z,tfi}=klippTakflateTarget;
-  const tf=(z.takflater||[])[tfi];
+  const kind=klippTakflateTarget.kind||'tak';
+  const F=FLATE[kind];
+  const arr=z[F.arr]||[];
+  const tf=arr[tfi];
   if(!tf){klippTakflatePts=[];klippTakflateTarget=null;setMode('navigate');return;}
   const result=_splitPolygonByPolyline(tf.pts,klippTakflatePts);
   if(result){
     const[p1,p2]=result;
-    const segs=calcSegments(z.pts,getHoyde(z))||[];
-    const ret1=_autoRetningForTakflate(p1,z,segs);
-    const ret2=_autoRetningForTakflate(p2,z,segs);
-    snapshot();
-    const baseName=tf.name||('Takflate '+(tfi+1));
-    const tf2={...JSON.parse(JSON.stringify(tf)),pts:p2,name:baseName+' B',id:'tf_'+Date.now(),retning:ret2};
-    tf.pts=p1;tf.name=baseName+' A';tf.retning=ret1;
-    z.takflater.splice(tfi+1,0,tf2);
-    z.gavlflater=[]; // strukturendring — gavlflater må reberegnast
+    snapshot();markDirty();
+    const baseName=tf.name||(F.lbl+' '+(tfi+1));
+    const tf2={...JSON.parse(JSON.stringify(tf)),pts:p2,name:baseName+' B',id:kind+'_'+Date.now()};
+    tf.pts=p1;tf.name=baseName+' A';
+    if(kind==='tak'){
+      // Fallretninga følgjer den næraste ytterfasaden til kvar nye halvdel
+      const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
+      tf.retning=_autoRetningForTakflate(p1,z,segs);
+      tf2.retning=_autoRetningForTakflate(p2,z,segs);
+      z.gavlflater=[]; // strukturendring — gavlflater må reberegnast
+    }
+    arr.splice(tfi+1,0,tf2);
     updateResults();renderTable();draw();
-    hintText.textContent='Takflata er klippt! Sjekk retning og juster om nødvendig.';
+    hintText.textContent=F.lbl+'a er klippt i to — sjekk typen på kvar del i sonekortet.';
   }else{
-    hintText.textContent='Klippelja treffer ikkje takflata — prøv å trekk linja heilt igjennom flata.';
+    hintText.textContent='Klippelinja treffer ikkje flata — prøv å trekk linja heilt igjennom.';
     draw();
   }
   klippTakflatePts=[];klippTakflateTarget=null;
@@ -4602,7 +5089,8 @@ function _finishDelSone(){
     delete ny.segOverrides;delete ny.skMergedGroups;delete ny.yvMergedGroups;
     delete ny.kjellerveggar;   // nye ytterveggar = alle med i kjellerelementet
     delete ny.groupId;delete ny.areaOverride;delete ny.perimOverride;
-    ny.takflater=[];ny.gavlflater=[];
+    // Flatene peikar på den gamle soneforma — dei nye sonene startar udelte
+    ny.takflater=[];ny.gulvflater=[];ny.gavlflater=[];
     for(let i=0;i<pts.length;i++){
       const a=pts[i],b=pts[(i+1)%pts.length];
       const oi=paaOpphavleg({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
@@ -5054,14 +5542,28 @@ function updateResults(){
       const volDisp=dispVolum!=null?dispVolum.toFixed(0)+' m³':'—';
       grid.appendChild(mkStat('Areal',areaDisp,z.areaOverride!=null?'✎ manuelt':null));
       grid.appendChild(mkStat('Volum',volDisp));
-      // Show pitched roof area if applicable
-      const tvDeg=getTakvinkel(z);
-      if(tvDeg>0&&(z.taktype||'Tak')==='Tak'){
-        const skraaA=getTakAreal(z);
-        const skraaDisp=skraaA!=null?skraaA.toFixed(1)+' m²':'—';
-        const pitchMult=(1/Math.cos(tvDeg*Math.PI/180));
-        grid.appendChild(mkStat('Tak skrått',skraaDisp,'∠'+tvDeg+'° → ×'+pitchMult.toFixed(3)));
-        grid.appendChild(mkStat('Takareal flat',dispArea!=null?dispArea.toFixed(1)+' m²':'—','Horisontalt'));
+      // Skrått takareal — summen over delflatene når taket er delt opp
+      if(harFlater(z,'tak')){
+        let flatT=0,skraaT=0,maxV=0,nTak=0;
+        flateListe(z,'tak').forEach(fl=>{
+          if(flateType(z,'tak',fl)!=='Tak')return;
+          const fa=flateAreaM2(z,fl),v=Math.max(0,fl.vinkel||0);
+          flatT+=fa;skraaT+=v>0?fa/Math.cos(v*Math.PI/180):fa;
+          if(v>maxV)maxV=v;nTak++;
+        });
+        if(nTak&&skraaT-flatT>0.05){
+          grid.appendChild(mkStat('Tak skrått',skraaT.toFixed(1)+' m²',nTak+' flate'+(nTak>1?'r':'')+' · opptil '+maxV+'°'));
+          grid.appendChild(mkStat('Takareal flat',flatT.toFixed(1)+' m²','Horisontalt'));
+        }
+      } else {
+        const tvDeg=getTakvinkel(z);
+        if(tvDeg>0&&(z.taktype||'Tak')==='Tak'){
+          const skraaA=getTakAreal(z);
+          const skraaDisp=skraaA!=null?skraaA.toFixed(1)+' m²':'—';
+          const pitchMult=(1/Math.cos(tvDeg*Math.PI/180));
+          grid.appendChild(mkStat('Tak skrått',skraaDisp,'∠'+tvDeg+'° → ×'+pitchMult.toFixed(3)));
+          grid.appendChild(mkStat('Takareal flat',dispArea!=null?dispArea.toFixed(1)+' m²':'—','Horisontalt'));
+        }
       }
       cardBody.appendChild(grid);
 
@@ -5137,238 +5639,11 @@ function updateResults(){
       himWrap.appendChild(himCb);himWrap.appendChild(himCbLbl);himWrap.appendChild(himInp);himWrap.appendChild(himU);
       settings.appendChild(mkRow('Himling',himWrap));
 
-      // Gulv / tak
-      const GULV_OPT=['Gulv på grunn','Gulv mot uoppvarma sone','Gulv mot oppvarma sone',KJELLER_GULV];
-      const TAK_OPT=['Tak','Himling mot uoppvarma sone','Himling mot varm sone'];
-      const mkSelRow=(lbl,opts,val,cb)=>{
-        const sel=document.createElement('select');sel.className='zone-select';sel.style.cssText='padding:3px 6px;font-size:11px;flex:1';
-        opts.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;if(o===val)op.selected=true;sel.appendChild(op);});
-        sel.onchange=()=>cb(sel.value);
-        return mkRow(lbl,sel);
-      };
-      const isPrimaryInGroup=!isGrouped||(linked[0]===z);
-      // Tak og gulv: alltid synleg per sone — kopla soner kan ha ulike konstruksjonstypar
-      settings.appendChild(mkSelRow('Gulv',GULV_OPT,z.gulvtype||'Gulv på grunn',v=>{z.gulvtype=v;updateResults();renderTable();}));
-
-      // Kjeller — oppfyllingshøgde + oppsummering av kva som vert eksportert
-      if(isKjeller(z)){
-        const opWrap=document.createElement('div');opWrap.style.cssText='display:flex;align-items:center;gap:5px;flex:1';
-        const opInp=document.createElement('input');opInp.type='number';opInp.min='0.1';opInp.step='0.1';
-        opInp.value=z.oppfylling!=null?z.oppfylling:'';
-        opInp.placeholder=getHoyde(z).toFixed(2);
-        opInp.title='Kor djupt kjellaren ligg under terreng. Blank = heile veggen er under terreng (= etasjehøgda).';
-        opInp.style.cssText="width:60px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace";
-        const opU=document.createElement('span');opU.style.cssText='font-size:11px;color:var(--text3)';opU.textContent='m';
-        opInp.onchange=()=>{
-          const v=parseFloat(opInp.value);
-          z.oppfylling=(isNaN(v)||v<=0)?null:v;
-          updateResults();renderTable();
-        };
-        opWrap.appendChild(opInp);opWrap.appendChild(opU);
-        settings.appendChild(mkRow('Oppfylling',opWrap));
-
-        const kjNote=document.createElement('div');
-        kjNote.style.cssText='font-size:10px;color:var(--text2);line-height:1.5;margin:4px 0 2px;padding:5px 7px;background:var(--surface3);border-radius:4px';
-        const kjLen=getKjellerVeggLen(z)??0;
-        const _kjSegs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
-        const nKj=_kjSegs.filter(s=>isKjellervegg(z,s.idx)).length;
-        // Vindauge som ligg på ein KJ-vegg forsvinn — dei på YV-veggar er trygge
-        const nWinKj=(z.windows||[]).filter(w=>isKjellervegg(z,w.segIdx)).length;
-        const _kstd=entroStandard(z.byggeaar);
-        const _ukv=z.uKjVegg??_kstd?.uKjVegg, _ukg=z.uKjGulv??_kstd?.uKjGulv;
-        const _uTxt=v=>v!=null?v.toFixed(2):'—';
-        kjNote.innerHTML='<b>Kjellerelement</b>: golv '+((getAreaM2(z)??0).toFixed(1))
-          +' m², vegg '+kjLen.toFixed(1)+' m ('+nKj+' av '+_kjSegs.length+'), høgd '
-          +getHoyde(z).toFixed(2)+' m, veggtjukn '+KJELLER_VEGGTJUKN.toFixed(2)+' m.'
-          +'<br>U-verdi vegg '+_uTxt(_ukv)+' · gulv '+_uTxt(_ukg)+' W/m²K'
-          +(z.uKjVegg!=null||z.uKjGulv!=null?' <b>(manuell)</b>':' (standard '+(z.byggeaar||'—')+')')
-          +(nKj===0?'<br><b>⚠ Ingen veggar er merkte KJ</b> — kjellaren får 0 m yttervegg.':'')
-          +(nWinKj?'<br><b>⚠ '+nWinKj+' vindauge/dør</b> står på ein KJ-vegg og vert ikkje med — kjellerelementet har ingen opningar.':'')
-          +'<br>Klikk ein vegg i lista under for å sykle <b>KJ → YV → SK</b>.';
-        settings.appendChild(kjNote);
-      }
-
-      settings.appendChild(mkSelRow('Tak',TAK_OPT,z.taktype||'Tak',v=>{z.taktype=v;updateResults();renderTable();}));
-
-        // Takvinkel — berre synleg når taktype = 'Tak' (standard tak mot det fri)
-        if((z.taktype||'Tak')==='Tak'){
-          const tvWrap=document.createElement('div');tvWrap.style.cssText='display:flex;align-items:center;gap:5px;flex:1';
-          const tvCb=document.createElement('input');tvCb.type='checkbox';tvCb.style.cssText='cursor:pointer;accent-color:var(--accent)';tvCb.checked=z.takvinkel!=null&&z.takvinkel>0;
-          const tvCbLbl=document.createElement('span');tvCbLbl.style.cssText='font-size:10.5px;color:var(--text3)';tvCbLbl.textContent='Skråtak';
-          const tvInp=document.createElement('input');tvInp.type='number';tvInp.min='1';tvInp.max='89';tvInp.step='1';tvInp.value=z.takvinkel||30;
-          tvInp.title='Takvinkel i grader frå horisontalt (0°=flatt, 30°=vanleg, 45°=bratt)';
-          tvInp.style.cssText=`width:48px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace;display:${(z.takvinkel!=null&&z.takvinkel>0)?'block':'none'}`;
-          const tvU=document.createElement('span');tvU.style.cssText=`font-size:11px;color:var(--text3);display:${(z.takvinkel!=null&&z.takvinkel>0)?'inline':'none'}`;tvU.textContent='°';
-          // Preview: show the multiplier
-          const tvPreview=document.createElement('span');
-          const updateTvPreview=()=>{
-            const deg=parseFloat(tvInp.value)||0;
-            if(deg>0&&deg<90){
-              const mult=(1/Math.cos(deg*Math.PI/180));
-              tvPreview.textContent='×'+mult.toFixed(3);
-              tvPreview.style.cssText='font-size:10px;color:var(--accent);font-family:\'DM Mono\',monospace;display:inline';
-            } else {tvPreview.style.display='none';}
-          };
-          tvCb.onchange=()=>{
-            if(tvCb.checked){tvInp.style.display='block';tvU.style.display='inline';z.takvinkel=parseFloat(tvInp.value)||30;updateTvPreview();}
-            else{tvInp.style.display='none';tvU.style.display='none';tvPreview.style.display='none';z.takvinkel=null;}
-            updateResults();renderTable();
-          };
-          tvInp.onchange=()=>{const v=parseFloat(tvInp.value);const ok=!isNaN(v)&&v>0&&v<90;z.takvinkel=ok?v:null;if(!ok&&tvInp.value.trim()!==''){tvInp.value='';hintText.textContent='⚠ Takvinkel må vere mellom 1 og 89 grader — sett til flatt tak.';}updateTvPreview();updateResults();renderTable();};
-          tvInp.oninput=updateTvPreview;
-          if(tvCb.checked)updateTvPreview();
-          tvWrap.appendChild(tvCb);tvWrap.appendChild(tvCbLbl);tvWrap.appendChild(tvInp);tvWrap.appendChild(tvU);tvWrap.appendChild(tvPreview);
-          settings.appendChild(mkRow('Takvinkel',tvWrap));
-
-          // ── Takflater-seksjon ──────────────────────────────────
-          const tfSec=document.createElement('div');
-          tfSec.style.cssText='margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)';
-          const tfHdr=document.createElement('div');
-          tfHdr.style.cssText='font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px';
-          tfHdr.innerHTML='Takflater&thinsp;<span style="font-size:8px;background:#fbbf24;color:#78350f;padding:1px 3px;border-radius:3px;font-weight:800;letter-spacing:.03em;vertical-align:middle">BETA</span>';
-          tfSec.appendChild(tfHdr);
-          const RETNING_OPTS_ALL=[{v:0,l:'Nord'},{v:45,l:'Nordaust'},{v:90,l:'Aust'},{v:135,l:'Søraust'},{v:180,l:'Sør'},{v:225,l:'Sørvest'},{v:270,l:'Vest'},{v:315,l:'Nordvest'}];
-          // Berre vis retningar som faktisk finst som YV-fasadar i denne sona, + den gjeldande verdien
-          const _tfSegs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
-          const _tfSk=z.skillevegg||new Set();
-          const _facadeAz=new Set();
-          _tfSegs.forEach(s=>{if(!_tfSk.has(s.idx))_facadeAz.add(Math.round(s.normalAz/45)*45%360);});
-          const RETNING_OPTS=RETNING_OPTS_ALL.filter(o=>_facadeAz.has(o.v)||(z.takflater||[]).some(tf=>tf.retning===o.v));
-          const TF_PALETTE_CSS=['#f59e0b','#6366f1','#ec4899','#22c55e','#f97316','#14b8a6'];
-          const tfList=z.takflater||[];
-          if(tfList.length===0){
-            // Ingen takflater: vis info + initialiser-knapp
-            const noTf=document.createElement('div');
-            noTf.style.cssText='font-size:11px;color:var(--text3);margin-bottom:6px;line-height:1.5';
-            noTf.textContent='Taket er éi heil flate. Klikk for å starte oppdeling av takflater.';
-            tfSec.appendChild(noTf);
-            const initBtn=document.createElement('button');
-            initBtn.textContent='⊞ Initialiser takflate frå soneform';
-            initBtn.style.cssText='width:100%;padding:6px;border:1px solid #f59e0b;border-radius:6px;background:#fefce8;color:#b45309;cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .12s';
-            initBtn.onmouseenter=()=>{initBtn.style.background='#fef3c7';};
-            initBtn.onmouseleave=()=>{initBtn.style.background='#fefce8';};
-            initBtn.onclick=()=>{
-              if(z.pts.length<3){hintText.textContent='Sona har ikkje nok punkt.';return;}
-              snapshot();
-              if(!z.takflater)z.takflater=[];
-              z.gavlflater=[];
-              // Auto-vel retning frå lengste YV-fasade
-              const _segs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
-              const _sk=z.skillevegg||new Set();
-              let _longestSeg=null,_maxLen=0;
-              _segs.forEach(s=>{if(!_sk.has(s.idx)&&(s.lenPx||0)>_maxLen){_maxLen=s.lenPx;_longestSeg=s;}});
-              const _initRet=_longestSeg?Math.round(_longestSeg.normalAz/45)*45%360:180;
-              z.takflater.push({id:'tf_'+Date.now(),pts:z.pts.map(p=>({...p})),vinkel:30,retning:_initRet,name:'Takflate 1'});
-              updateResults();renderTable();draw();
-            };
-            tfSec.appendChild(initBtn);
-          } else {
-            // Vis kvar takflate med klipp-knapp
-            tfList.forEach((tf,tfi)=>{
-              const col=TF_PALETTE_CSS[tfi%TF_PALETTE_CSS.length];
-              const tfCard=document.createElement('div');
-              tfCard.style.cssText=`margin-bottom:6px;padding:7px 8px;border-radius:6px;border:1px solid ${col}44;background:${col}0d`;
-              // Rad 1: farge-dot + namn + klipp + slett
-              const r1=document.createElement('div');r1.style.cssText='display:flex;align-items:center;gap:5px;margin-bottom:4px';
-              const dot=document.createElement('span');dot.style.cssText=`width:8px;height:8px;border-radius:2px;background:${col};flex-shrink:0`;
-              const nInp=document.createElement('input');nInp.type='text';nInp.value=tf.name||('Takflate '+(tfi+1));
-              nInp.style.cssText="flex:1;font-size:11px;border:1px solid var(--border2);border-radius:4px;padding:2px 5px;font-family:'DM Mono',monospace";
-              nInp.onchange=()=>{tf.name=nInp.value;draw();};
-              // Klipp-knapp (inline i kortet) — Beta-funksjon
-              const klippBtn=document.createElement('button');
-              klippBtn.title='Klipp denne takflata med ei polylinje';
-              klippBtn.textContent='✂';
-              klippBtn.style.cssText='background:none;border:1px solid #ef444466;border-radius:4px;color:#dc2626;cursor:pointer;font-size:12px;padding:1px 5px;flex-shrink:0;transition:all .1s';
-              klippBtn.onmouseenter=()=>{klippBtn.style.background='#fef2f2';};
-              klippBtn.onmouseleave=()=>{klippBtn.style.background='none';};
-              klippBtn.onclick=()=>{
-                if(fi!==activeFloor){saveFloorState();activeFloor=fi;syncFloorState();renderFloorTabs();}
-                klippTakflateTarget={z,tfi};
-                klippTakflatePts=[];
-                setMode('klipp-takflate');draw();
-                hintText.textContent='Klipp «'+tf.name+'» · klikk første punkt for klippelja. Esc for å avbryte.';
-              };
-              const delTf=document.createElement('button');delTf.textContent='✕';delTf.title='Slett takflate';
-              delTf.style.cssText='background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px';
-              delTf.onclick=()=>{snapshot();z.takflater.splice(tfi,1);z.gavlflater=[];updateResults();renderTable();draw();};
-              r1.appendChild(dot);r1.appendChild(nInp);r1.appendChild(klippBtn);r1.appendChild(delTf);
-              // Rad 2: vinkel + retning
-              const r2=document.createElement('div');r2.style.cssText='display:flex;align-items:center;gap:6px';
-              const vLbl=document.createElement('span');vLbl.style.cssText='font-size:10.5px;color:var(--text3)';vLbl.textContent='Vinkel';
-              const vInp=document.createElement('input');vInp.type='number';vInp.min='1';vInp.max='89';vInp.value=tf.vinkel||30;
-              vInp.style.cssText="width:46px;font-size:11px;border:1px solid var(--border2);border-radius:4px;padding:2px 5px;text-align:right;font-family:'DM Mono',monospace";
-              vInp.onchange=()=>{const v=parseFloat(vInp.value);tf.vinkel=(isNaN(v)||v<=0||v>=90)?30:v;_syncGavlflater(z);updateResults();renderTable();draw();};
-              const rLbl=document.createElement('span');rLbl.style.cssText='font-size:10.5px;color:var(--text3)';rLbl.textContent='Retning';
-              const rSel=document.createElement('select');rSel.style.cssText='font-size:11px;border:1px solid var(--border2);border-radius:4px;padding:2px 4px;flex:1';
-              // Vis fasaderetningar + noverande retning om ho ikkje finst i lista
-              const thisRetning=tf.retning??180;
-              const optsForThisTf=[...RETNING_OPTS];
-              if(!optsForThisTf.some(o=>o.v===thisRetning)){
-                const extra=RETNING_OPTS_ALL.find(o=>o.v===thisRetning);
-                if(extra)optsForThisTf.push(extra);
-              }
-              optsForThisTf.forEach(o=>{const op=document.createElement('option');op.value=o.v;op.textContent=o.l;if(o.v===thisRetning)op.selected=true;rSel.appendChild(op);});
-              rSel.onchange=()=>{tf.retning=parseInt(rSel.value);_syncGavlflater(z);updateResults();renderTable();draw();};
-              r2.appendChild(vLbl);r2.appendChild(vInp);r2.appendChild(document.createTextNode('°'));r2.appendChild(rLbl);r2.appendChild(rSel);
-              tfCard.appendChild(r1);tfCard.appendChild(r2);
-              tfSec.appendChild(tfCard);
-            });
-            // ── Gavlflater ──────────────────────────────────────
-            if(mmPerImgPx){
-              const gavlSec=document.createElement('div');
-              gavlSec.style.cssText='margin-top:8px;padding-top:6px;border-top:1px dashed var(--border)';
-              const gavlHdr=document.createElement('div');
-              gavlHdr.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:5px';
-              const gavlLbl=document.createElement('span');
-              gavlLbl.style.cssText='font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em';
-              gavlLbl.textContent='Gavlflater';
-              const calcGavlBtn=document.createElement('button');
-              calcGavlBtn.textContent='⊿ Berekn';
-              calcGavlBtn.title='Berekn trekantforma gavlveggar frå takflatene';
-              calcGavlBtn.style.cssText='padding:2px 7px;font-size:10px;border:1px solid var(--border2);border-radius:4px;background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .1s';
-              calcGavlBtn.onmouseenter=()=>{calcGavlBtn.style.borderColor='var(--accent)';calcGavlBtn.style.color='var(--accent)';};
-              calcGavlBtn.onmouseleave=()=>{calcGavlBtn.style.borderColor='var(--border2)';calcGavlBtn.style.color='var(--text2)';};
-              calcGavlBtn.onclick=()=>{
-                snapshot();
-                z.gavlflater=_calcGavlflater(z);
-                if(!z.gavlflater.length)hintText.textContent='Ingen gavlflater funne — sjekk at sona har takflater med vinkel > 0°';
-                updateResults();renderTable();draw();
-              };
-              gavlHdr.appendChild(gavlLbl);gavlHdr.appendChild(calcGavlBtn);
-              gavlSec.appendChild(gavlHdr);
-              const gavlList=z.gavlflater||[];
-              if(gavlList.length){
-                gavlList.forEach(gf=>{
-                  const gRow=document.createElement('div');
-                  gRow.style.cssText='display:flex;justify-content:space-between;align-items:center;font-size:10.5px;padding:2px 0;color:var(--text2)';
-                  gRow.innerHTML=`<span>⊿ ${gf.dir||'Gavl'}</span><span style="font-family:'DM Mono',monospace;color:var(--text)">${gf.area.toFixed(2)} m²</span>`;
-                  gavlSec.appendChild(gRow);
-                });
-                const gavlTot=gavlList.reduce((s,g)=>s+g.area,0);
-                const gavlTotRow=document.createElement('div');
-                gavlTotRow.style.cssText='display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;padding-top:3px;border-top:1px solid var(--border);margin-top:2px;color:var(--text)';
-                gavlTotRow.innerHTML=`<span>Totalt</span><span style="font-family:'DM Mono',monospace">${gavlTot.toFixed(2)} m²</span>`;
-                gavlSec.appendChild(gavlTotRow);
-              } else {
-                const noGavl=document.createElement('div');
-                noGavl.style.cssText='font-size:10.5px;color:var(--text3)';
-                noGavl.textContent='Ikkje berekna — klikk ⊿ Berekn';
-                gavlSec.appendChild(noGavl);
-              }
-              tfSec.appendChild(gavlSec);
-            }
-            // Tilbakestill-knapp
-            const resetTfBtn=document.createElement('button');
-            resetTfBtn.textContent='↺ Tilbakestill takflater';
-            resetTfBtn.title='Slett alle takflater og start på nytt';
-            resetTfBtn.style.cssText='width:100%;padding:5px;border:1px solid var(--border2);border-radius:6px;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;font-size:11px;margin-top:2px;transition:all .12s';
-            resetTfBtn.onmouseenter=()=>{resetTfBtn.style.background='var(--surface2)';};
-            resetTfBtn.onmouseleave=()=>{resetTfBtn.style.background='transparent';};
-            resetTfBtn.onclick=()=>{snapshot();z.takflater=[];z.gavlflater=[];updateResults();renderTable();draw();};
-            tfSec.appendChild(resetTfBtn);
-          }
-          settings.appendChild(tfSec);
-        }
+      // ── Tak og golv ──────────────────────────────────────
+      // Begge laga kan delast opp i fleire flater med kvar sin
+      // konstruksjonstype. byggFlateSeksjon byggjer begge.
+      settings.appendChild(byggFlateSeksjon(z,'gulv',fi));
+      settings.appendChild(byggFlateSeksjon(z,'tak',fi));
 
       // Standard U-verdiar badge
       if(std){
@@ -6107,9 +6382,15 @@ function renderTable(){
   html+='Manuelt justert</div></div>';
   html+='<table class="dtbl"><thead><tr><th>Namn</th><th>Kategori</th><th>Areal m²</th><th>Volum m³</th><th>Perim. m</th><th>Etg.høyde m</th><th>Himling m</th><th>Gulv</th><th>Tak</th></tr></thead><tbody>';
   const BYGG_KAT2=['Småhus','Boligblokker','Barnehager','Kontorbygg','Skolebygg','Universitets- og høgskolebygg','Sykehus','Sykehjem','Hoteller','Idrettsbygg','Forretningsbygg','Kulturbygg','Lett industri, verksteder'];
-  const GULV_OPT2=['Gulv på grunn','Gulv mot uoppvarma sone','Gulv mot oppvarma sone',KJELLER_GULV];
-  const TAK_OPT2=['Tak','Himling mot uoppvarma sone','Himling mot varm sone'];
   const mkOpts=(opts,val)=>opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('');
+  // Er laget delt opp, styrer kvar delflate sin eigen type — då er éin select
+  // for heile sona ei løgn, og cella peikar i staden til sonekortet.
+  const mkTypeCelle=(z,kind,dattr)=>{
+    const F=FLATE[kind];
+    const n=flateListe(z,kind).length;
+    if(!n)return `<select class="tbl-input" ${dattr} style="width:100%">${mkOpts(F.typar,z[F.zoneFelt]||F.std)}</select>`;
+    return `<span style="font-size:10.5px;color:var(--accent);font-weight:600" title="${F.eining[0].toUpperCase()+F.eining.slice(1)} er delt i ${n} flater — sjå sonekortet">Oppdelt · ${n} flater</span>`;
+  };
   floors.forEach((fl,fli)=>{fl.zones.forEach((z,zi)=>{
     const _zm=mppForFloor(fl);
     const area=calcAreaM2(z.pts,_zm);
@@ -6126,8 +6407,8 @@ function renderTable(){
       <td class="${z.perimOverride!=null?'cell-overridden':''}"><input class="tbl-input${z.perimOverride!=null?' overridden':''}" data-zperim="${fli},${zi}" value="${perimVal}" style="width:60px" placeholder="auto" title="${z.perimOverride!=null?'Manuelt justert — slett for å tilbakestille':'Endre for å overstyre. Blank = automatisk.'}"></td>
       <td><input class="tbl-input" data-zhoyde="${fli},${zi}" value="${getHoyde(z)}" style="width:50px" title="Etasjehøyde — styrer fasadeareal"></td>
       <td class="${z.himling!=null?'cell-overridden':''}"><input class="tbl-input${z.himling!=null?' overridden':''}" data-zhimling="${fli},${zi}" value="${z.himling!=null?z.himling:''}" placeholder="${getHoyde(z)}" style="width:50px" title="Himlingshøgde — styrer berre volum. Blank = same som etg.høyde."></td>
-      <td><select class="tbl-input" data-zgulv="${fli},${zi}" style="width:100%">${mkOpts(GULV_OPT2,z.gulvtype||'Gulv på grunn')}</select></td>
-      <td><select class="tbl-input" data-ztak="${fli},${zi}" style="width:100%">${mkOpts(TAK_OPT2,z.taktype||'Tak')}</select></td>
+      <td>${mkTypeCelle(z,'gulv',`data-zgulv="${fli},${zi}"`)}</td>
+      <td>${mkTypeCelle(z,'tak',`data-ztak="${fli},${zi}"`)}</td>
     </tr>`;
   });});
   html+='</tbody></table>';
@@ -6136,40 +6417,54 @@ function renderTable(){
   html+='<div class="ttitle">Tak og gulv</div>';
   html+='<table class="dtbl"><thead><tr><th>Sone</th><th>Type</th><th>Konstruksjon</th><th>Flatareal m²</th><th>Takvinkel °</th><th title="Skrått areal etter vinkelkorrigering">Skrå m²</th><th>Utv. perimeter m</th></tr></thead><tbody>';
   floors.forEach((fl,fli)=>{fl.zones.forEach((z,zi)=>{
-    const a=getAreaM2(z);
-    const aStr=a!=null?a.toFixed(2):'—';
-    const GULV_OPT3=['Gulv på grunn','Gulv mot uoppvarma sone','Gulv mot oppvarma sone',KJELLER_GULV];
-    const TAK_OPT3=['Tak','Himling mot uoppvarma sone','Himling mot varm sone'];
-    const mkO3=(opts,val,dkey)=>{
-      const s=`<select class="tbl-input" ${dkey} style="width:100%">`+opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')+'</select>';
-      return s;
-    };
     const utvOmk=getUtvOmkrets(z);
-    const utvStr=utvOmk!=null?utvOmk.toFixed(2):"—";
     const _fltag=floors.length>1?` (${fl.name})`:'';
-
-    // Tak-rad: vis takvinkel og skrå-areal
-    const taktype=z.taktype||'Tak';
-    const isStdTak=taktype==='Tak';
-    const tvDeg=getTakvinkel(z);
-    const skraaA=getTakAreal(z);
-    const tvStr=isStdTak?(tvDeg>0?tvDeg.toFixed(0):'0'):'—';
-    const skraaStr=isStdTak&&skraaA!=null?skraaA.toFixed(2):'—';
-    const tvHighlight=isStdTak&&tvDeg>0?'style="color:var(--accent);font-weight:600"':'style="color:var(--text3)"';
-
-    html+=`<tr><td style="color:#64748b">${z.name}${_fltag}</td><td style="color:#6b7280">Gulv</td>`
-      +`<td>${mkO3(GULV_OPT3,z.gulvtype||'Gulv på grunn',`data-tgulv="${fli},${zi}"`)}</td>`
-      +`<td style="font-weight:600">${aStr}</td>`
-      +`<td style="color:var(--text3)">—</td>`
-      +`<td style="color:var(--text3)">—</td>`
-      +`<td style="color:#64748b" title="Utvendig omkrets (berre yttervegg, ikkje SK)">${utvStr} m</td></tr>`;
-    html+=`<tr><td style="color:#64748b">${z.name}${_fltag}</td><td style="color:#6b7280">Tak</td>`
-      +`<td>${mkO3(TAK_OPT3,z.taktype||'Tak',`data-ttak="${fli},${zi}"`)}</td>`
-      +`<td style="font-weight:600">${aStr}</td>`
-      +`<td><input class="tbl-input" data-ztakvinkel="${fli},${zi}" value="${isStdTak?tvDeg:''}" placeholder="0" style="width:46px;${isStdTak?'':'opacity:.35;pointer-events:none'}" title="Takvinkel i grader (0=flatt). Arealet vert korrigert med 1/cos(vinkel)."></td>`
-      +`<td ${tvHighlight}>${skraaStr}</td>`
-      +`<td style="color:#94a3b8">—</td></tr>`;
-
+    const _sk=z.skillevegg||new Set();
+    // Éi rad per flate. Udelt lag gir nøyaktig éi rad med redigerbar type, som før.
+    const flateRader=(kind,dattr)=>{
+      const F=FLATE[kind];
+      const delt=flateListe(z,kind).length>0;
+      eksportFlater(z,kind).forEach(({fl:flate,type,navn,area},fi2)=>{
+        const typeCelle=delt
+          ?`<select class="tbl-input" data-tflate="${fli},${zi},${kind},${fi2}" style="width:100%">`
+            +F.typar.map(o=>`<option${o===type?' selected':''}>${o}</option>`).join('')+'</select>'
+          :`<select class="tbl-input" ${dattr} style="width:100%">`
+            +F.typar.map(o=>`<option${o===type?' selected':''}>${o}</option>`).join('')+'</select>';
+        const radNamn=delt?`${z.name}${_fltag} <span style="color:var(--text3)">· ${navn}</span>`:`${z.name}${_fltag}`;
+        // Vinkel og skrått areal er berre meiningsfulle på tak mot det fri
+        const erTak=kind==='tak'&&type==='Tak';
+        const tvDeg=erTak?(flate?Math.max(0,flate.vinkel||0):getTakvinkel(z)):0;
+        const skraaA=erTak?(flate?(tvDeg>0?area/Math.cos(tvDeg*Math.PI/180):area):(getTakAreal(z)??0)):null;
+        const tvCelle=erTak
+          ?(delt
+            ?`<span style="font-family:'DM Mono',monospace;color:${tvDeg>0?'var(--accent)':'var(--text3)'}">${tvDeg.toFixed(0)}</span>`
+            :`<input class="tbl-input" data-ztakvinkel="${fli},${zi}" value="${tvDeg||''}" placeholder="0" style="width:46px" title="Takvinkel i grader (0=flatt). Arealet vert korrigert med 1/cos(vinkel).">`)
+          :'<span style="color:var(--text3)">—</span>';
+        // Perimeter: berre golv på grunn. Ei delflate har berre si eiga ytterkant.
+        let perimCelle='<span style="color:#94a3b8">—</span>';
+        if(kind==='gulv'){
+          const pm=flate?flateKantLenM(z,flate,ix=>!_sk.has(ix)):utvOmk;
+          perimCelle=pm!=null?`<span title="Utvendig omkrets (berre yttervegg, ikkje SK)">${pm.toFixed(2)} m</span>`:'—';
+        }
+        html+=`<tr><td style="color:#64748b">${radNamn}</td>`
+          +`<td style="color:#6b7280">${kind==='tak'?'Tak':'Gulv'}</td>`
+          +`<td>${typeCelle}</td>`
+          +`<td style="font-weight:600">${area.toFixed(2)}</td>`
+          +`<td>${tvCelle}</td>`
+          +`<td ${erTak&&tvDeg>0?'style="color:var(--accent);font-weight:600"':'style="color:var(--text3)"'}>${skraaA!=null?skraaA.toFixed(2):'—'}</td>`
+          +`<td style="color:#64748b">${perimCelle}</td></tr>`;
+      });
+      // Manglande eller overlappande dekning skal aldri passere i stillheit
+      const avvik=flateAvvikM2(z,kind);
+      if(delt&&Math.abs(avvik)>0.05){
+        html+=`<tr><td colspan="7" style="color:#92400e;background:#fef3c7;font-size:10.5px">`
+          +(avvik>0?`⚠ ${avvik.toFixed(2)} m² av ${F.eining} i ${z.name} er ikkje dekt av nokon flate`
+                   :`⚠ Flatene på ${F.eining} i ${z.name} overlappar med ${(-avvik).toFixed(2)} m²`)
+          +'</td></tr>';
+      }
+    };
+    flateRader('gulv',`data-tgulv="${fli},${zi}"`);
+    flateRader('tak',`data-ttak="${fli},${zi}"`);
   });});
   html+='</tbody></table>';
 
@@ -6446,6 +6741,24 @@ function renderTable(){
     const _z=floors[_fi].zones[_zi];
     sel.onchange=()=>{_z.taktype=sel.value;updateResults();renderTable();};
   });
+  wrap.querySelectorAll('[data-tflate]').forEach(sel=>{
+    const [_fi,_zi,_kind,_idx]=sel.dataset.tflate.split(',');
+    const _z=floors[parseInt(_fi)]?.zones[parseInt(_zi)];
+    const _fl=_z&&flateListe(_z,_kind)[parseInt(_idx)];
+    if(!_fl)return;
+    sel.onchange=()=>{
+      snapshot();
+      _fl.type=sel.value;
+      if(_kind==='tak'){
+        if(_fl.type==='Tak'){
+          if(_fl.vinkel==null)_fl.vinkel=getTakvinkel(_z);
+          if(_fl.retning==null)_fl.retning=_autoRetningForTakflate(_fl.pts,_z,calcSegments(_z.pts,getHoyde(_z),mppForZone(_z))||[]);
+        }
+        _z.gavlflater=[];
+      }
+      updateResults();renderTable();draw();
+    };
+  });
   wrap.querySelectorAll('[data-tgulv]').forEach(sel=>{
     const [_fi,_zi]=sel.dataset.tgulv.split(',').map(Number);
     const _z=floors[_fi].zones[_zi];
@@ -6507,10 +6820,11 @@ function renderTable(){
   });
 }
 
-// Snap-funksjon for klipp-takflate: hjørner og kantmidtpunkt på alle takflater i sona
+// Snap-funksjon for klippeverktøyet: hjørner og kantmidtpunkt på alle flater i laget
 function _snapKlippPt(sx,sy){
   if(!klippTakflateTarget)return null;
   const{z}=klippTakflateTarget;
+  const _kind=klippTakflateTarget.kind||'tak';
   const THRESH=16; // skjermpikslar
   let best=null,bestD=THRESH;
   const check=(x,y,type)=>{
@@ -6518,7 +6832,7 @@ function _snapKlippPt(sx,sy){
     const d=Math.hypot(sx-sp.x,sy-sp.y);
     if(d<bestD){bestD=d;best={x,y,sx:sp.x,sy:sp.y,type};}
   };
-  (z.takflater||[]).forEach(tf=>{
+  flateListe(z,_kind).forEach(tf=>{
     const pts=tf.pts||[];
     // Hjørner
     pts.forEach(p=>check(p.x,p.y,'corner'));
@@ -8099,6 +8413,10 @@ async function lastProsjekt(proj,opts){
   const newFloors=await Promise.all(proj.floors.map(f=>deserialiserEtasje(f)));
   floors=newFloors;
   activeFloor=Math.min(proj.activeFloor??0,floors.length-1);
+  // Vis den oppdelinga prosjektet faktisk har. Berre eitt lag om gongen, og
+  // taket vinn — utan oppdelt tak ville golvlaget elles ligge usynleg.
+  flateLag=floors.some(fl=>fl.zones.some(z=>(z.takflater||[]).length))?'tak'
+          :(floors.some(fl=>fl.zones.some(z=>(z.gulvflater||[]).length))?'gulv':'tak');
   globalNorth=proj.globalNorth??0;
   globalMmPerImgPx=proj.globalMmPerImgPx??null;
   prosjektAdresse=proj.prosjektAdresse||'';
@@ -10934,69 +11252,71 @@ function buildSXI(proj){
       });
     });
 
-    // Tak og gulv — per instans med eigne konstruksjonstypar
+    // Tak og gulv — per instans, og per delflate når taket eller golvet er
+    // delt opp. `eksportFlater` gir alltid minst éi oppføring, så begge vegane
+    // går gjennom same løkka: udelt sone gir teikn for teikn same XML som før.
     let takXml='',gulvXml='',kjellerXml='';
     instances.forEach(lz=>{
-      const takType=lz.taktype||'Tak';
-      const gulvType=lz.gulvtype||'Gulv på grunn';
-      const a=getAreaM2(lz);
-      const aStr=(a??0).toFixed(2);
       const perim=getUtvOmkrets(lz)??getPerimM(lz)??0;
       const flSuf2=instances.length>1?' ('+zoneFloorName.get(lz)+')':'';
+      const lzSk=lz.skillevegg||new Set();
 
       // ── TAK ──────────────────────────────────────────────────
-      if(takType==='Himling mot uoppvarma sone'){
-        const thisTakId=nextId('partition');
-        takXml+=`    <partition id="${thisTakId}" name="Himling mot uoppvarma sone${flSuf2}" comment="" area="${aStr}" uvalue="${uTak}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="himling" facing="unheated_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="Uklimatisert loftsrom eller kaldt luftet loft" heat_loss_coeff="0.93" zone_temperature="5.0"></partition>\n`;
-      } else if(takType==='Himling mot varm sone'){
-        const thisTakId=nextId('partition');
-        takXml+=`    <partition id="${thisTakId}" name="Himling mot varm sone${flSuf2}" comment="" area="${aStr}" uvalue="${uTak}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="himling" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
-      } else {
-        // Standard tak mot det fri
-        if((lz.takflater||[]).length>0){
-          // Fleire takflater — éin <roof> per flate
-          lz.takflater.forEach((tf,tfi)=>{
-            if((tf.pts||[]).length<3)return;
-            const thisTakId=nextId('roof');
-            const flatA=calcAreaM2(tf.pts,mppForZone(lz))??0;
-            const tvDeg=Math.max(0,tf.vinkel||0);
-            const skraaA=tvDeg>0?flatA/Math.cos(tvDeg*Math.PI/180):flatA;
-            const inclination=tvDeg>0?tvDeg.toFixed(1):'0';
-            const dir=(((tf.retning??180)+360)%360).toFixed(0);
-            const tfName=xesc((tf.name||('Takflate '+(tfi+1)))+flSuf2);
-            takXml+=`    <roof id="${thisTakId}" name="${tfName}" comment="" area="${skraaA.toFixed(2)}" uvalue="${uTak}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" exposed="no" ext_absorption_coeff="0.80" direction="${dir}" inclination="${inclination}" horizon_sector_n="9.0" horizon_sector_ne="9.0" horizon_sector_e="9.0" horizon_sector_se="9.0" horizon_sector_s="9.0" horizon_sector_sw="9.0" horizon_sector_w="9.0" horizon_sector_nw="9.0"></roof>\n`;
-          });
+      eksportFlater(lz,'tak').forEach(({fl,type:takType,navn,area})=>{
+        const uT=(fl&&fl.uverdi!=null)?fl.uverdi:uTak;
+        if(takType==='Himling mot uoppvarma sone'){
+          const thisTakId=nextId('partition');
+          const nm=xesc((navn||'Himling mot uoppvarma sone')+flSuf2);
+          takXml+=`    <partition id="${thisTakId}" name="${nm}" comment="" area="${area.toFixed(2)}" uvalue="${uT}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="himling" facing="unheated_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="Uklimatisert loftsrom eller kaldt luftet loft" heat_loss_coeff="0.93" zone_temperature="5.0"></partition>\n`;
+        } else if(takType==='Himling mot varm sone'){
+          const thisTakId=nextId('partition');
+          const nm=xesc((navn||'Himling mot varm sone')+flSuf2);
+          takXml+=`    <partition id="${thisTakId}" name="${nm}" comment="" area="${area.toFixed(2)}" uvalue="${uT}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="himling" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
         } else {
-          // Enkel takvinkel (eksisterande åtferd)
+          // Tak mot det fri. Udelt tak: sona sin takvinkel og retning 100 som før.
           const thisTakId=nextId('roof');
-          const tvDeg=getTakvinkel(lz);
-          const skraaA=getTakAreal(lz);
-          const takArealStr=(skraaA??0).toFixed(2);
+          const tvDeg=fl?Math.max(0,fl.vinkel||0):getTakvinkel(lz);
+          const skraaA=fl
+            ?(tvDeg>0?area/Math.cos(tvDeg*Math.PI/180):area)
+            :(getTakAreal(lz)??0);
           const inclination=tvDeg>0?tvDeg.toFixed(1):'0';
-          takXml+=`    <roof id="${thisTakId}" name="Tak${flSuf2}" comment="" area="${takArealStr}" uvalue="${uTak}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" exposed="no" ext_absorption_coeff="0.80" direction="100" inclination="${inclination}" horizon_sector_n="9.0" horizon_sector_ne="9.0" horizon_sector_e="9.0" horizon_sector_se="9.0" horizon_sector_s="9.0" horizon_sector_sw="9.0" horizon_sector_w="9.0" horizon_sector_nw="9.0"></roof>\n`;
+          const dir=fl?(((fl.retning??180)+360)%360).toFixed(0):'100';
+          const nm=xesc((navn||'Tak')+flSuf2);
+          takXml+=`    <roof id="${thisTakId}" name="${nm}" comment="" area="${skraaA.toFixed(2)}" uvalue="${uT}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" exposed="no" ext_absorption_coeff="0.80" direction="${dir}" inclination="${inclination}" horizon_sector_n="9.0" horizon_sector_ne="9.0" horizon_sector_e="9.0" horizon_sector_se="9.0" horizon_sector_s="9.0" horizon_sector_sw="9.0" horizon_sector_w="9.0" horizon_sector_nw="9.0"></roof>\n`;
         }
-      }
+      });
 
       // ── GULV ─────────────────────────────────────────────────
-      if(gulvType==='Gulv mot uoppvarma sone'){
-        const thisGulvId=nextId('partition');
-        gulvXml+=`    <partition id="${thisGulvId}" name="Gulv mot uoppvarma sone${flSuf2}" comment="" area="${aStr}" uvalue="${uGulv}" thermal_cap="63.00" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="gulv" facing="unheated_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="Kald luftet kjeller eller parkeringskjeller" heat_loss_coeff="0.91" zone_temperature="5.0"></partition>\n`;
-      } else if(gulvType==='Gulv mot oppvarma sone'){
-        const thisGulvId=nextId('partition');
-        gulvXml+=`    <partition id="${thisGulvId}" name="Gulv mot oppvarma sone${flSuf2}" comment="" area="${aStr}" uvalue="${uGulv}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="gulv" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
-      } else if(gulvType===KJELLER_GULV){
-        // Kjeller — eitt element som dekkjer både golvet og dei veggane som er
-        // merkte KJ. fill_depth er kor djupt kjellaren ligg under terreng.
-        const kjId=nextId('cellar');
-        const veggLen=getKjellerVeggLen(lz)??0;
-        const veggH=getHoyde(lz);
-        const fyll=Math.min(getOppfylling(lz),veggH);
-        kjellerXml+=`    <cellar id="${kjId}" name="${xesc('Kjeller'+flSuf2)}" comment="" area="${aStr}" uvalue="${uKjGulv}" thermal_cap="63.0" construction="Egendefinert" internal_layer="Tungt gulv" wall_length="${veggLen.toFixed(2)}" wall_height="${veggH.toFixed(2)}" fill_depth="${fyll.toFixed(2)}" wall_thickness="${KJELLER_VEGGTJUKN.toFixed(2)}" wall_uvalue="${uKjVegg}" wall_thermal_cap="63.0" wall_construction="Egendefinert" wall_internal_layer="Tung vegg" ground_condition="Leire/silt" ground_thermal_cond="1.50" ground_thermal_cap="833.00"></cellar>\n`;
-      } else {
-        // Gulv på grunn (standard)
-        const thisGulvId=nextId('floor');
-        gulvXml+=`    <floor id="${thisGulvId}" name="Gulv på grunn${flSuf2}" comment="" area="${aStr}" uvalue="${uGulv}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" floor_type="grunn" perimeter="${perim.toFixed(2)}" foundation="0.30" ground_condition="Standardvalg" ground_thermal_cond="1.50" ground_thermal_cap="556.00" edge_insulation="yes" edge_insulation_type="vertikal" edge_insulation_depth="0.60" edge_insulation_thickness="5.00" edge_insulation_product="Standardvalg" edge_insulation_lambda="0.037" unheated_zone="" heat_loss_coeff="0.95"></floor>\n`;
-      }
+      eksportFlater(lz,'gulv').forEach(({fl,type:gulvType,navn,area})=>{
+        const uG=(fl&&fl.uverdi!=null)?fl.uverdi:uGulv;
+        if(gulvType==='Gulv mot uoppvarma sone'){
+          const thisGulvId=nextId('partition');
+          const nm=xesc((navn||'Gulv mot uoppvarma sone')+flSuf2);
+          gulvXml+=`    <partition id="${thisGulvId}" name="${nm}" comment="" area="${area.toFixed(2)}" uvalue="${uG}" thermal_cap="63.00" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="gulv" facing="unheated_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="Kald luftet kjeller eller parkeringskjeller" heat_loss_coeff="0.91" zone_temperature="5.0"></partition>\n`;
+        } else if(gulvType==='Gulv mot oppvarma sone'){
+          const thisGulvId=nextId('partition');
+          const nm=xesc((navn||'Gulv mot oppvarma sone')+flSuf2);
+          gulvXml+=`    <partition id="${thisGulvId}" name="${nm}" comment="" area="${area.toFixed(2)}" uvalue="${uG}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="gulv" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
+        } else if(gulvType===KJELLER_GULV){
+          // Kjeller — eitt element som dekkjer både golvet og dei veggane som er
+          // merkte KJ. fill_depth er kor djupt kjellaren ligg under terreng.
+          // Er golvet delt opp, tel berre dei KJ-veggane som ligg langs denne
+          // delflata — elles ville kvar delflate fått heile kjellerveggen.
+          const kjId=nextId('cellar');
+          const veggLen=fl?flateKantLenM(lz,fl,i=>isKjellervegg(lz,i)):(getKjellerVeggLen(lz)??0);
+          const veggH=getHoyde(lz);
+          const fyll=Math.min(getOppfylling(lz),veggH);
+          const nm=xesc((navn||'Kjeller')+flSuf2);
+          kjellerXml+=`    <cellar id="${kjId}" name="${nm}" comment="" area="${area.toFixed(2)}" uvalue="${uKjGulv}" thermal_cap="63.0" construction="Egendefinert" internal_layer="Tungt gulv" wall_length="${veggLen.toFixed(2)}" wall_height="${veggH.toFixed(2)}" fill_depth="${fyll.toFixed(2)}" wall_thickness="${KJELLER_VEGGTJUKN.toFixed(2)}" wall_uvalue="${uKjVegg}" wall_thermal_cap="63.0" wall_construction="Egendefinert" wall_internal_layer="Tung vegg" ground_condition="Leire/silt" ground_thermal_cond="1.50" ground_thermal_cap="833.00"></cellar>\n`;
+        } else {
+          // Gulv på grunn (standard). Perimeteren er den delen av flatekanten
+          // som ligg mot det fri — ei delflate midt inne i sona har ingen.
+          const thisGulvId=nextId('floor');
+          const pm=fl?flateKantLenM(lz,fl,i=>!lzSk.has(i)):perim;
+          const nm=xesc((navn||'Gulv på grunn')+flSuf2);
+          gulvXml+=`    <floor id="${thisGulvId}" name="${nm}" comment="" area="${area.toFixed(2)}" uvalue="${uG}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" floor_type="grunn" perimeter="${pm.toFixed(2)}" foundation="0.30" ground_condition="Standardvalg" ground_thermal_cond="1.50" ground_thermal_cap="556.00" edge_insulation="yes" edge_insulation_type="vertikal" edge_insulation_depth="0.60" edge_insulation_thickness="5.00" edge_insulation_product="Standardvalg" edge_insulation_lambda="0.037" unheated_zone="" heat_loss_coeff="0.95"></floor>\n`;
+        }
+      });
     });
 
     const bra=totalBra.toFixed(2);
@@ -11707,7 +12027,10 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
             // legg til nord-rotasjonen slik at kompass-retninga vert bilderetning
             const _retRad=((tf.retning||0)+(parseFloat(northI.value)||0))*Math.PI/180;
             const ux=-Math.sin(_retRad),uz=Math.cos(_retRad);
-            const tanV=Math.tan(Math.max(0,(tf.vinkel||0))*Math.PI/180);
+            // Ei himling mot ei anna sone er flat — ho har inga fallretning
+            const _tfTyp=flateType(z,'tak',tf);
+            const _erTak=_tfTyp==='Tak';
+            const tanV=_erTak?Math.tan(Math.max(0,(tf.vinkel||0))*Math.PI/180):0;
             let minProj=Infinity;
             for(let i=0;i<n;i++){const proj=tfPos.getX(i)*ux+tfPos.getY(i)*uz;if(proj<minProj)minProj=proj;}
             const verts=new Float32Array(n*3);
@@ -11720,17 +12043,21 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
             tfNewGeo.setAttribute('position',new THREE.BufferAttribute(verts,3));
             if(tfGeo2d.index)tfNewGeo.setIndex(tfGeo2d.index);
             tfNewGeo.computeVertexNormals();
-            const tfColor=TF3D_PAL[tfi%TF3D_PAL.length];
+            // Himlingar får ein dempa gråtone, så ein ser med ein gong kva
+            // som er tak mot det fri og kva som grensar mot ei anna sone
+            const tfColor=_erTak?TF3D_PAL[tfi%TF3D_PAL.length]:0x94a3b8;
             const tfMat=new THREE.MeshLambertMaterial({color:tfColor,side:THREE.DoubleSide,transparent:true,opacity:0.82});
             const tfMesh=new THREE.Mesh(tfNewGeo,tfMat);
             tfMesh.userData.w=true;
+            const _uTf=tf.uverdi??z.uTak??entroStandard(z.byggeaar)?.uTak;
             tfMesh.userData.pick={
               title:z.name+' — '+(tf.name||('Takflate '+(tfi+1))),
               rows:[
                 ['Etasje',f.name],
-                ['Takvinkel',(tf.vinkel||0)+'°'],
-                ['Fallretning',(tf.retning??180)+'°'],
-                ['U-tak',(z.uTak??entroStandard(z.byggeaar)?.uTak)!=null?((z.uTak??entroStandard(z.byggeaar).uTak).toFixed(2)+' W/m²K'):'—']
+                ['Type',_tfTyp],
+                ...(_erTak?[['Takvinkel',(tf.vinkel||0)+'°'],['Fallretning',(tf.retning??180)+'°']]:[]),
+                ['Areal',flateAreaM2(z,tf).toFixed(2)+' m²'],
+                ['U-verdi',_uTf!=null?(_uTf.toFixed(2)+' W/m²K'+(tf.uverdi!=null?' (eiga)':'')):'—']
               ]
             };
             scene3.add(tfMesh);
