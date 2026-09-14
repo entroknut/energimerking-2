@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 4.0.0 | Single-file HTML applikasjon
+**Versjon:** 4.2.0 | Single-file HTML applikasjon
 
 ---
 
@@ -702,6 +702,67 @@ SXI-eksporten er urørte — å skjule er eit visingsval, ikkje ei sletting.
 - 3D-legenda og verdssentrum i 3D/kart reknast frå dei synlege sonene, så
   modellen sentrerer på det som faktisk vert vist.
 
+## Fasadeteikningar
+
+Eit **fasadeark** er ei teikning som berre vert målt på. Det ligg VED SIDA AV
+planteikningane, ikkje som ein etasje: ingen soner, ingen vindauge, inga
+kopling til 3D-modellen, kartet eller SXI-eksporten. `floors` er framleis
+modellen, og alt som reknar på bygget skal halde fram med å sjå berre den
+arrayen. Arka ligg i `fasadar[]` med `activeFasade`/`_nextFasadeId`.
+
+```javascript
+fasadar = [{
+  id, name,
+  bgImg, bgImgData, pdfDoc, pdfPage, totalPages,
+  paperWMm, paperHMm, paperSource,
+  mmPerImgPx,        // EIGA kalibrering — ingen global, ingen ownCal
+  sc, offX, offY,
+  measurements       // [{p1,p2}] i biletkoordinatar, som på ein etasje
+}]
+```
+
+**Lerret-globalane peikar på det aktive arket i begge visingar.** Det er heile
+poenget: måleverktøyet, kalibreringa, zoom/pan og `imgLineSnap` verkar på eit
+fasadeark utan ein einaste ny kodeveg. `viewMode` ('plan' | 'fasade') seier
+kven som eig dei, og `curArk()` gir arket (etasje eller fasade) for det som
+høyrer til teikninga — papirformat, PDF-sider, bakgrunnsbilete.
+
+Invariantar:
+
+- **`saveFloorState()` skriv til fasadearket når det er framme**, ikkje til
+  etasjen. Autolagringa kallar han kvart minutt; utan vakta ville fasadebiletet
+  og fasadeskalaen hamna på den aktive etasjen.
+- **`syncFloorState()` set berre `zones`-aliaset i fasadevisinga.** Aliaset må
+  likevel følgje med — elles ville ei angring late det stå att på den gamle
+  arrayen, og neste `saveFloorState()` ville skrive den utdaterte sonelista
+  tilbake på etasjen.
+- **Fasadearket har inga ghost-forskyving.** `_arkOffset()` gir `{0,0}` der, så
+  etasjen si forskyving ikkje forskyv fasademåla.
+- **Alt som slår opp soner må hoppe over fasadevisinga**: `unifiedSnap`
+  (sonehjørne og sonekant — `imgLineSnap` skal derimot verke), `snapToSegment`,
+  `findWindowAtScreen`, hover for Ctrl+C, høgreklikk-oppslaget, sone-løkka i
+  `draw()` og ghost-laget. Sonene ligg på heilt andre koordinatar på eit anna
+  ark, så eit treff ville vore reint tilfeldig.
+- **Kvart ark har si eiga kalibrering.** Ei fasadeteikning er sjeldan i same
+  målestokk som planen, og det finst ingen global fasadeskala å arve.
+  `calOk` har ei eiga grein: ingen `_reskalerAlleEtasjar`, sidan arket ikkje
+  har noko lagra i millimeter — måla vert rekna frå biletpikslar ved kvar
+  teikning og følgjer omkalibreringa av seg sjølv.
+- **Arealkalibrering er skjult** i fasadevisinga (ho krev ei sone).
+- **Ei ny teikning på arket tømmer måla** (`.length=0`, ikkje ei ny array —
+  `measureResults`-aliaset). Dei var målte på det biletet som vart bytta ut.
+- UI: `data-view` på `<html>` frå `applyViewUI()`. Klassene `.plan-only` og
+  `.fasade-only` gjer resten, så ein ny fasade-berre kontroll er rein markup.
+  Reglane MÅ stå etter `.embed-only`-reglane — lik spesifisitet, siste vinn,
+  slik at ein embed-only-knapp som òg er plan-only forsvinn i fasadevisinga.
+- **Lagring:** `fasadar`, `activeFasade` og `_nextFasadeId` er felt på
+  prosjektnivå og ligg i `serialiserProsjekt()`/`lastProsjekt()` +
+  `snapshot()`/`applyHistoryState()`/`getCurrentState()` (via `_fasadeMinne`).
+  Eit prosjekt vert alltid opna i planvisinga. Bakgrunnsbiletet går gjennom
+  same `_serBgInn()`-mellomlager som etasjane.
+- Etasje-klippbordet og etasjeimporten tek **ikkje** med fasadeark — dei
+  kopierer etasjar.
+
 ## Kjende manglar / ikkje implementert
 
 - Import av eksisterande SXI
@@ -774,4 +835,7 @@ Viktig bughistorikk:
   tiltak skal meldast, aldri silast bort i stillheit
 - Tiltak utan included_measures_ids + <profitsim> blir ståande urekna i SIMIEN.
   profitsim har id-prefiks `profit-evaluation`, ikkje taggnamnet
+- Fasadeark er IKKJE etasjar. saveFloorState/syncFloorState har vakter for
+  viewMode, og alt som slår opp soner må hoppe over fasadevisinga — sjå
+  «Fasadeteikningar»
 ```
