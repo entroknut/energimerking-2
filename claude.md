@@ -794,6 +794,26 @@ Invariantar:
 - Del sone og kopiering mellom etasjar nullstiller begge listene — dei peikar på
   den gamle soneforma.
 
+Sidepanelet:
+
+- Begge seksjonane er **kollapsbare** og brukar `.sub-sec`-mønsteret frå
+  vindaugslista. Tilstanden ligg i `window._flateCollapsed[`fl_<fi>_<zi>_<kind>`]`
+  og overlever dei hyppige rebuildane. Lister lengre enn
+  `FLATELIST_AUTO_COLLAPSE` startar samanslegne.
+- **Samandraget står i headeren** (`.sub-count`): konstruksjonstypen når laget er
+  udelt (pluss takvinkelen), «n flater» når det er delt, og gul pille med ⚠ når
+  flatene ikkje dekkjer sonearealet. Poenget er at ein ser verdien utan å opne
+  seksjonen — elles ville det å gøyme han vore å gøyme informasjon.
+- **Alt+klikk på headeren** set same tilstand på alle soner. Eit prosjekt med 30
+  soner skal kunne ryddast med eitt klikk, ikkje eitt per sonekort.
+- Klippeknappen (✂) bur i headeren, ikkje som ein brei knapp i kroppen — dei
+  fleste soner vert aldri delte opp.
+- `_finishKlipp` ryddar `klippTakflatePts`/`klippTakflateTarget` og går ut av
+  klippemodus **før** `draw()`. Gjer han det etterpå, blir den raude
+  forhandsvisninga ståande att på lerretet til noko anna utløyser ei ny
+  teikning. Bomskot (linja treffer ikkje flata) held derimot på målet, så
+  brukaren kan prøve igjen utan å starte på nytt.
+
 ## Skjulte soner
 
 `z.skjult` tek sona ut av **visinga**: planteikninga (inkludert ghost-laget frå
