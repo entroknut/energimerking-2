@@ -301,6 +301,30 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 [data-embed] .embed-only.eo-inline{display:inline-flex!important}
 [data-embed] .local-only{display:none!important}
 
+/* ── Fasadeteikningar ────────────────────────────────────────
+   Fasadearka er eit eige lag ved sida av planteikningane. Dei vert berre
+   målte på: ingen soner, ingen påverknad på 3D-modellen eller SXI-eksporten.
+   `data-view="fasade"` vert sett på <html> av applyViewUI(). Alt som høyrer
+   til sonene får .plan-only, alt som berre gjeld fasadearka .fasade-only —
+   same mekanikk som .embed-only/.local-only, så ein ny knapp er rein markup.
+   MÅ stå etter .embed-only-reglane: lik spesifisitet, og den siste vinn, slik
+   at ein embed-only-knapp som òg er plan-only forsvinn i fasadevisinga. */
+.fasade-only{display:none!important}
+[data-view="fasade"] .fasade-only{display:flex!important}
+[data-view="fasade"] .fasade-only.eo-inline{display:inline-flex!important}
+[data-view="fasade"] .plan-only{display:none!important}
+/* Vis-vekslaren — segmentert kontroll heilt til venstre i fanelinja */
+#viewSwitch{display:flex;align-items:center;gap:0;flex-shrink:0;border:1px solid var(--border2);
+  border-radius:7px;overflow:hidden;background:var(--surface2);margin-right:4px}
+.view-sw-btn{
+  display:flex;align-items:center;gap:5px;padding:4px 10px;border:none;background:transparent;
+  color:var(--text3);cursor:pointer;font-family:inherit;font-size:11px;font-weight:500;
+  white-space:nowrap;transition:all .12s;
+}
+.view-sw-btn+.view-sw-btn{border-left:1px solid var(--border2)}
+.view-sw-btn:hover:not(.on){background:var(--surface3);color:var(--text2)}
+.view-sw-btn.on{background:var(--accent);color:#fff;font-weight:600}
+
 /* ── Responsiv verktøylinje ──────────────────────────────────
    Knappane skal alltid vere synlege. Først vert alt tettare, og
    dei lengste merkelappane vert korta ned; er det framleis for
@@ -671,35 +695,35 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div class="tg">
       <button class="btn" id="calBtn" title="Kalibrer skala">⊕ Kalibrer</button>
       <button class="btn" id="rotBtn" title="Roter 90°">↻ Roter</button>
-      <span class="lbl" style="margin-left:4px"><span class="tb-full">Etg.høgde</span><span class="tb-short">Etg.</span></span>
-      <input type="number" class="ni" id="fhI" value="3.0" min="0.1" step="0.1">
-      <span class="lbl">m</span>
-      <span class="lbl" style="margin-left:4px">Nord</span>
-      <span class="lbl" id="northLabel" style="font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text2);min-width:32px">0°</span>
+      <span class="lbl plan-only eo-inline" style="margin-left:4px"><span class="tb-full">Etg.høgde</span><span class="tb-short">Etg.</span></span>
+      <input type="number" class="ni plan-only" id="fhI" value="3.0" min="0.1" step="0.1">
+      <span class="lbl plan-only eo-inline">m</span>
+      <span class="lbl plan-only eo-inline" style="margin-left:4px">Nord</span>
+      <span class="lbl plan-only eo-inline" id="northLabel" style="font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text2);min-width:32px">0°</span>
       <input type="number" class="ni" id="northI" value="0" min="0" max="359" step="1" style="display:none">
     </div>
     <div class="tg">
       <button class="btn on" id="navBtn" title="Naviger — panorér og zoom (Esc)">↖ Naviger</button>
-      <button class="btn" id="drawBtn" title="Teikn sone — klikk hjørner, Shift for 90°/45°, Enter/dobbelklikk for å avslutte (Esc for å avbryte)">⬡ Sone</button>
-      <button class="btn" id="editBtn" title="Rediger sonegeometri — dra hjørner, høgreklikk for å slette (Esc for å avslutte)">⊹ Rediger</button>
-      <button class="btn" id="winBtn" title="Legg til vindauge/dør — klikk på ein fasade (Ctrl+C/V for å kopiere)">▭ <span class="tb-full">Vindauge/dør</span><span class="tb-short">Vindauge</span></button>
+      <button class="btn plan-only" id="drawBtn" title="Teikn sone — klikk hjørner, Shift for 90°/45°, Enter/dobbelklikk for å avslutte (Esc for å avbryte)">⬡ Sone</button>
+      <button class="btn plan-only" id="editBtn" title="Rediger sonegeometri — dra hjørner, høgreklikk for å slette (Esc for å avslutte)">⊹ Rediger</button>
+      <button class="btn plan-only" id="winBtn" title="Legg til vindauge/dør — klikk på ein fasade (Ctrl+C/V for å kopiere)">▭ <span class="tb-full">Vindauge/dør</span><span class="tb-short">Vindauge</span></button>
       <button class="btn on" id="snapBtn" title="Snap til hjørne — låser punktet til hjørne i planteikninga og på eksisterande soner. Slå av om det snappar til feil stad.">⌖ Snap</button>
       <button class="btn" id="measureBtn" title="Kontrollmål avstand (påverkar ikkje SXI) — klikk start og slutt, Shift for 90°/45°, Esc for å avslutte"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="4.5" rx="1"/><path d="M4.5 6v2M7.5 6v3M10.5 6v2"/></svg> Mål</button>
       <button class="btn on" id="measShowBtn" style="display:none" title="Vis eller skjul lagra mål. Måla følgjer etasjen og blir lagra med prosjektet — høgreklikk på ei målelinje for å slette henne."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="1.9"/></svg> Mål (<span class="mcount">0</span>)</button>
     </div>
     <div class="tg">
-      <button class="btn" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ <span class="tb-full">Slå saman fasadar</span><span class="tb-short">Fasadar</span></button>
-      <button class="btn embed-only" id="sysBtn" title="Hent dei tekniske systema som ligg på bygget i EntroPi og legg dei på soner">⚙ <span class="tb-full">Hent tekniske systemer</span><span class="tb-short">Tekn. system</span> <span class="sys-beta">BETA</span></button>
+      <button class="btn plan-only" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ <span class="tb-full">Slå saman fasadar</span><span class="tb-short">Fasadar</span></button>
+      <button class="btn embed-only plan-only" id="sysBtn" title="Hent dei tekniske systema som ligg på bygget i EntroPi og legg dei på soner">⚙ <span class="tb-full">Hent tekniske systemer</span><span class="tb-short">Tekn. system</span> <span class="sys-beta">BETA</span></button>
     </div>
     <div class="tg">
       <button class="btn" id="undoBtn" title="Angre (Ctrl+Z)" style="opacity:.4" disabled>↩</button>
       <button class="btn" id="redoBtn" title="Gjere om (Ctrl+Y / Ctrl+Shift+Z)" style="opacity:.4" disabled>↪</button>
-      <button class="btn red" id="clrBtn" title="Slett alle soner og bilete på aktiv etasje">× Slett alt</button>
+      <button class="btn red plan-only" id="clrBtn" title="Slett alle soner og bilete på aktiv etasje">× Slett alt</button>
     </div>
     <div class="tg">
-      <button class="btn" id="btn3d" title="Opne 3D-visualisering">⬡ 3D</button>
-      <button class="btn" id="nordBtn" title="Nord-sjekk — hald inne for å rotere planteikninga slik at nord peikar opp" style="user-select:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M10.5 5.5 9 9l-3.5 1.5L7 7z" stroke-linejoin="round"/></svg></button>
-      <button class="btn" id="exportImgBtn" title="Eksporter planteikning som PNG"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="5.8" cy="6.5" r="1.1"/><path d="M2.5 11.5l3.5-3 3 2.5 2.5-2 2 2"/></svg></button>
+      <button class="btn plan-only" id="btn3d" title="Opne 3D-visualisering">⬡ 3D</button>
+      <button class="btn plan-only" id="nordBtn" title="Nord-sjekk — hald inne for å rotere planteikninga slik at nord peikar opp" style="user-select:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M10.5 5.5 9 9l-3.5 1.5L7 7z" stroke-linejoin="round"/></svg></button>
+      <button class="btn plan-only" id="exportImgBtn" title="Eksporter planteikning som PNG"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="5.8" cy="6.5" r="1.1"/><path d="M2.5 11.5l3.5-3 3 2.5 2.5-2 2 2"/></svg></button>
       <button class="btn" id="helpBtn" title="Tastatursnarvegar (?)" style="font-weight:700">?</button>
     </div>
     <div class="tg" style="margin-left:auto">
@@ -711,9 +735,15 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 <div id="main">
   <div id="floor-wrap" style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-width:0">
   <div id="floor-tabs-bar">
-    <div id="floor-tabs"></div>
-    <button id="addFloorBtn" class="add-floor-btn" title="Legg til ny etasje, eller hent ein inn frå eit anna prosjekt — drag fanane for å endre rekkjefølge">+ Etasje</button>
-    <div id="ghostWidget" style="display:none;align-items:center;gap:0;margin-left:8px;flex-shrink:0;border:1px solid var(--border2);border-radius:7px;overflow:hidden;background:var(--surface2)">
+    <div id="viewSwitch" title="Planteikningar er modellen — soner, 3D og SXI. Fasadeteikningar er eit eige lag som berre vert målt på.">
+      <button class="view-sw-btn on" id="viewPlanBtn" title="Planteikningar — soner, 3D-modell og SXI-eksport"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.8" y="1.8" width="12.4" height="12.4" rx="1.2"/><path d="M1.8 6.6h12.4M6.6 6.6v7.6"/></svg> Plan</button>
+      <button class="view-sw-btn" id="viewFasadeBtn" title="Fasadeteikningar — eige lag berre for oppmåling. Ingen soner, ingen verknad på modellen eller SXI-eksporten."><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.6 6.6 8 2.2l6.4 4.4v7.6H1.6z"/><rect x="4.4" y="8.4" width="2.4" height="2.4"/><rect x="9.2" y="8.4" width="2.4" height="2.4"/></svg> Fasade</button>
+    </div>
+    <div id="floor-tabs" class="plan-only"></div>
+    <div id="fasade-tabs" class="fasade-only" style="gap:2px;align-items:center;flex:1"></div>
+    <button id="addFasadeBtn" class="add-floor-btn fasade-only" title="Legg til eit nytt fasadeark — last opp PDF eller bilete og mål på det">+ Fasade</button>
+    <button id="addFloorBtn" class="add-floor-btn plan-only" title="Legg til ny etasje, eller hent ein inn frå eit anna prosjekt — drag fanane for å endre rekkjefølge">+ Etasje</button>
+    <div id="ghostWidget" class="plan-only" style="display:none;align-items:center;gap:0;margin-left:8px;flex-shrink:0;border:1px solid var(--border2);border-radius:7px;overflow:hidden;background:var(--surface2)">
       <button id="ghostBtn" title="Vis nabeetasje som ghost for justering av forskyving" style="font-size:11px;padding:4px 10px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:5px;border-right:1px solid var(--border2)">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v11M1 6.5h5.5" stroke="currentColor" stroke-width="1.2" opacity=".5"/><circle cx="6.5" cy="6.5" r="2.5" fill="currentColor" opacity=".25"/></svg>
         Ghost
@@ -723,8 +753,8 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
         <button id="floorOffsetReset" title="Nullstill forskyving" style="font-size:10.5px;padding:1px 5px;border:1px solid var(--border2);border-radius:3px;background:var(--surface);color:var(--text3);cursor:pointer;font-family:inherit;line-height:1.4">↺</button>
       </div>
     </div>
-    <div id="braSummary" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.1.0</span>
+    <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.2.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -733,8 +763,8 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <div id="dropz-text"><strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp fil her</small></div>
     </div>
     <div id="scaleBadge" class="uncal">Ikkje kalibrert</div>
-    <canvas id="compassCanvas" width="96" height="96"></canvas>
-    <button id="compassNordBtn" title="Hald inne for å sjå planteikninga med nord opp (som kart)" style="position:absolute;bottom:14px;right:122px;height:28px;padding:0 10px;font-size:11px;font-weight:600;font-family:inherit;background:rgba(255,255,255,.92);border:1px solid var(--border2);border-radius:7px;color:var(--text2);cursor:pointer;box-shadow:var(--shadow-sm);backdrop-filter:blur(6px);white-space:nowrap;transition:all .12s;display:flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M10.5 5.5 9 9l-3.5 1.5L7 7z" stroke-linejoin="round"/></svg> Nord-sjekk</button>
+    <canvas id="compassCanvas" class="plan-only" width="96" height="96"></canvas>
+    <button id="compassNordBtn" class="plan-only" title="Hald inne for å sjå planteikninga med nord opp (som kart)" style="position:absolute;bottom:14px;right:122px;height:28px;padding:0 10px;font-size:11px;font-weight:600;font-family:inherit;background:rgba(255,255,255,.92);border:1px solid var(--border2);border-radius:7px;color:var(--text2);cursor:pointer;box-shadow:var(--shadow-sm);backdrop-filter:blur(6px);white-space:nowrap;transition:all .12s;display:flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M10.5 5.5 9 9l-3.5 1.5L7 7z" stroke-linejoin="round"/></svg> Nord-sjekk</button>
 
     <!-- Mapbox Kart Overlay — direkte barn av cwrap, eiga header -->
     <div id="mapboxPanel">
@@ -835,7 +865,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
                 <div style="font-size:11px;color:var(--text3);margin-top:2px">Klikk to punkt med kjend avstand (t.d. ein vegg)</div>
               </div>
             </button>
-            <button id="calChooseArea" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid var(--border2);border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:all .12s">
+            <button id="calChooseArea" class="plan-only" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid var(--border2);border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:all .12s">
               <span style="font-size:22px">⬡</span>
               <div>
                 <div style="font-weight:700;font-size:13px;color:var(--text)">Kjend areal</div>
@@ -1001,20 +1031,22 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 
   <div id="sidebar">
     <div id="sidebar-resize"></div>
-    <div id="stabs">
+    <div id="stabs" class="plan-only">
       <div class="stab on" data-tab="zones">Soner</div>
       <div class="stab" data-tab="table">Tabell</div>
 
     </div>
     <div id="spanel">
-      <div id="zonesPanel">
+      <div id="zonesPanel" class="plan-only">
         <div class="empty" id="empty"><div class="empty-icon">⬡</div>Teikn ei sone på plantegningen<br>for å sjå areal og fasadar</div>
         <div id="zlistToolbar" style="display:none;justify-content:flex-end;gap:6px;padding:0 2px 6px 2px"><button id="skjulAllBtn" onclick="window._toggleAllSkjul()" style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit" title="Skjul / vis alle soner i planteikninga og 3D-modellen">Skjul alle soner</button><button id="collapseAllBtn" onclick="window._toggleAllZcards()" style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit" title="Slå saman / vis alle sonekort">Slå saman alle ▾</button></div>
         <div id="zlist"></div>
       </div>
-      <div id="tablePanel" style="display:none">
+      <div id="tablePanel" class="plan-only" style="display:none">
         <div id="tableWrap"></div>
       </div>
+      <!-- Fasadeark: eige sidepanel, bygd av renderFasadePanel() -->
+      <div id="fasadePanel" class="fasade-only" style="flex-direction:column;gap:10px"></div>
 
     </div>
   </div>
@@ -1184,6 +1216,30 @@ let _nextFloorId=2;
 let _nextGroupId=1;
 let _nextZoneId=0; // pre-increment, so first zone = 1
 
+// ── Fasadeteikningar ─────────────────────────────────────────
+// Fasadearka ligg VED SIDA AV planteikningane og er eit reint oppmålingslag:
+// ingen soner, ingen vindauge, inga kopling til 3D-modellen, kartet eller
+// SXI-eksporten. Difor er dei ikkje etasjar — `floors` er modellen, og alt
+// som reknar på bygget skal halde fram med å sjå berre den arrayen.
+//
+// Kvart ark har si EIGA kalibrering. Ei fasadeteikning er sjeldan i same
+// målestokk som planen, og det finst ingen «global fasadeskala» å arve, så
+// ownCal-mekanikken frå etasjane har ingen meining her.
+//
+// Lerret-globalane (bgImg, sc, offX, offY, mmPerImgPx, measureResults,
+// pdfDoc/curPage/totalPages) peikar på det AKTIVE arket i begge visingar.
+// Det er heile poenget: måleverktøyet, kalibreringa, zoom/pan og snappinga
+// verkar uendra på eit fasadeark utan ein einaste ny kodeveg.
+let fasadar=[];
+let activeFasade=0;
+let _nextFasadeId=1;
+let viewMode='plan';   // 'plan' | 'fasade' — kva lerretet viser
+function iFasade(){return viewMode==='fasade';}
+function curFasade(){return fasadar[activeFasade]||null;}
+// Arket lerretet viser no. Papirformat, PDF-sider og bakgrunnsbilete høyrer
+// til arket — ikkje til etasjen — så alt som les dei skal gå gjennom denne.
+function curArk(){return iFasade()?(curFasade()||{}):curFloor();}
+
 function setGlobalNorth(nd){
   globalNorth=((nd%360)+360)%360;
   northI.value=globalNorth;
@@ -1196,24 +1252,35 @@ function curFloor(){return floors[activeFloor];}
 // Redirect zones to active floor
 function syncFloorState(){
   const f=curFloor();
+  // `zones`-aliaset må alltid peike på den aktive etasjen — også medan
+  // lerretet viser eit fasadeark. Elles ville ei angring i fasadevisinga
+  // late aliaset stå att på den gamle arrayen, og saveFloorState() ville
+  // seinare skrive den utdaterte lista tilbake på etasjen.
+  zones=f.zones;
+  if(!f.measurements)f.measurements=[];
+  if(f.defaultHoyde==null)f.defaultHoyde=parseFloat(fhI.value)||3.0;
+  // Fasadearket eig lerret-globalane medan det er framme.
+  if(iFasade())return;
   bgImg=f.bgImg;sc=f.sc;offX=f.offX;offY=f.offY;
   // Bruk eigen kalibrering om ownCal=true, elles global
   mmPerImgPx=f.ownCal?f.mmPerImgPx:(globalMmPerImgPx??f.mmPerImgPx);
-  zones=f.zones;
-  if(!f.measurements)f.measurements=[];
   measureResults=f.measurements;
   pdfDoc=f.pdfDoc;curPage=f.pdfPage||1;totalPages=f.totalPages||1;
   updatePdfSideUI();
   northI.value=globalNorth;
   const _nl=document.getElementById('northLabel');if(_nl)_nl.textContent=globalNorth+'°';
   // Synkroniser etasjehøgde-feltet med aktiv etasje
-  if(f.defaultHoyde==null)f.defaultHoyde=parseFloat(fhI.value)||3.0;
   fhI.value=f.defaultHoyde;
   updateScaleBadge();
   hoveredMeasure=null;
   updateMeasureUI();
 }
 function saveFloorState(){
+  // Medan eit fasadeark er framme, eig arket lerret-globalane — då skal
+  // ingenting av dette skrivast tilbake på etasjen. Autolagringa kallar
+  // denne kvart minutt, så utan vakta ville fasadebiletet og fasadeskalaen
+  // hamna på den aktive etasjen.
+  if(iFasade()){saveFasadeState();return;}
   const f=curFloor();
   f.bgImg=bgImg;f.sc=sc;f.offX=offX;f.offY=offY;
   f.defaultHoyde=parseFloat(fhI.value)||3.0;
@@ -1369,6 +1436,223 @@ document.getElementById('addFloorBtn').onclick=async()=>{
   if(bgImg)fitImage();else draw();
 };
 
+
+// ── Fasadeark: lerret-tilstand, faner og vis-veksling ────────
+// Same rolle som saveFloorState/syncFloorState, men for eit fasadeark.
+// Arket har inga ghost-forskyving, ingen etasjehøgde og inga global skala —
+// berre bilete, zoom/pan, eiga kalibrering og måla sine.
+function saveFasadeState(){
+  const fa=curFasade();
+  if(!fa)return;
+  fa.bgImg=bgImg;fa.sc=sc;fa.offX=offX;fa.offY=offY;
+  fa.mmPerImgPx=mmPerImgPx;
+  fa.measurements=measureResults;
+  fa.pdfDoc=pdfDoc;fa.pdfPage=curPage;fa.totalPages=totalPages;
+}
+function syncFasadeState(){
+  const fa=curFasade();
+  if(!fa){
+    bgImg=null;pdfDoc=null;curPage=1;totalPages=1;
+    sc=1;offX=0;offY=0;mmPerImgPx=null;measureResults=[];
+  } else {
+    bgImg=fa.bgImg;sc=fa.sc;offX=fa.offX;offY=fa.offY;
+    mmPerImgPx=fa.mmPerImgPx??null;
+    if(!fa.measurements)fa.measurements=[];
+    measureResults=fa.measurements;   // alias — ikkje tildel [] seinare
+    pdfDoc=fa.pdfDoc;curPage=fa.pdfPage||1;totalPages=fa.totalPages||1;
+  }
+  updatePdfSideUI();
+  updateScaleBadge();
+  hoveredMeasure=null;
+  updateMeasureUI();
+}
+
+function nyFasade(opts){
+  const o=opts||{};
+  const fa={
+    id:_nextFasadeId++,
+    name:o.name||('Fasade '+(fasadar.length+1)),
+    bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,
+    paperWMm:null,paperHMm:null,paperSource:null,
+    mmPerImgPx:null,sc:1,offX:0,offY:0,
+    measurements:[]
+  };
+  fasadar.push(fa);
+  activeFasade=fasadar.length-1;
+  return fa;
+}
+
+function renderFasadeTabs(){
+  const bar=document.getElementById('fasade-tabs');
+  if(!bar)return;
+  bar.innerHTML='';
+  fasadar.forEach((fa,i)=>{
+    const tab=document.createElement('button');
+    tab.className='floor-tab'+(i===activeFasade?' active':'');
+    tab.title='Fasadeark — berre oppmåling. Påverkar ikkje soner, 3D-modell eller SXI-eksport.';
+
+    const nameEl=document.createElement('span');
+    nameEl.contentEditable='true';
+    nameEl.textContent=fa.name;
+    nameEl.style.cssText='outline:none;min-width:30px;cursor:'+(i===activeFasade?'text':'pointer');
+    nameEl.onfocus=()=>{if(i!==activeFasade){nameEl.blur();switchFasade(i);}};
+    nameEl.onblur=()=>{
+      const n=nameEl.textContent.trim();
+      if(n&&n!==fa.name){fa.name=n;markDirty();}
+      nameEl.textContent=fa.name;
+    };
+    nameEl.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();nameEl.blur();}e.stopPropagation();};
+    nameEl.addEventListener('mousedown',e=>e.stopPropagation());
+    tab.onclick=e=>{if(e.target===nameEl&&i===activeFasade)return;if(i!==activeFasade)switchFasade(i);};
+
+    const badge=document.createElement('span');
+    badge.className='floor-tab-badge';
+    const nm=(fa.measurements||[]).length;
+    badge.textContent=fa.bgImg?(nm+' mål'):'tom';
+
+    tab.appendChild(nameEl);
+    tab.appendChild(badge);
+
+    if(fasadar.length>1){
+      const del=document.createElement('button');
+      del.className='floor-tab-del';
+      del.textContent='×';
+      del.title='Slett fasadearket';
+      del.onclick=e=>{
+        e.stopPropagation();
+        if(!confirm('Slett "'+fa.name+'" og alle måla på arket?\n\nKan angrast med Ctrl+Z.'))return;
+        snapshot();
+        saveFasadeState();
+        fasadar.splice(i,1);
+        if(i<activeFasade)activeFasade--;
+        if(activeFasade>=fasadar.length)activeFasade=fasadar.length-1;
+        syncFasadeState();renderFasadeTabs();
+        if(bgImg)fitImage();else draw();
+      };
+      tab.appendChild(del);
+    }
+    bar.appendChild(tab);
+  });
+}
+
+// Sidepanelet i fasadevisinga. Sonelista og tabellen gjeld planteikninga og
+// er skjulte (.plan-only), så her står det som faktisk gjeld arket: kva som
+// manglar før ein kan måle, og alle måla med lengdene sine.
+function renderFasadePanel(){
+  const el=document.getElementById('fasadePanel');
+  if(!el)return;
+  el.innerHTML='';
+  const fa=curFasade();
+  const mk=(tag,css,txt)=>{const n=document.createElement(tag);if(css)n.style.cssText=css;if(txt!=null)n.textContent=txt;return n;};
+
+  if(!fa){
+    el.appendChild(mk('div','color:var(--text3);font-size:12px;line-height:1.9;text-align:center;padding:30px 10px',
+      'Ingen fasadeark enno. Trykk «+ Fasade» over teikninga.'));
+    return;
+  }
+
+  const head=mk('div','font-size:13px;font-weight:700;color:var(--text)',fa.name);
+  el.appendChild(head);
+
+  // Status: kva som står att før ein kan måle
+  const st=mk('div','font-size:11.5px;line-height:1.8;color:var(--text3)');
+  if(!fa.bgImg){
+    st.textContent='Ingen teikning lasta opp. Klikk i slippsona, eller dra ei PDF/biletfil dit.';
+  } else if(!fa.mmPerImgPx){
+    st.textContent='Teikninga er ikkje kalibrert. Trykk ⊕ Kalibrer og bruk kjend lengde eller målestokk.';
+  } else {
+    st.textContent=Math.round(fa.bgImg.width)+'×'+Math.round(fa.bgImg.height)+' px · 1 px = '
+      +fa.mmPerImgPx.toFixed(3)+' mm';
+  }
+  el.appendChild(st);
+
+  // Måla
+  const maal=fa.measurements||[];
+  const lst=mk('div','display:flex;flex-direction:column;gap:4px;margin-top:2px');
+  if(!maal.length){
+    lst.appendChild(mk('div','font-size:11.5px;color:var(--text3)',
+      fa.mmPerImgPx?'Ingen mål enno — trykk Mål og klikk to punkt.':''));
+  } else {
+    maal.forEach((m,i)=>{
+      const row=mk('div','display:flex;align-items:center;gap:8px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface)');
+      row.appendChild(mk('span','font-size:10.5px;color:var(--text3);min-width:26px','#'+(i+1)));
+      const mm=measureLenMm(m);
+      row.appendChild(mk('span','font-size:12px;font-weight:600;font-family:\'JetBrains Mono\',monospace;color:var(--text);flex:1',
+        mm!=null?fmtMaal(mm):'—'));
+      const del=mk('button','background:none;border:none;cursor:pointer;font-size:13px;color:var(--text3);padding:0 2px;line-height:1','×');
+      del.title='Slett målet';
+      del.onclick=()=>slettMaal(i);
+      row.appendChild(del);
+      // Peik ut målet i teikninga når musa er over rada
+      row.onmouseenter=()=>{hoveredMeasure={m,idx:i};draw();};
+      row.onmouseleave=()=>{hoveredMeasure=null;draw();};
+      lst.appendChild(row);
+    });
+    const alle=mk('button','margin-top:4px;font-size:10.5px;padding:4px 9px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit;align-self:flex-start','Slett alle mål');
+    alle.onclick=()=>{if(confirm('Slett alle måla på «'+fa.name+'»?\n\nKan angrast med Ctrl+Z.'))slettAlleMaal();};
+    lst.appendChild(alle);
+  }
+  el.appendChild(lst);
+
+  el.appendChild(mk('div','margin-top:auto;padding-top:14px;font-size:11px;line-height:1.8;color:var(--text3);border-top:1px solid var(--border)',
+    'Fasadeark er eit eige oppmålingslag. Dei har ingen soner og påverkar korkje 3D-modellen, kartet eller SXI-eksporten.'));
+}
+
+function switchFasade(i){
+  saveFasadeState();
+  activeFasade=i;
+  syncFasadeState();
+  measurePts=[];setMode('navigate');
+  renderFasadeTabs();
+  if(bgImg)fitImage();else draw();
+}
+
+// `data-view` på <html> styrer heile visinga — sjå .plan-only/.fasade-only i
+// CSS-en. Ein ny fasade-berre kontroll er difor rein markup.
+function applyViewUI(){
+  document.documentElement.setAttribute('data-view',viewMode);
+  const pb=document.getElementById('viewPlanBtn'),fb=document.getElementById('viewFasadeBtn');
+  if(pb)pb.classList.toggle('on',!iFasade());
+  if(fb)fb.classList.toggle('on',iFasade());
+  const dz=document.getElementById('dropz-text');
+  if(dz)dz.innerHTML=iFasade()
+    ? '<strong>Last opp fasadeteikning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp fil her</small>'
+    : '<strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp fil her</small>';
+}
+
+function setViewMode(v){
+  if(v===viewMode)return;
+  // Lerret-globalane høyrer til arket vi går FRÅ — lagre dei først.
+  if(iFasade())saveFasadeState();else saveFloorState();
+  viewMode=v;
+  setMode('navigate');
+  editZoneIdx=null;curPts=[];draftZones=[];winPts=[];calPts=[];measurePts=[];
+  hoveredWin=null;hoveredZone=null;hoveredMeasure=null;dragWin=null;
+  calOverlay.classList.remove('show');
+  if(iFasade()){
+    // Fyrste gongen: eit tomt ark, så slippsona står klar med ein gong.
+    if(!fasadar.length)nyFasade();
+    if(activeFasade>=fasadar.length)activeFasade=fasadar.length-1;
+    syncFasadeState();renderFasadeTabs();
+    hintText.textContent='Fasadeteikningar — eige lag berre for oppmåling. Soner, 3D-modell og SXI-eksport er upåverka.';
+  } else {
+    syncFloorState();renderFloorTabs();
+    hintText.textContent='';
+  }
+  applyViewUI();
+  updateResults();
+  if(bgImg)fitImage();else draw();
+}
+
+document.getElementById('viewPlanBtn').onclick=()=>setViewMode('plan');
+document.getElementById('viewFasadeBtn').onclick=()=>setViewMode('fasade');
+document.getElementById('addFasadeBtn').onclick=()=>{
+  snapshot();
+  saveFasadeState();
+  nyFasade();
+  syncFasadeState();renderFasadeTabs();draw();
+  hintText.textContent='Nytt fasadeark. Last opp PDF eller bilete, kalibrer skalaen og mål.';
+};
 
 // ── Ghost-overlay og etasje-offset ─────────────────────────
 function updateGhostUI(){
@@ -1625,13 +1909,20 @@ async function pickFile(){
 // ── Coord helpers ─────────────────────────────────────────────
 // floorDxImg/floorDyImg er offset i BILETPIKSLAR — zoom-uavhengig.
 // Skjermposisjon = (ix + floorDxImg)*sc + offX, slik at aligneringa held seg ved zoom.
-function s2i(sx,sy){
+// Ghost-forskyvinga høyrer til etasjane. Eit fasadeark har ingen, så det
+// ville vore etasjen si forskyving som forskauv fasademåla.
+function _arkOffset(){
+  if(iFasade())return{x:0,y:0};
   const f=curFloor();
-  return{x:(sx-offX)/sc-(f.floorDxImg||0),y:(sy-offY)/sc-(f.floorDyImg||0)};
+  return{x:f.floorDxImg||0,y:f.floorDyImg||0};
+}
+function s2i(sx,sy){
+  const d=_arkOffset();
+  return{x:(sx-offX)/sc-d.x,y:(sy-offY)/sc-d.y};
 }
 function i2s(ix,iy){
-  const f=curFloor();
-  return{x:(ix+(f.floorDxImg||0))*sc+offX,y:(iy+(f.floorDyImg||0))*sc+offY};
+  const d=_arkOffset();
+  return{x:(ix+d.x)*sc+offX,y:(iy+d.y)*sc+offY};
 }
 // Konverter biletkord for ei spesifikk etasje (for ghost-overlay)
 function i2sFloor(ix,iy,f){
@@ -2080,6 +2371,15 @@ function updateScaleBadge(){
     return;
   }
 
+  // Fasadeark har alltid si eiga kalibrering — ingen global skala å veksle mot.
+  if(iFasade()){
+    scaleBadge.className='';
+    scaleBadge.onclick=null;
+    scaleBadge.style.pointerEvents='none';
+    scaleBadge.textContent='1 px = '+mmPerImgPx.toFixed(3)+' mm · eigen skala for arket';
+    return;
+  }
+
   scaleBadge.className='';
   scaleBadge.onclick=null;
   scaleBadge.style.pointerEvents=multiFloor?'all':'none';
@@ -2210,6 +2510,9 @@ document.getElementById('measShowBtn').onclick=()=>{
   draw();
 };
 function updateMeasureUI(){
+  // Måltalet står både i fanebadgen og i sidepanelet på eit fasadeark, og
+  // denne funksjonen er den eine staden alle måleendringar går gjennom.
+  if(iFasade()){renderFasadeTabs();renderFasadePanel();}
   const b=document.getElementById('measShowBtn');if(!b)return;
   const cnt=(measureResults||[]).length;
   b.style.display=cnt?'':'none';
@@ -2380,6 +2683,20 @@ function updateUndoBtn(){
   if(rBtn){rBtn.disabled=redoStack.length===0;rBtn.style.opacity=redoStack.length===0?'.4':'1';}
 }
 
+// Eit fasadeark inn og ut av angre-historikken. Bilete og PDF ligg som
+// referansar (dei er uforanderlege i praksis), måla vert kopierte.
+function _fasadeMinne(fa){
+  return{
+    id:fa.id,name:fa.name,
+    bgImg:fa.bgImg||null,pdfDoc:fa.pdfDoc||null,
+    pdfPage:fa.pdfPage||1,totalPages:fa.totalPages||1,
+    paperWMm:fa.paperWMm??null,paperHMm:fa.paperHMm??null,paperSource:fa.paperSource??null,
+    mmPerImgPx:fa.mmPerImgPx??null,
+    sc:fa.sc??1,offX:fa.offX??0,offY:fa.offY??0,
+    measurements:normMaal(fa.measurements)
+  };
+}
+
 function snapshot(){
   const s=floors.map(f=>({
     id:f.id,name:f.name,
@@ -2394,7 +2711,8 @@ function snapshot(){
       ...z,skillevegg:Array.from(z.skillevegg||[])
     }))))
   }));
-  history.push({floors:s,activeFloor,globalNorth:globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId});
+  history.push({floors:s,fasadar:fasadar.map(_fasadeMinne),activeFloor,activeFasade,
+    globalNorth:globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId});
   if(history.length>MAX_HISTORY)history.shift();
   redoStack.length=0; // Ny handling tømer redo-stacken
   updateUndoBtn();
@@ -2418,12 +2736,19 @@ function applyHistoryState(prev){
       zones:pf.zones.map(z=>({...z,skillevegg:new Set(z.skillevegg||[])}))
     };
   });
+  // Fasadearka. Eldre snapshots manglar feltet — då står arka som dei er.
+  if(prev.fasadar){
+    fasadar=prev.fasadar.map(_fasadeMinne);
+    activeFasade=Math.min(prev.activeFasade??0,Math.max(0,fasadar.length-1));
+    if(prev._nextFasadeId!==undefined)_nextFasadeId=prev._nextFasadeId;
+  }
   activeFloor=Math.min(prev.activeFloor,floors.length-1);
   _nextGroupId=prev._nextGroupId;
   if(prev._nextZoneId!==undefined)_nextZoneId=prev._nextZoneId;
   if(prev.globalMmPerImgPx!==undefined)globalMmPerImgPx=prev.globalMmPerImgPx;
   setGlobalNorth(prev.globalNorth);
-  syncFloorState();
+  syncFloorState();                 // peikar `zones` på rett etasje i begge visingar
+  if(iFasade()){syncFasadeState();renderFasadeTabs();}
   editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
   renderFloorTabs();updateResults();renderTable();draw();
   updateUndoBtn();
@@ -2441,7 +2766,8 @@ function getCurrentState(){
       measurements:normMaal(f.measurements),
       zones:JSON.parse(JSON.stringify(f.zones.map(z=>({...z,skillevegg:Array.from(z.skillevegg||[])}))))
     })),
-    activeFloor,globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId
+    fasadar:fasadar.map(_fasadeMinne),
+    activeFloor,activeFasade,globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId
   };
 }
 
@@ -2538,6 +2864,23 @@ async function handleFile(f){
       result.paperSource='dpi';
     }
   }
+  // Fasadevising: teikninga går på det aktive fasadearket, aldri på etasjen.
+  // Ei ny teikning gjer både skalaen og måla ugyldige — dei var målte på det
+  // biletet som nettopp vart bytta ut. Måla vert tømde i staden for å bli
+  // tildelte ei ny array, så measureResults-aliaset held.
+  if(iFasade()){
+    const fa=curFasade()||nyFasade();
+    fa.bgImg=result.bgImg;fa.pdfDoc=result.pdfDoc;
+    fa.pdfPage=result.pdfPage;fa.totalPages=result.totalPages;
+    fa.paperWMm=result.paperWMm;fa.paperHMm=result.paperHMm;fa.paperSource=result.paperSource;
+    fa.mmPerImgPx=null;
+    if(fa.measurements)fa.measurements.length=0;else fa.measurements=[];
+    syncFasadeState();
+    measurePts=[];setMode('navigate');
+    markDirty();
+    renderFasadeTabs();renderFasadePanel();fitImage();
+    return;
+  }
   // Load into active floor
   const f2=curFloor();
   f2.bgImg=result.bgImg;f2.pdfDoc=result.pdfDoc;
@@ -2569,7 +2912,7 @@ cwrap.addEventListener('drop',async e=>{e.preventDefault();await handleFile(e.da
 // frå syncFloorState() så etasjebyte, ny etasje, prosjektlasting og
 // etasjeimport alle får han med seg.
 function updatePdfSideUI(){
-  const f=curFloor();
+  const f=curArk();
   const n=f.totalPages||1;
   pgctrl.style.display=(f.pdfDoc&&n>1)?'flex':'none';
   pgLbl.textContent=(f.pdfPage||1)+'/'+n;
@@ -2577,7 +2920,7 @@ function updatePdfSideUI(){
 async function _byttPdfSide(nyPg){
   curPage=nyPg;
   bgImg=await loadPdfPage(curPage);
-  const f=curFloor();
+  const f=curArk();
   f.pdfPage=curPage;f.bgImg=bgImg;
   const pm=await pdfSidePapirMm(pdfDoc,curPage);
   if(pm){f.paperWMm=pm.w;f.paperHMm=pm.h;f.paperSource='pdf';}
@@ -2718,7 +3061,7 @@ function fmtMaal(mm){
   return mm<1000?Math.round(mm)+' mm':(mm/1000).toFixed(3).replace('.',',')+' m';
 }
 function measureLenMm(m){
-  const mpp=mppForFloor(curFloor());
+  const mpp=iFasade()?mmPerImgPx:mppForFloor(curFloor());
   if(!mpp)return null;
   return Math.hypot(m.p2.x-m.p1.x,m.p2.y-m.p1.y)*mpp;
 }
@@ -2834,7 +3177,7 @@ function slettAlleMaal(){
   snapshot();
   measureResults.length=0;
   hoveredMeasure=null;updateMeasureUI();draw();
-  hintText.textContent='Alle mål på denne etasjen er sletta.';
+  hintText.textContent=iFasade()?'Alle mål på dette fasadearket er sletta.':'Alle mål på denne etasjen er sletta.';
 }
 
 // ── Draw ──────────────────────────────────────────────────────
@@ -2862,8 +3205,9 @@ function draw(){
 
     // Ghost-overlay: vis nabeetasje UNDER, aktiv etasje OVER med redusert opacity
     // floorDxImg i biletpikslar → skjermoffset = floorDxImg * sc
-    const afdx=(curFloor().floorDxImg||0)*sc,afdy=(curFloor().floorDyImg||0)*sc;
-    if(ghostMode&&floors.length>1){
+    const _ao=_arkOffset();
+    const afdx=_ao.x*sc,afdy=_ao.y*sc;
+    if(ghostMode&&floors.length>1&&!iFasade()){
       // Steg 1: Teikn ghost-etasjen (naboetasjen) fullt synleg
       const ghostFloorIdx=activeFloor>0?activeFloor-1:activeFloor+1;
       const gf=floors[ghostFloorIdx];
@@ -2897,8 +3241,9 @@ function draw(){
     ctx.fillRect(0,0,cv.width,cv.height);
   }
 
-  // Completed zones
+  // Completed zones — fasadearket er eit reint oppmålingslag og har ingen
   zones.forEach((z,zi)=>{
+    if(iFasade())return;
     if(z.pts.length<2||z.skjult)return;
     // Grupperte soner deler farge — bruk global indeks for konsistens
     let ci;
@@ -3559,14 +3904,14 @@ const SKALA_VAL=[50,100,200,250,500,1000];
 let valdSkala=100;
 // Papirmål som skal brukast: oppdaga frå fila, eller overstyrt i nedtrekket
 function gjeldandePapir(){
-  const f=curFloor();
+  const f=curArk();
   const sel=document.getElementById('calPaperSel').value;
   if(sel!=='auto'&&bgImg)return papirMaalFor(sel,bgImg.width,bgImg.height);
   if(f.paperWMm&&f.paperHMm)return{w:f.paperWMm,h:f.paperHMm};
   return null;
 }
 function oppdaterSkalaUI(){
-  const f=curFloor();
+  const f=curArk();
   const info=document.getElementById('calPaperInfo');
   const icon=document.getElementById('calPaperIcon');
   const res=document.getElementById('calScaleResult');
@@ -3625,9 +3970,9 @@ function oppdaterSkalaUI(){
 })();
 
 document.getElementById('calChooseScale').onclick=()=>{
-  if(!bgImg){hintText.textContent='Last opp ei planteikning først.';return;}
+  if(!bgImg){hintText.textContent='Last opp ei teikning først.';return;}
   calMode='scale';
-  const f=curFloor();
+  const f=curArk();
   // Føreslå format frå fila om vi kjenner det
   document.getElementById('calPaperSel').value='auto';
   if(!f.paperWMm&&bgImg){
@@ -3691,6 +4036,19 @@ document.getElementById('calOk').onclick=()=>{
   }
   if(newMmPerImgPx){
     snapshot(); // angre-steg + markerer prosjektet som endra → autolagring
+    // Fasadearket har si eiga skala og ingenting lagra i millimeter: måla
+    // vert rekna frå biletpikslar ved kvar teikning, så ei omkalibrering slår
+    // gjennom av seg sjølv. Ingen reskalering, og ingenting å gjere med
+    // etasjane — arket er utanfor modellen.
+    if(iFasade()){
+      const fa=curFasade();
+      if(fa)fa.mmPerImgPx=newMmPerImgPx;
+      mmPerImgPx=newMmPerImgPx;
+      updateScaleBadge();renderFasadeTabs();renderFasadePanel();draw();
+      calOverlay.classList.remove('show');
+      calPts=[];setMode('navigate');
+      return;
+    }
     const f=curFloor();
     const _oldMpp=_snapshotMpp();   // MÅ tas før skalaen blir bytta
     if(f.ownCal){
@@ -4278,6 +4636,10 @@ function imgLineSnap(sx,sy){
 // Samla snap. ownPts = punkta i den pågåande teikninga (høgste prioritet).
 function unifiedSnap(sx,sy,ownPts){
   if(!snapEnabled)return null;
+  // På eit fasadeark finst ingen soner å snappe til — berre eigne punkt og
+  // veggkryss i sjølve teikninga. Sonene ville dessutan lege på heilt andre
+  // koordinatar, sidan arket er ei anna teikning.
+  const _sz=iFasade()?[]:zones;
   let bd,b;
   if(ownPts&&ownPts.length){
     bd=SNAP_R.point;b=null;
@@ -4288,7 +4650,7 @@ function unifiedSnap(sx,sy,ownPts){
     if(b)return b;
   }
   bd=SNAP_R.corner;b=null;
-  zones.forEach(z=>{if(z.skjult)return;z.pts.forEach(p=>{
+  _sz.forEach(z=>{if(z.skjult)return;z.pts.forEach(p=>{
     const sp=i2s(p.x,p.y),dd=Math.hypot(sx-sp.x,sy-sp.y);
     if(dd<bd){bd=dd;b={x:p.x,y:p.y,type:'corner',sx:sp.x,sy:sp.y};}
   });});
@@ -4296,7 +4658,7 @@ function unifiedSnap(sx,sy,ownPts){
   const il=imgLineSnap(sx,sy);
   if(il&&Math.hypot(sx-il.sx,sy-il.sy)<=SNAP_R.imgcorner)return il;
   bd=SNAP_R.edge;b=null;
-  zones.forEach(z=>{
+  _sz.forEach(z=>{
     if(z.skjult)return;
     for(let i=0;i<z.pts.length;i++){
       const p1=z.pts[i],p2=z.pts[(i+1)%z.pts.length];
@@ -4334,6 +4696,7 @@ function drawSnapMarker(sp,type,col){
 
 // Find the closest segment to a screen point, and the projected t (0-1) along it
 function snapToSegment(sx,sy){
+  if(iFasade())return null;
   const ip=s2i(sx,sy);
   let best=null,bestD=Infinity;
   zones.forEach((z,zi)=>{
@@ -6223,7 +6586,7 @@ cwrap.addEventListener('mousemove',e=>{
   cwrap.style.cursor=hoveredWin?'grab':(hoveredMeasure?'pointer':(mode==='navigate'?'grab':'crosshair'));
 
   // Track kva sone musa er over (for Ctrl+C)
-  if(!hoveredWin&&mode==='navigate'){
+  if(!hoveredWin&&mode==='navigate'&&!iFasade()){
     const ip2=s2i(sx,sy);
     let hz=null;
     for(let zi=0;zi<zones.length;zi++){
@@ -6353,7 +6716,9 @@ cwrap.addEventListener('contextmenu',e=>{
   }
 
   // ── Høgreklikk på sone (navigate/draw/window-modus) ──
-  if(mode==='navigate'||mode==='draw'||mode==='window'){
+  // Eit fasadeark har ingen soner, og sonene frå etasjane ligg på heilt andre
+  // koordinatar — eit treff her ville vore reint tilfeldig.
+  if(!iFasade()&&(mode==='navigate'||mode==='draw'||mode==='window')){
     // Basispunkt utan etasje-offset — kvar etasje har sitt eige offset-rammeverk,
     // så punktet må reknast per etasje (elles bommar treffet med offset-differansen)
     const _bx=(sx-offX)/sc,_by=(sy-offY)/sc;
@@ -6604,6 +6969,7 @@ function uniqueWinName(name, existingWindows){
 }
 
 function findWindowAtScreen(sx,sy){
+  if(iFasade())return null;
   const THRESH=10;
   let best=null,bestD=THRESH;
   // Berre søk i aktiv etasje — vindauge på andre etasjar skal ikkje påverkast
@@ -7104,6 +7470,12 @@ document.addEventListener('keydown',e=>{
   }
 
   // ── Lim inn (Ctrl+V) ──
+  // Soner og vindauge høyrer til planteikninga. Vart dei limte inn medan eit
+  // fasadeark var framme, ville dei hamna usynleg på den aktive etasjen.
+  if((e.ctrlKey||e.metaKey)&&e.key==='v'&&iFasade()){
+    hintText.textContent='Soner og vindauge kan ikkje limast inn på eit fasadeark. Byt til Plan.';
+    return;
+  }
   if((e.ctrlKey||e.metaKey)&&e.key==='v'){
     // Sone
     if(zoneClipboard&&!winClipboard){
@@ -7233,6 +7605,8 @@ function tungOppdateringSnart(){
 }));
 
 renderFloorTabs();
+applyViewUI();
+renderFasadeTabs();
 
 // ── AI: Soner ─────────────────────────────────────────────────
 const aiOverlay=document.getElementById('aiOverlay');
@@ -7392,7 +7766,6 @@ const AUTOSAVE_INTERVAL=60000; // 1 min
 // hoppar over biletet heilt — klippbordet legg det ved som Blob i staden.
 function serialiserEtasje(f,opts){
   const o=opts||{};
-  const mime=o.mime||'image/png';
   const obj={
     id:f.id,name:f.name,
     mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
@@ -7402,37 +7775,85 @@ function serialiserEtasje(f,opts){
     measurements:normMaal(f.measurements),
     zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]}))
   };
-  if(f.bgImg&&!o.utanBilete){
-    // Enkodinga er det dyre her: ei PDF-side på ~48 Mpx tek rundt 0,7 s i
-    // toDataURL, og han blokkerer hovudtråden. Bakgrunnen endrar seg berre
-    // når brukaren lastar opp ei ny fil eller byter PDF-side, medan
-    // autolagringa går kvart minutt så lenge noko som helst er endra — utan
-    // mellomlagring betalte vi altså full enkoding for kvar sonejustering.
-    // Nøkkelen inneheld sjølve biletobjektet, så eit nytt bilete gir bom av
-    // seg sjølv. Éin plass per etasje, så minnebruken er den same som den
-    // strengen vi uansett måtte lage.
-    const nokkel=mime+'|'+(o.qual!=null?o.qual:'');
-    const buf=f._bgCache;
-    if(buf&&buf.img===f.bgImg&&buf.nokkel===nokkel){
-      obj.bgImgData=buf.data;
-    } else {
-      try{
-        const tmp=document.createElement('canvas');
-        tmp.width=f.bgImg.width;tmp.height=f.bgImg.height;
-        tmp.getContext('2d').drawImage(f.bgImg,0,0);
-        obj.bgImgData=o.qual!=null?tmp.toDataURL(mime,o.qual):tmp.toDataURL(mime);
-        f._bgCache={img:f.bgImg,nokkel,data:obj.bgImgData};
-      }catch(e){/* tainted canvas — hopp over */}
-    }
-  }
+  _serBgInn(f,obj,o);
   return obj;
 }
 
+// Bakgrunnsbiletet frå eit ark (etasje eller fasade) inn i `obj.bgImgData`.
+// Enkodinga er det dyre her: ei PDF-side på ~48 Mpx tek rundt 0,7 s i
+// toDataURL, og han blokkerer hovudtråden. Bakgrunnen endrar seg berre når
+// brukaren lastar opp ei ny fil eller byter PDF-side, medan autolagringa går
+// kvart minutt så lenge noko som helst er endra — utan mellomlagring betalte
+// vi altså full enkoding for kvar sonejustering. Nøkkelen inneheld sjølve
+// biletobjektet, så eit nytt bilete gir bom av seg sjølv. Éin plass per ark,
+// så minnebruken er den same som den strengen vi uansett måtte lage.
+// `_bgCache` vert aldri serialisert — både serialiserEtasje og
+// serialiserFasade byggjer `obj` felt for felt.
+function _serBgInn(f,obj,o){
+  if(!f.bgImg||o.utanBilete)return;
+  const mime=o.mime||'image/png';
+  const nokkel=mime+'|'+(o.qual!=null?o.qual:'');
+  const buf=f._bgCache;
+  if(buf&&buf.img===f.bgImg&&buf.nokkel===nokkel){
+    obj.bgImgData=buf.data;
+    return;
+  }
+  try{
+    const tmp=document.createElement('canvas');
+    tmp.width=f.bgImg.width;tmp.height=f.bgImg.height;
+    tmp.getContext('2d').drawImage(f.bgImg,0,0);
+    obj.bgImgData=o.qual!=null?tmp.toDataURL(mime,o.qual):tmp.toDataURL(mime);
+    f._bgCache={img:f.bgImg,nokkel,data:obj.bgImgData};
+  }catch(e){/* tainted canvas — hopp over */}
+}
+
+// Eitt fasadeark ut og inn. Arket har ingen soner, ingen etasjehøgde og inga
+// ghost-forskyving — berre teikninga, si eiga kalibrering og måla.
+function serialiserFasade(fa,opts){
+  const o=opts||{};
+  const obj={
+    id:fa.id,name:fa.name,
+    mmPerImgPx:fa.mmPerImgPx??null,
+    sc:fa.sc,offX:fa.offX,offY:fa.offY,
+    pdfPage:fa.pdfPage,totalPages:fa.totalPages,
+    paperWMm:fa.paperWMm??null,paperHMm:fa.paperHMm??null,paperSource:fa.paperSource??null,
+    measurements:normMaal(fa.measurements)
+  };
+  _serBgInn(fa,obj,o);
+  return obj;
+}
+async function deserialiserFasade(fa){
+  const ark={
+    id:fa.id,name:fa.name||'Fasade',
+    mmPerImgPx:fa.mmPerImgPx??null,
+    sc:fa.sc??1,offX:fa.offX??0,offY:fa.offY??0,
+    pdfPage:fa.pdfPage??1,totalPages:fa.totalPages??1,
+    paperWMm:fa.paperWMm??null,paperHMm:fa.paperHMm??null,paperSource:fa.paperSource??null,
+    pdfDoc:null,bgImg:null,
+    measurements:normMaal(fa.measurements)
+  };
+  if(fa.bgImgData){
+    await new Promise(res=>{
+      const img=new Image();
+      img.onload=()=>{ark.bgImg=img;res();};
+      img.onerror=()=>res();
+      img.src=fa.bgImgData;
+    });
+  }
+  return ark;
+}
+
 function serialiserProsjekt(opts){
+  // saveFloorState() skriv fasadearket i staden når det er framme — sjå vakta
+  // der. Difor må begge kallast, slik at det arket som IKKJE ligg på lerretet
+  // også er oppdatert (det vart lagra då vi bytta vising, men eit ekstra kall
+  // kostar ingenting og gjer rekkjefølgja likegyldig).
   saveFloorState();
   const serFloors=floors.map(f=>serialiserEtasje(f,opts));
   return {version:1,savedAt:new Date().toISOString(),activeFloor,globalNorth,globalMmPerImgPx,
     prosjektAdresse,_nextFloorId,_nextGroupId,_nextZoneId,
+    // Fasadeteikningane — eige oppmålingslag, utanfor modellen
+    fasadar:fasadar.map(fa=>serialiserFasade(fa,opts)),activeFasade,_nextFasadeId,
     // Kva bygg fila kjem frå. Stemplar lokalkopien (sjå _autolagringEigar), og
     // lèt etasje-importen sjå om tekniske system framleis peikar på rett bygg.
     _eigar:_autolagringEigar(),
@@ -7485,6 +7906,15 @@ async function lastProsjekt(proj,opts){
   _nextFloorId=proj._nextFloorId??floors.length+1;
   _nextGroupId=proj._nextGroupId??1;
   _nextZoneId=proj._nextZoneId??1;
+  // Fasadearka. Eldre prosjektfiler har ikkje feltet — då står lista tom.
+  fasadar=await Promise.all((proj.fasadar||[]).map(fa=>deserialiserFasade(fa)));
+  activeFasade=Math.min(proj.activeFasade??0,Math.max(0,fasadar.length-1));
+  _nextFasadeId=proj._nextFasadeId??(fasadar.length+1);
+  // Eit prosjekt vert alltid opna i planvisinga. Må stå FØR syncFloorState(),
+  // som elles ville tru at eit fasadeark eig lerret-globalane.
+  viewMode='plan';
+  applyViewUI();
+  renderFasadeTabs();
   syncFloorState();
   // Prosjektfila kan mangle felt som bygget i EntroPi alt har — då tek vi dei
   // derifrå. Må stå etter syncFloorState() (så `zones` peikar på den nye
@@ -7544,7 +7974,9 @@ function restoreAutosave(opts){
     if(!raw)return false;
     const proj=JSON.parse(raw);
     if(!proj.floors||!Array.isArray(proj.floors))return false;
-    const hasZones=proj.floors.some(f=>(f.zones||[]).some(z=>(z.pts||[]).length>=3));
+    // Eit prosjekt som berre har fasadeteikningar er òg arbeid verdt å berge.
+    const hasZones=proj.floors.some(f=>(f.zones||[]).some(z=>(z.pts||[]).length>=3))
+      ||(proj.fasadar||[]).some(fa=>fa.bgImgData||(fa.measurements||[]).length);
     if(!hasZones){localStorage.removeItem(AUTOSAVE_KEY);return false;}
     const eigar=proj._eigar||null;
     // Feil bygg: la kopien liggje. Han er ikkje søppel — han høyrer berre
@@ -9079,6 +9511,12 @@ async function showFloorContextMenu(clientX,clientY,f){
       ['Scroll','Zoom inn/ut'],
       ['Klikk+dra','Flytt plantegning'],
       ['Høgreklikk sone','Kontekstmeny (rediger, kopier, slett…)'],
+      ['',''],
+      ['Fasadeteikningar',''],
+      ['Plan / Fasade','Vekslar mellom planteikningane og fasadearka'],
+      ['+ Fasade','Nytt fasadeark — eigen teikning og eigen skala'],
+      ['Kalibrer','Kvart fasadeark har si eiga kalibrering'],
+      ['Mål','Kontrollmål på arket — ingen soner, ingen verknad på SXI eller 3D'],
     ].map(([k,v])=>k===''?`<div style="height:8px"></div>`:v===''?
       `<div style="font-size:10px;font-weight:700;color:#1d4f4f;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;margin-top:4px">${k}</div>`:
       `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:12.5px;gap:12px">
@@ -9148,6 +9586,8 @@ async function showFloorContextMenu(clientX,clientY,f){
 // Handled in renderZoneCard — we add dblclick to zone header
 function zoomToZone(z){
   if(!z||z.pts.length<3)return;
+  // Sonelista er skjult i fasadevisinga, men eit kall kan kome frå anna hald.
+  if(iFasade())setViewMode('plan');
   const r=cwrap.getBoundingClientRect();
   // Bounding box of zone in image coords
   const xs=z.pts.map(p=>p.x),ys=z.pts.map(p=>p.y);
@@ -9173,8 +9613,33 @@ function zoomToZone(z){
 
 // ── Roter plantegning 90° CW ─────────────────────────────────
 document.getElementById('rotBtn').onclick=()=>{
-  if(!bgImg){hintText.textContent='Last opp ei plantegning først.';return;}
+  if(!bgImg){hintText.textContent='Last opp ei teikning først.';return;}
   saveFloorState();
+  // Fasadearket har ingen soner og ingen nord — berre biletet og måla skal
+  // snuast. Punkta er i biletkoordinatar, så same transformen som for sonene.
+  if(iFasade()){
+    const fa=curFasade();
+    if(!fa||!fa.bgImg)return;
+    const oH=fa.bgImg.height;
+    const tmpF=document.createElement('canvas');
+    tmpF.width=oH;tmpF.height=fa.bgImg.width;
+    const tcF=tmpF.getContext('2d',{alpha:false});
+    tcF.fillStyle='#ffffff';tcF.fillRect(0,0,tmpF.width,tmpF.height);
+    tcF.translate(oH,0);tcF.rotate(Math.PI/2);
+    tcF.drawImage(fa.bgImg,0,0);
+    const ferdig=bmp=>{
+      fa.bgImg=bmp;
+      (fa.measurements||[]).forEach(m=>{
+        const p1={x:oH-m.p1.y,y:m.p1.x},p2={x:oH-m.p2.y,y:m.p2.x};
+        m.p1=p1;m.p2=p2;
+      });
+      markDirty();
+      syncFasadeState();fitImage();
+    };
+    if(typeof createImageBitmap!=='undefined')createImageBitmap(tmpF).then(ferdig);
+    else{const r=new Image();r.onload=()=>ferdig(r);r.src=tmpF.toDataURL('image/png');}
+    return;
+  }
   const f=curFloor();
   const origW=f.bgImg.width, origH=f.bgImg.height;
   // Rotate image 90° CW on a canvas
