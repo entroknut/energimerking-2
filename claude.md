@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 4.3.1 | Single-file HTML applikasjon
+**Versjon:** 4.3.2 | Single-file HTML applikasjon
 
 ---
 
