@@ -754,7 +754,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
-    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.2.0</span>
+    <span id="appVer" style="margin-left:auto;padding:0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.3.0</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -2054,6 +2054,85 @@ function winSpanPx(w,segLenPx,mpp){
   return fitSpanT((w.t0+w.t1)/2,widthPx,segLenPx);
 }
 
+// ── Vindaugsgrupper: eitt SIMIEN-element, mange stk på veggen ─
+// `antal` er talet på like vindauge i gruppa. I SXI-en er gruppa framleis
+// EITT <window number="antal">, men på veggen — i planteikninga, fasadevisinga
+// og 3D-modellen — står dei som antal stykk.
+//
+// `w.posT` held senterposisjonen (0-1 langs segmentet) for kvar stk. Feltet er
+// VALFRITT: manglar det, vert stykka fordelte jamnt rundt gruppesenteret, slik
+// dei alltid har vore. Difor ser gamle prosjekt og nye vindauge ut som før, og
+// posT dukkar først opp når brukaren faktisk flyttar ei enkelt stk.
+//
+// t0/t1 er framleis gruppa sitt ANKER — senteret ei jamn fordeling vert bygd
+// rundt, og det remap-funksjonane, kopieringa og deling av sone les. Når posT
+// endrar seg må ankeret følgje snittet (winSyncAnchor), elles ville gruppa
+// hoppe tilbake til den gamle staden om posT fall bort.
+const WIN_GAP_FRAC=0.02;   // luft mellom stykka i ei jamn rekkje
+function winCount(w){const n=parseInt(w.antal);return n>0?n:1;}
+function winHasPos(w){return Array.isArray(w.posT)&&w.posT.length===winCount(w);}
+// Senterposisjon (t) for kvar stk. `width` og `segLen` i SAME eining.
+function winCentres(w,width,segLen){
+  const n=winCount(w);
+  if(winHasPos(w))return w.posT.map(t=>isFinite(t)?Math.max(0,Math.min(1,t)):0.5);
+  const c=(w.t0+w.t1)/2;
+  const centre=isFinite(c)?c:0.5;
+  if(n<=1||!(segLen>0)||!(width>0))return Array.from({length:n},()=>centre);
+  const gap=Math.max(WIN_GAP_FRAC*segLen,(segLen*0.1)/n);
+  const span=width*n+gap*(n-1);
+  // Skyv heile rekkja inn på veggen om senteret ligg for nær enden
+  let start=centre*segLen-span/2;
+  if(span<=segLen)start=Math.max(0,Math.min(start,segLen-span));
+  return Array.from({length:n},(_,i)=>(start+i*(width+gap)+width/2)/segLen);
+}
+// Utstrekninga til kvar stk i BILETpikslar — teikning og treff-testing.
+function winSpansPx(w,segLenPx,mpp){
+  const widthPx=(mpp&&w.breddeMm>0)?w.breddeMm/mpp:Math.max(0,(w.t1-w.t0))*segLenPx;
+  return winCentres(w,widthPx,segLenPx).map(c=>fitSpanT(c,widthPx,segLenPx));
+}
+// Segmentlengd og vindaugsbreidde i biletpikslar for eit vindauge i ei sone.
+function winGeom(z,w){
+  const mpp=mppForZone(z);
+  const seg=(calcSegments(z.pts,getHoyde(z),mpp)||[])[w.segIdx]||null;
+  const segLen=seg?seg.lenPx:0;
+  const width=(mpp&&w.breddeMm>0)?w.breddeMm/mpp:Math.max(0,(w.t1-w.t0))*segLen;
+  return{seg,segLen,width,mpp};
+}
+function winSyncAnchor(w,width,segLen){
+  const cs=winCentres(w,width,segLen);
+  if(!cs.length)return;
+  const mean=cs.reduce((s,t)=>s+t,0)/cs.length;
+  const sp=fitSpanT(mean,width,segLen);
+  w.t0=sp.t0;w.t1=sp.t1;
+}
+// Frys den jamne fordelinga til faktiske posisjonar, slik at dei andre stykka
+// står i ro når brukaren flyttar eitt av dei.
+function winFreezePos(w,width,segLen){
+  if(!winHasPos(w))w.posT=winCentres(w,width,segLen);
+  return w.posT;
+}
+// Endrar antalet og tek vare på plasseringa av dei som alt står der.
+// Nye stk vert lagde etter den siste med same luft som ei jamn rekkje; er det
+// ikkje plass, fell heile gruppa tilbake til jamn fordeling (posT=null).
+function winSetAntal(w,n,width,segLen){
+  n=Math.max(1,Math.round(n)||1);
+  const old=winCount(w);
+  if(n!==old&&winHasPos(w)){
+    const cs=w.posT.slice();
+    if(n<old)w.posT=cs.slice(0,n);
+    else{
+      const gap=Math.max(WIN_GAP_FRAC*segLen,(segLen*0.1)/n);
+      const stepT=(width+gap)/(segLen||1);
+      const halfT=(width/2)/(segLen||1);
+      let t=Math.max.apply(null,cs),plass=true;
+      for(let i=old;i<n;i++){t+=stepT;if(t+halfT>1){plass=false;break;}cs.push(t);}
+      w.posT=plass?cs:null;
+    }
+  }
+  w.antal=n;
+  if(winHasPos(w))winSyncAnchor(w,width,segLen);
+}
+
 // ── Felles fasadenamn-generator ───────────────────────────────
 // Returnerer array med same lengde som segs, kvart element er namn for det segmentet
 function getFacadeLabels(z, segs){
@@ -2308,10 +2387,19 @@ function remapSegsAfterInsert(z,i,t){
     if(w.segIdx>i){w.segIdx++;return;}
     // Vindauget sat på segmentet som vart delt — legg det på den delen der senteret er
     const c=(w.t0+w.t1)/2;
-    if(c<=tt){w.t0=Math.max(0,w.t0/tt);w.t1=Math.min(1,w.t1/tt);}
-    else{w.segIdx=i+1;w.t0=Math.max(0,(w.t0-tt)/(1-tt));w.t1=Math.min(1,(w.t1-tt)/(1-tt));}
+    if(c<=tt){w.t0=Math.max(0,w.t0/tt);w.t1=Math.min(1,w.t1/tt);_mapWinPos(w,x=>x/tt);}
+    else{w.segIdx=i+1;w.t0=Math.max(0,(w.t0-tt)/(1-tt));w.t1=Math.min(1,(w.t1-tt)/(1-tt));_mapWinPos(w,x=>(x-tt)/(1-tt));}
   };
   _remapSegRefs(z,mapWin,mapIdx);
+}
+
+// Plasseringa av kvar stk (posT) følgjer same lineære omrekninga som t0/t1.
+// Hamnar ei stk utanfor den nye veggen, fell heile gruppa tilbake til jamn
+// fordeling — å klemme dei inn mot kanten ville stabla dei oppå kvarandre.
+function _mapWinPos(w,fn){
+  if(!winHasPos(w))return;
+  const ny=w.posT.map(fn);
+  w.posT=ny.every(x=>isFinite(x)&&x>=0&&x<=1)?ny:null;
 }
 
 // Punkt pi skal fjernast — kall FØR z.pts.splice(pi,1) (treng gamle lengder)
@@ -2328,8 +2416,8 @@ function remapSegsBeforeDelete(z,pi){
     return j<pi?j:j-1;
   };
   const mapWin=w=>{
-    if(w.segIdx===segA){w.segIdx=merged;w.t0=w.t0*lenA/tot;w.t1=w.t1*lenA/tot;}
-    else if(w.segIdx===segB){w.segIdx=merged;w.t0=(lenA+w.t0*lenB)/tot;w.t1=(lenA+w.t1*lenB)/tot;}
+    if(w.segIdx===segA){w.segIdx=merged;w.t0=w.t0*lenA/tot;w.t1=w.t1*lenA/tot;_mapWinPos(w,x=>x*lenA/tot);}
+    else if(w.segIdx===segB){w.segIdx=merged;w.t0=(lenA+w.t0*lenB)/tot;w.t1=(lenA+w.t1*lenB)/tot;_mapWinPos(w,x=>(lenA+x*lenB)/tot);}
     else{const ni=mapIdx(w.segIdx);if(ni==null)return false;w.segIdx=ni;}
   };
   _remapSegRefs(z,mapWin,mapIdx);
@@ -2338,7 +2426,11 @@ function remapSegsBeforeDelete(z,pi){
 // Rydd opp ugyldige segmentreferansar (t.d. frå eldre lagra prosjekt)
 function sanitizeZoneSegRefs(z){
   const n=(z.pts||[]).length;
-  if(z.windows)z.windows=z.windows.filter(w=>Number.isInteger(w.segIdx)&&w.segIdx>=0&&w.segIdx<n);
+  if(z.windows){
+    z.windows=z.windows.filter(w=>Number.isInteger(w.segIdx)&&w.segIdx>=0&&w.segIdx<n);
+    // Plasseringslista må ha ei oppføring per stk — elles jamn fordeling
+    z.windows.forEach(w=>{if(w.posT&&!winHasPos(w))w.posT=null;});
+  }
   if(z.skillevegg&&z.skillevegg.size)z.skillevegg=new Set([...z.skillevegg].filter(i=>i>=0&&i<n));
   if(z.kjellerveggar)z.kjellerveggar=z.kjellerveggar.filter(i=>Number.isInteger(i)&&i>=0&&i<n);
   if(z.skMergedGroups)z.skMergedGroups=z.skMergedGroups.filter(g=>{
@@ -3394,6 +3486,8 @@ function draw(){
     }
 
     // Draw windows/doors on zone
+    // Ei gruppe (antal>1) vert teikna som antal stykk — kvar med si eiga
+    // plassering, og kvar for seg å ta tak i. Sjå winCentres/winSpansPx.
     (z.windows||[]).forEach((w,wi)=>{
       const seg=calcSegments(z.pts)?.[w.segIdx];
       if(!seg)return;
@@ -3402,57 +3496,68 @@ function draw(){
       if(segLen<1)return;
       const ux=dx/segLen,uy=dy/segLen;
       const perp={x:-uy,y:ux};
-      // Bruk breddeMm for visuell breidde (uavhengig av segmentlengd)
-      const _span=winSpanPx(w,segLen,mmPerImgPx);
-      const t0vis=_span.t0,t1vis=_span.t1;
-      const s0i={x:seg.p1.x+ux*t0vis*segLen,y:seg.p1.y+uy*t0vis*segLen};
-      const s1i={x:seg.p1.x+ux*t1vis*segLen,y:seg.p1.y+uy*t1vis*segLen};
-      const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
-      const isHov=hoveredWin&&hoveredWin.wi===wi&&hoveredWin.zi===ci&&hoveredWin.fli===activeFloor;
-      const isDrag=dragWin&&dragWin.w===w;
-      const baseColor=w.type==='dor'?'#f59e0b':'#06b6d4';
-      // Highlight glow
-      if(isHov||isDrag){
-        ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-        ctx.strokeStyle=isDrag?'rgba(29,79,79,.45)':w.type==='dor'?'rgba(245,158,11,.35)':'rgba(6,182,212,.35)';
-        ctx.lineWidth=11;ctx.stroke();
-      }
-      ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-      ctx.strokeStyle=(isHov||isDrag)?'#fff':baseColor;
-      ctx.lineWidth=(isHov||isDrag)?5:3.5;ctx.stroke();
-      if(isHov||isDrag){
-        ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-        ctx.strokeStyle=isDrag?'#1d4f4f':baseColor;ctx.lineWidth=2.5;ctx.stroke();
-      }
-      // Label
-      const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
       const psx=perp.x*sc,psy=perp.y*sc;
       const plen=Math.hypot(psx,psy)||1;
-      ctx.font=`${(isHov||isDrag)?'bold ':''}9px Inter,sans-serif`;
-      ctx.fillStyle=isDrag?'#1d4f4f':baseColor;
-      ctx.textAlign='center';ctx.textBaseline='middle';
-      const _cl=(w.name||(w.type==='dor'?'D':'V'))+(w.antal>1?'×'+w.antal:'');
-      const lx=mx+psx/plen*12,ly=my+psy/plen*12;
-      if(isHov||isDrag){
+      const baseColor=w.type==='dor'?'#f59e0b':'#06b6d4';
+      const nStk=winCount(w);
+      // Bruk breddeMm for visuell breidde (uavhengig av segmentlengd)
+      const spans=winSpansPx(w,segLen,mmPerImgPx);
+      const isSameW=hoveredWin&&hoveredWin.wi===wi&&hoveredWin.zi===ci&&hoveredWin.fli===activeFloor;
+      let gx=0,gy=0,merkt=false;
+      spans.forEach((sp,k)=>{
+        const s0i={x:seg.p1.x+ux*sp.t0*segLen,y:seg.p1.y+uy*sp.t0*segLen};
+        const s1i={x:seg.p1.x+ux*sp.t1*segLen,y:seg.p1.y+uy*sp.t1*segLen};
+        const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
+        const isHov=isSameW&&hoveredWin.inst===k;
+        const isDrag=dragWin&&dragWin.w===w&&dragWin.inst===k;
+        const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
+        gx+=mx;gy+=my;
+        // Highlight glow
+        if(isHov||isDrag){
+          ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
+          ctx.strokeStyle=isDrag?'rgba(29,79,79,.45)':w.type==='dor'?'rgba(245,158,11,.35)':'rgba(6,182,212,.35)';
+          ctx.lineWidth=11;ctx.stroke();
+        }
+        ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
+        ctx.strokeStyle=(isHov||isDrag)?'#fff':baseColor;
+        ctx.lineWidth=(isHov||isDrag)?5:3.5;ctx.stroke();
+        if(isHov||isDrag){
+          ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
+          ctx.strokeStyle=isDrag?'#1d4f4f':baseColor;ctx.lineWidth=2.5;ctx.stroke();
+        }
+        if(!(isHov||isDrag))return;
+        // Merkelapp på den stk musa er på — gruppelappen står under
+        merkt=true;
+        const lx=mx+psx/plen*12,ly=my+psy/plen*12;
+        const _cl=(w.name||(w.type==='dor'?'D':'V'))+(nStk>1?' '+(k+1)+'/'+nStk:'');
+        ctx.font='bold 9px Inter,sans-serif';
+        ctx.textAlign='center';ctx.textBaseline='middle';
         const tw=ctx.measureText(_cl).width+10;
         ctx.fillStyle='rgba(255,255,255,.92)';
         ctx.beginPath();ctx.roundRect(lx-tw/2,ly-8,tw,16,4);ctx.fill();
         ctx.fillStyle=isDrag?'#1d4f4f':baseColor;
-      }
-      ctx.fillText(_cl,lx,ly);
-      // Hint on hover
-      if(isHov&&!isDrag){
-        ctx.font='8px Inter,sans-serif';
-        ctx.fillStyle='rgba(100,116,139,.8)';
-        ctx.fillText('Drag for å flytte · høgreklikk for meny',lx,ly+14);
-      }
-      if(isDrag){
-        // Show position while dragging
-        const segLenM=dragWin.seg.lenM;
-        const posLbl=segLenM?(w.t0*segLenM).toFixed(2)+'m → '+(w.t1*segLenM).toFixed(2)+'m':(w.t0*100).toFixed(0)+'%';
-        ctx.font='bold 9px Inter,sans-serif';
-        ctx.fillStyle='#1d4f4f';
-        ctx.fillText(posLbl,lx,ly+14);
+        ctx.fillText(_cl,lx,ly);
+        if(isDrag){
+          // Show position while dragging
+          const segLenM=dragWin.seg.lenM;
+          const posLbl=segLenM?(sp.t0*segLenM).toFixed(2)+'m → '+(sp.t1*segLenM).toFixed(2)+'m':(sp.t0*100).toFixed(0)+'%';
+          ctx.font='bold 9px Inter,sans-serif';
+          ctx.fillStyle='#1d4f4f';
+          ctx.fillText(posLbl,lx,ly+14);
+        } else {
+          ctx.font='8px Inter,sans-serif';
+          ctx.fillStyle='rgba(100,116,139,.8)';
+          ctx.fillText(nStk>1?'Drag for å flytte denne · høgreklikk for meny':'Drag for å flytte · høgreklikk for meny',lx,ly+14);
+        }
+      });
+      // Gruppelapp midt i rekkja når ingen enkelt stk er markert
+      if(!merkt&&spans.length){
+        const mx=gx/spans.length,my=gy/spans.length;
+        const lx=mx+psx/plen*12,ly=my+psy/plen*12;
+        ctx.font='9px Inter,sans-serif';
+        ctx.fillStyle=baseColor;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText((w.name||(w.type==='dor'?'D':'V'))+(nStk>1?'×'+nStk:''),lx,ly);
       }
     });
 
@@ -4522,7 +4627,9 @@ function _finishDelSone(){
         const nyLen=Math.sqrt(L2);
         const widthPx=(mmPerImgPx&&w.breddeMm>0)?w.breddeMm/mmPerImgPx:Math.max(0,(w.t1-w.t0))*origLen;
         const _ds=fitSpanT(t,widthPx,nyLen);
-        nz.windows.push({...w,segIdx:i,t0:_ds.t0,t1:_ds.t1});
+        // posT peikar på den opphavlege veggen, som no er delt — stykka vert
+        // fordelte jamnt på den nye veggen i staden for å hamne feil stad
+        nz.windows.push({...w,segIdx:i,t0:_ds.t0,t1:_ds.t1,posT:null});
         plassert=true;break;
       }
     }
@@ -5307,7 +5414,8 @@ function updateResults(){
           const _wlbl=w.name||(w.type==='dor'?'Dør':'Vindauge');
           const info=document.createElement('div');info.className='win-card-info';
           const icon=w.type==='dor'?'🚪':'▭';
-          info.innerHTML=`<strong style="color:var(--text)">${icon} ${_wlbl}</strong> <span style="color:var(--text3)">${dir} · ${w.breddeMm}×${w.hoyMm}mm · ${w.antal} stk</span>`;
+          const _plassert=(winCount(w)>1&&winHasPos(w))?' · plassert':'';
+          info.innerHTML=`<strong style="color:var(--text)">${icon} ${_wlbl}</strong> <span style="color:var(--text3)">${dir} · ${w.breddeMm}×${w.hoyMm}mm · ${w.antal} stk${_plassert}</span>`;
           const cpW=document.createElement('button');cpW.className='win-card-del';cpW.title='Kopier';cpW.textContent='⎘';
           cpW.style.cssText='background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 2px;transition:color .1s';
           cpW.onmouseenter=()=>{cpW.style.color='var(--accent)';};cpW.onmouseleave=()=>{cpW.style.color='var(--text3)';};
@@ -6385,7 +6493,7 @@ function renderTable(){
   });
   wrap.querySelectorAll('[data-wn]').forEach(inp=>{
     const [_fi,_zi,_wi]=inp.dataset.wn.split(',').map(Number);
-    inp.onchange=()=>{const w=floors[_fi].zones[_zi].windows[_wi];const v=parseInt(inp.value);w.antal=v>0?v:1;updateResults();renderTable();draw();};
+    inp.onchange=()=>{const z=floors[_fi].zones[_zi];const w=z.windows[_wi];const v=parseInt(inp.value);const g=winGeom(z,w);winSetAntal(w,v>0?v:1,g.width,g.segLen);updateResults();renderTable();draw();};
   });
 }
 
@@ -6543,7 +6651,7 @@ cwrap.addEventListener('wheel',e=>{
   oppdaterSnap();draw();
 },{passive:false});
 let hoveredWin=null;
-let dragWin=null;      // {w, wi, z, zi, seg, dragOffsetT}
+let dragWin=null;      // {w, wi, z, zi, seg, inst, dragOffsetT}
 let winClipboard=null; // kopiert vindauge-objekt
 let zoneClipboard=null;// kopiert sone-objekt
 let hoveredZone=null;  // {z, zi, f, fi} — sona under muspeikar
@@ -6560,8 +6668,10 @@ cwrap.addEventListener('mousemove',e=>{
   }
 
   // ── Dra vindauge langs fasaden ──
+  // Ei gruppe vert dregen éi stk om gongen: første draget frys den jamne
+  // fordelinga til faktiske posisjonar, slik at dei andre står i ro.
   if(dragWin){
-    const {w,seg}=dragWin;
+    const {w,seg,inst}=dragWin;
     // Project mouse onto segment
     const dx=seg.p2.x-seg.p1.x,dy=seg.p2.y-seg.p1.y;
     const segLenImg=Math.hypot(dx,dy);if(segLenImg<1)return;
@@ -6570,8 +6680,15 @@ cwrap.addEventListener('mousemove',e=>{
     // Bruk breddeMm-basert breidde for dragging — ikkje lagra t1-t0
     // (lagra t1-t0 kan vere mykje større enn det visuelle vindauget om plasseringa vart gjort med store klikkpunkt)
     const widthPx=(mmPerImgPx&&w.breddeMm>0)?w.breddeMm/mmPerImgPx:Math.max(0,(w.t1-w.t0))*segLenImg;
-    const _ns=fitSpanT(t-dragWin.dragOffsetT,widthPx,segLenImg);
-    w.t0=_ns.t0;w.t1=_ns.t1;
+    const c=t-dragWin.dragOffsetT;
+    if(winCount(w)>1)winFreezePos(w,widthPx,segLenImg);
+    if(winHasPos(w)){
+      w.posT[inst]=Math.max(0,Math.min(1,c));
+      winSyncAnchor(w,widthPx,segLenImg);
+    } else {
+      const _ns=fitSpanT(c,widthPx,segLenImg);
+      w.t0=_ns.t0;w.t1=_ns.t1;
+    }
     cv.style.cursor='grabbing';
     draw();
     return;
@@ -6582,7 +6699,10 @@ cwrap.addEventListener('mousemove',e=>{
   hoveredWin=hit||null;
   const prevM=hoveredMeasure;
   hoveredMeasure=hoveredWin?null:findMeasureAtScreen(sx,sy);
-  if((prev==null)!==(hoveredWin==null)||(prevM&&prevM.idx)!==(hoveredMeasure&&hoveredMeasure.idx)||(prevM==null)!==(hoveredMeasure==null))draw();
+  // Nøkkelen tek med stk-indeksen — å gli frå ei stk til ei anna i same
+  // gruppa endrar ingen null-status, men merkinga skal likevel følgje musa
+  const _wk=h=>h?h.fli+'/'+h.zi+'/'+h.wi+'/'+h.inst:'';
+  if(_wk(prev)!==_wk(hoveredWin)||(prevM&&prevM.idx)!==(hoveredMeasure&&hoveredMeasure.idx)||(prevM==null)!==(hoveredMeasure==null))draw();
   cwrap.style.cursor=hoveredWin?'grab':(hoveredMeasure?'pointer':(mode==='navigate'?'grab':'crosshair'));
 
   // Track kva sone musa er over (for Ctrl+C)
@@ -6609,14 +6729,16 @@ cwrap.addEventListener('mousedown',e=>{
     e.preventDefault();
     const r=cv.getBoundingClientRect();
     const sx=e.clientX-r.left,sy=e.clientY-r.top;
-    const {w,wi,z,zi,fli,seg}=hoveredWin;
+    const {w,wi,z,zi,fli,seg,inst}=hoveredWin;
     const dx=seg.p2.x-seg.p1.x,dy=seg.p2.y-seg.p1.y;
     const segLenImg=Math.hypot(dx,dy);
     const ip=s2i(sx,sy);
     const t=Math.max(0,Math.min(1,((ip.x-seg.p1.x)*dx+(ip.y-seg.p1.y)*dy)/(segLenImg*segLenImg)));
     snapshot();
-    // dragOffsetT = avstand frå visuelle sentrum til klikkpunktet
-    dragWin={w,wi,z,zi,fli,seg,dragOffsetT:t-(w.t0+w.t1)/2};
+    // dragOffsetT = avstand frå sentrum i den stk som vart teken til klikkpunktet
+    const _sp=winSpansPx(w,segLenImg,mmPerImgPx)[inst||0];
+    const _c=_sp?(_sp.t0+_sp.t1)/2:(w.t0+w.t1)/2;
+    dragWin={w,wi,z,zi,fli,seg,inst:inst||0,dragOffsetT:t-_c};
     return;
   }
   if(e.button===0&&mode==='edit'&&editZoneIdx!==null){
@@ -6985,29 +7107,83 @@ function findWindowAtScreen(sx,sy){
       const dx=seg.p2.x-seg.p1.x,dy=seg.p2.y-seg.p1.y;
       const segLen=Math.hypot(dx,dy);if(segLen<1)return;
       const ux=dx/segLen,uy=dy/segLen;
-      const _sp=winSpanPx(w,segLen,mmPerImgPx);
-      const t0v=_sp.t0,t1v=_sp.t1;
-      const s0i={x:seg.p1.x+ux*t0v*segLen,y:seg.p1.y+uy*t0v*segLen};
-      const s1i={x:seg.p1.x+ux*t1v*segLen,y:seg.p1.y+uy*t1v*segLen};
-      const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
-      const ex=s1.x-s0.x,ey=s1.y-s0.y;
-      const elen=Math.hypot(ex,ey)||1;
-      const t=Math.max(0,Math.min(1,((sx-s0.x)*ex+(sy-s0.y)*ey)/(elen*elen)));
-      const px=s0.x+t*ex,py=s0.y+t*ey;
-      const d=Math.hypot(sx-px,sy-py);
-      const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
-      const dm=Math.hypot(sx-mx,sy-my);
-      const dist=Math.min(d,dm);
-      if(dist<bestD){bestD=dist;best={w,wi,z,zi,fli,fl,seg,segs};}
+      // Kvar stk i gruppa er sin eigen treffflate — brukaren tek tak i éin
+      // om gongen, og `inst` fortel kven det vart.
+      winSpansPx(w,segLen,mmPerImgPx).forEach((_sp,inst)=>{
+        const s0i={x:seg.p1.x+ux*_sp.t0*segLen,y:seg.p1.y+uy*_sp.t0*segLen};
+        const s1i={x:seg.p1.x+ux*_sp.t1*segLen,y:seg.p1.y+uy*_sp.t1*segLen};
+        const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
+        const ex=s1.x-s0.x,ey=s1.y-s0.y;
+        const elen=Math.hypot(ex,ey)||1;
+        const t=Math.max(0,Math.min(1,((sx-s0.x)*ex+(sy-s0.y)*ey)/(elen*elen)));
+        const px=s0.x+t*ex,py=s0.y+t*ey;
+        const d=Math.hypot(sx-px,sy-py);
+        const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
+        const dm=Math.hypot(sx-mx,sy-my);
+        const dist=Math.min(d,dm);
+        if(dist<bestD){bestD=dist;best={w,wi,z,zi,fli,fl,seg,segs,inst};}
+      });
     });
   });
   return best;
+}
+
+// ── Løyse stk ut av ei vindaugsgruppe ─────────────────────────
+// Gruppa er eitt element i SIMIEN (<window number="n">). Å løyse ut ei stk
+// gjer gruppa til number="n-1" og legg det utløyste vindauget ved sida av som
+// eit eige element med number="1" — same plass på veggen, same mål.
+function loysUtStk(w,z,inst){
+  const n=winCount(w);
+  if(n<2)return;
+  const {segLen,width}=winGeom(z,w);
+  snapshot();
+  const cs=winCentres(w,width,segLen);
+  const c=cs[inst]!=null?cs[inst]:cs[0];
+  const sp=fitSpanT(c,width,segLen);
+  const ny={...w,antal:1,posT:[c],t0:sp.t0,t1:sp.t1,
+            name:uniqueWinName(w.name||(w.type==='dor'?'Dør':'Vindauge'),z.windows)};
+  w.antal=n-1;
+  w.posT=cs.filter((_,i)=>i!==inst);
+  winSyncAnchor(w,width,segLen);
+  const ix=z.windows.indexOf(w);
+  z.windows.splice(ix>=0?ix+1:z.windows.length,0,ny);
+  updateResults();renderTable();draw();
+  hintText.textContent='Løyste ut «'+ny.name+'» — gruppa står att med '+winCount(w)+' stk.';
+}
+// Heile gruppa til sjølvstendige vindauge. Merk at det gir n element i SXI-en
+// i staden for eitt — difor er det eit eige val, ikkje noko som skjer av seg
+// sjølv når brukaren flyttar på stykka.
+function loysOppGruppe(w,z){
+  const n=winCount(w);
+  if(n<2)return;
+  const {segLen,width}=winGeom(z,w);
+  snapshot();
+  const cs=winCentres(w,width,segLen);
+  const base=w.name||(w.type==='dor'?'Dør':'Vindauge');
+  const ix=Math.max(0,z.windows.indexOf(w));
+  z.windows.splice(ix,1);
+  cs.forEach((c,i)=>{
+    const sp=fitSpanT(c,width,segLen);
+    z.windows.splice(ix+i,0,{...w,antal:1,posT:[c],t0:sp.t0,t1:sp.t1,
+      name:i===0?base:uniqueWinName(base,z.windows)});
+  });
+  updateResults();renderTable();draw();
+  hintText.textContent='Løyste opp gruppa i '+n+' sjølvstendige '+(w.type==='dor'?'dører':'vindauge')+'.';
+}
+// Tilbake til jamn fordeling rundt gruppesenteret
+function fordelStkJamnt(w,z){
+  snapshot();
+  w.posT=null;
+  updateResults();renderTable();draw();
+  hintText.textContent='Fordelte stykka jamnt på veggen.';
 }
 
 // ── Kontekstmeny for vindauge/dør ────────────────────────────
 function showWindowContextMenu(cx,cy,hit){
   document.getElementById('winCtxMenu')?.remove();
   const {w,wi,z,zi,fli}=hit;
+  const inst=hit.inst||0;
+  const nStk=winCount(w);
   const label=w.name||(w.type==='dor'?'Dør':'Vindauge');
   const menu=document.createElement('div');
   menu.id='winCtxMenu';
@@ -7015,7 +7191,7 @@ function showWindowContextMenu(cx,cy,hit){
 
   const header=document.createElement('div');
   header.style.cssText='font-size:11px;font-weight:700;color:var(--text3);padding:4px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:4px';
-  header.textContent=(w.type==='dor'?'🚪 ':'▭ ')+label+' · '+w.breddeMm+'×'+w.hoyMm+' mm';
+  header.textContent=(w.type==='dor'?'🚪 ':'▭ ')+label+(nStk>1?' '+(inst+1)+'/'+nStk:'')+' · '+w.breddeMm+'×'+w.hoyMm+' mm';
   menu.appendChild(header);
 
   const mkItem=(icon,txt,cb,danger=false)=>{
@@ -7029,6 +7205,11 @@ function showWindowContextMenu(cx,cy,hit){
   };
 
   mkItem('✏️','Rediger',()=>showWindowEditDialog(w,wi,z,zi,fli));
+  if(nStk>1){
+    mkItem('⧉','Løys ut denne stk',()=>loysUtStk(w,z,inst));
+    mkItem('⋮⋮','Løys opp gruppa ('+nStk+' eigne)',()=>loysOppGruppe(w,z));
+  }
+  if(nStk>1&&winHasPos(w))mkItem('⇔','Fordel jamnt',()=>fordelStkJamnt(w,z));
   mkItem('📋','Kopier til fasade…',()=>{showCopyWindowMenu(w,z,zi,floors[fli],fli);});
   mkItem('⎘','Kopier (Ctrl+C)',()=>{
     winClipboard=JSON.parse(JSON.stringify(w));
@@ -7111,6 +7292,10 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   box.appendChild(mkRow('Breidde (mm)',brI));
   box.appendChild(mkRow('Høgde (mm)',hoI));
   box.appendChild(mkRow('Antal stk',antI));
+  const antNote=document.createElement('div');
+  antNote.style.cssText='font-size:10.5px;color:var(--text3);margin:-6px 0 10px 120px;line-height:1.4';
+  antNote.textContent='Fleire stk = eitt element i SIMIEN med dette antalet. Kvar stk kan dragast for seg på veggen.';
+  box.appendChild(antNote);
   box.appendChild(mkRow('U-verdi W/m²K',uI));
   if(w.type!=='dor') box.appendChild(brystRow);
 
@@ -7132,7 +7317,11 @@ function showWindowEditDialog(w,wi,z,zi,fli){
     if(!br||br<=0||!ho||ho<=0||!ant||ant<=0){errEl.textContent='Breidde, høgde og antal må vere positive tal.';errEl.style.display='block';return;}
     snapshot();
     w.name=nameI.value.trim()||typeL;
-    w.breddeMm=br;w.hoyMm=ho;w.antal=ant;
+    w.breddeMm=br;w.hoyMm=ho;
+    // Antalet endrar plasseringa til stykka — winSetAntal tek vare på dei som
+    // alt står der og legg nye etter den siste (sjå winSetAntal)
+    const _g=winGeom(z,w);
+    winSetAntal(w,ant,_g.width,_g.segLen);
     const uv=parseFloat(uI.value);w.uVerdi=isNaN(uv)?undefined:uv;
     if(w.type!=='dor'){
       if(brystCb.checked){const bv=parseInt(brystI.value);w.brystningMm=isNaN(bv)?null:bv;}
@@ -7153,7 +7342,7 @@ function showWindowEditDialog(w,wi,z,zi,fli){
     const _src=winSpanPx(w,_segLenPx,mppForZone(z));
     const width=_src.t1-_src.t0;
     const {t0,t1}=fitSpanT(_src.t1+0.02+width/2,width*_segLenPx,_segLenPx);
-    const copy={...w,t0,t1,name:uniqueWinName(w.name,z.windows)};
+    const copy={...w,t0,t1,posT:null,name:uniqueWinName(w.name,z.windows)};
     z.windows.push(copy);
     dlg.remove();updateResults();renderTable();draw();
   };
@@ -7505,7 +7694,8 @@ document.addEventListener('keydown',e=>{
         const _refSpan=winSpanPx(refW,seg.lenPx,mmPerImgPx);
         const _wPx=_clipW(seg.lenPx);
         const {t0,t1}=fitSpanT(_refSpan.t1+0.02+(_wPx/2)/(seg.lenPx||1),_wPx,seg.lenPx);
-        const copy={...winClipboard,t0,t1,segIdx:refW.segIdx,dir:seg.dir};
+        // posT gjeld kjeldeveggen — kopien får jamn fordeling frå den nye staden
+        const copy={...winClipboard,t0,t1,posT:null,segIdx:refW.segIdx,dir:seg.dir};
         if(!z.windows)z.windows=[];
         copy.name=uniqueWinName(winClipboard.name||(winClipboard.type==='dor'?'Dør':'Vindauge'),z.windows);
         z.windows.push(copy);
@@ -7524,7 +7714,7 @@ document.addEventListener('keydown',e=>{
             const tMid=Math.max(0,Math.min(1,((ip.x-seg.p1.x)*dx+(ip.y-seg.p1.y)*dy)/(segLen*segLen)));
             const {t0,t1}=fitSpanT(tMid,_clipW(segLen),segLen);
             if(!z.windows)z.windows=[];
-            const copy={...winClipboard,t0,t1,segIdx:seg.idx,dir:seg.dir,name:uniqueWinName(winClipboard.name||(winClipboard.type==='dor'?'Dør':'Vindauge'),z.windows)};
+            const copy={...winClipboard,t0,t1,posT:null,segIdx:seg.idx,dir:seg.dir,name:uniqueWinName(winClipboard.name||(winClipboard.type==='dor'?'Dør':'Vindauge'),z.windows)};
             z.windows.push(copy);
             updateResults();renderTable();draw();
             hintText.textContent='✓ Lima inn «'+(copy.name||copy.type)+'» på fasade.';
@@ -11910,33 +12100,16 @@ function _rebuild3DDebounced(){
 }
 
 // ── Vindauge-ekspansjon for fasade + 3D ───────────────────────
-// Tar eit vindaugsobjekt med antal>1 og segmentlengde i meter,
-// returnerer array med individuelle vindauge med eigne t0/t1,
-// fordelt jamnt innanfor det opphavlege t0→t1-intervallet.
+// Tar eit vindaugsobjekt med antal>1 og segmentlengde i meter, returnerer
+// array med éin oppføring per stk, kvar med sine eigne t0/t1. Plasseringa kjem
+// frå `w.posT` når brukaren har flytta stykka sjølv, elles frå ei jamn
+// fordeling rundt gruppesenteret (sjå winCentres).
 function expandWindows(w, segLenM){
-  const n=w.antal||1;
   // Bruk alltid breddeMm for faktisk breidde — t0/t1 er berre senterposisjon
   const winWidthM=w.breddeMm/1000;
-  const centreT=(w.t0+w.t1)/2;
-  if(n<=1||segLenM<=0){
-    // Eit vindauge — berekn t0/t1 frå breddeMm og senter
-    const {t0,t1}=fitSpanT(centreT,winWidthM,segLenM);
-    return[{...w,antal:1,t0,t1}];
-  }
-  // Fleire vindauge — fordel jamnt rundt sentrum
-  const totalWinWidth=winWidthM*n;
-  const gapFraction=0.02; // 2% av segLenM som mellomrom
-  const gap=Math.max(gapFraction*segLenM,(segLenM*0.1)/n);
-  const totalSpan=totalWinWidth+gap*(n-1);
-  // Skyv heile rekkja inn på veggen om senteret ligg for nær enden — elles
-  // ville dei ytste vindauga blitt klipte og vist ei anna breidde enn resten
-  let startM=centreT*segLenM-totalSpan/2;
-  if(totalSpan<=segLenM)startM=Math.max(0,Math.min(startM,segLenM-totalSpan));
-  return Array.from({length:n},(_,i)=>{
-    const wStartM=startM+i*(winWidthM+gap);
-    const t0=Math.max(0,wStartM/segLenM);
-    const t1=Math.min(1,(wStartM+winWidthM)/segLenM);
-    return{...w,antal:1,t0,t1};
+  return winCentres(w,winWidthM,segLenM).map(c=>{
+    const {t0,t1}=fitSpanT(c,winWidthM,segLenM);
+    return{...w,antal:1,posT:null,t0,t1};
   });
 }
 

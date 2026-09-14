@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 4.2.0 | Single-file HTML applikasjon
+**Versjon:** 4.3.0 | Single-file HTML applikasjon
 
 ---
 
@@ -213,7 +213,59 @@ Begge hjelparane **skyv** vindauget inn på veggen når det ikkje er plass frå
 senteret — dei klipper ikkje éi side. Ei einsidig klipping viste ei anna breidde
 på skjermen enn den som gjekk til SIMIEN.
 
-### 7. Omkalibrering: alt som er teikna må følgje bygget
+### 7. `antal` er eitt SIMIEN-element og mange stk på veggen
+
+Eit vindauge med `antal>1` er framleis **eitt** `<window number="antal">` i
+SXI-en, men på veggen står det som `antal` stykk — i planteikninga, i
+fasadevisinga og i 3D-modellen. Plasseringa av kvar stk ligg i `w.posT`, ei
+liste med senterposisjonar (0–1 langs segmentet), ei per stk.
+
+`posT` er **valfri**. Manglar ho, vert stykka fordelte jamnt rundt
+gruppesenteret slik dei alltid har vore — difor ser gamle prosjekt og nye
+vindauge ut nøyaktig som før, og feltet dukkar først opp når brukaren faktisk
+flyttar ei enkelt stk.
+
+```javascript
+winCount(w)                       // antal, minst 1
+winHasPos(w)                      // posT finst OG har rett lengd
+winCentres(w, width, segLen)      // senter for kvar stk — posT eller jamn rekkje
+winSpansPx(w, segLenPx, mpp)      // {t0,t1} per stk, i biletpikslar
+winGeom(z, w)                     // {seg, segLen, width, mpp} i biletpikslar
+winFreezePos(w, width, segLen)    // frys den jamne rekkja til faktiske posisjonar
+winSetAntal(w, n, width, segLen)  // endra antal og ta vare på plasseringa
+winSyncAnchor(w, width, segLen)   // t0/t1 = snittet av posT
+```
+
+Invariantar:
+
+- **`t0`/`t1` er framleis gruppa sitt anker**, ikkje ei stk. Det er senteret ei
+  jamn rekkje vert bygd rundt, og det `remapSegsAfterInsert`,
+  `remapSegsBeforeDelete`, «Del sone» og kopieringa les. Endrar `posT` seg, må
+  ankeret følgje snittet (`winSyncAnchor`) — elles ville gruppa hoppe tilbake
+  til den gamle staden om `posT` fall bort.
+- **Alle stk ligg på same segment.** Gruppa er eitt `<window>` inne i éin
+  `<facade>`; spreidde vi stykka over fleire veggar, ville det ikkje lenger
+  finnast éin fasade å leggje elementet i.
+- **`posT` følgjer aldri med ein kopi.** Kopier, limeinn og «Del sone» set
+  `posT:null` — plasseringa gjeld kjeldeveggen, og ein annan vegg har annan
+  lengd. Utan dette ville kopiane dessutan dele same array som originalen.
+- **Endra antal går gjennom `winSetAntal`**, aldri `w.antal=n`. Nye stk vert
+  lagde etter den siste med same luft som ei jamn rekkje; er det ikkje plass,
+  fell heile gruppa tilbake til jamn fordeling.
+- **Segment-remappinga tek `posT` med** (`_mapWinPos`, same lineære omrekning
+  som `t0`/`t1`). Hamnar ei stk utanfor den nye veggen, fell gruppa tilbake til
+  jamn fordeling — å klemme dei inn mot kanten ville stabla dei oppå kvarandre.
+- **Plasseringa når aldri SXI-en.** Ho er berre visning; SIMIEN får `number` og
+  målet på éin.
+- Å løyse ut ei stk (`loysUtStk`) gjer gruppa til `number="n-1"` og legg det
+  utløyste vindauget ved sida av som eit eige element med `number="1"`, på same
+  plass. `loysOppGruppe` gjer heile gruppa til n sjølvstendige element — det
+  endrar SXI-en frå eitt til n `<window>`, og er difor eit eige val, ikkje noko
+  som skjer av seg sjølv når brukaren flyttar på stykka.
+- `expandWindows()` er den eine vegen inn til fasadevising, 3D og kartet; han
+  les `winCentres` og treng ingen eigen kunnskap om `posT`.
+
+### 8. Omkalibrering: alt som er teikna må følgje bygget
 
 Endrar brukaren skalaen etter å ha teikna, ligg teikninga i ro — det er **måla**
 som endrar seg. Sonearealer, veggengder og kontrollmål reknast frå biletpikslar
@@ -815,6 +867,10 @@ Viktig bughistorikk:
 - floorDx/floorDy finst ikkje lenger — bruk floorDxImg/floorDyImg (biletpikslar)
 - Utjamningsfilter må kopiere kanten av vindauget, ikkje la han stå som nullar
 - Vindaugsbreidde: bruk fitSpanT/winSpanPx, ALDRI w.t1-w.t0 (som berre er senteret)
+- Vindauge med antal>1 er EITT SIMIEN-element, men antal stk på veggen. Kvar stk
+  har si plassering i w.posT; bruk winCentres/winSpansPx, og endra antal berre
+  gjennom winSetAntal. posT skal ALDRI følgje med ein kopi (kopi/limeinn/del sone
+  set posT:null) — sjå «antal er eitt SIMIEN-element og mange stk på veggen»
 - Omkalibrering må skalere w.breddeMm og rekne gavlflater på nytt — elles slutta
   vindauga å følgje bygget, og glasandelen i SXI vart stille feil
 - PDF-renderskala er adaptiv (pdfRenderScale): eit fast 4.0 gav 288 DPI uansett
