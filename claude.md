@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 4.4.0 | Single-file HTML applikasjon
+**Versjon:** 4.4.1 | Single-file HTML applikasjon
 
 ---
 
@@ -223,15 +223,29 @@ SXI-en, men på veggen står det som `antal` stykk — i planteikninga, i
 fasadevisinga og i 3D-modellen. Plasseringa av kvar stk ligg i `w.posT`, ei
 liste med senterposisjonar (0–1 langs segmentet), ei per stk.
 
-`posT` er **valfri**. Manglar ho, vert stykka fordelte jamnt rundt
-gruppesenteret slik dei alltid har vore — difor ser gamle prosjekt og nye
-vindauge ut nøyaktig som før, og feltet dukkar først opp når brukaren faktisk
-flyttar ei enkelt stk.
+`posT` er **valfri**. Manglar ho, vert stykka fordelte jamnt utover **heile**
+veggen: kvar stk får si eiga rute på `segLen/n` og står midt i ruta. Då er
+avstanden mellom stykka lik overalt, med halve avstanden ned til kvar ende —
+slik ein fasade med like vindauge faktisk ser ut. Feltet dukkar først opp når
+brukaren flyttar ei enkelt stk.
+
+Klikkpunktet (`t0`/`t1`) styrer berre eit **einsleg** vindauge. For ei gruppe er
+det veggen som avgjer. Ei tidlegare utgåve klumpa stykka saman rundt
+gruppesenteret med ein liten luftavstand; det gav ein 3D-modell som ikkje likna
+på bygget, og på ein kort vegg hamna stykka oppå kvarandre.
+
+Ruteinndelinga er dessutan den **tettaste** fordelinga som finst for n stk, så
+er det plass i det heile (`n*breidde <= segLen`), ligg dei aldri oppå kvarandre.
+Er gruppa breiare enn veggen, kan ingen plassering hjelpe — `winForTrongt()`
+seier frå i sonekortet, i redigeringsdialogen (medan brukaren skriv) og i
+hintlinja når gruppa vert laga. Aldri sil det i stillheit: tala går rett inn i
+energimerket.
 
 ```javascript
 winCount(w)                       // antal, minst 1
 winHasPos(w)                      // posT finst OG har rett lengd
 winCentres(w, width, segLen)      // senter for kvar stk — posT eller jamn rekkje
+winForTrongt(w, width, segLen)    // breiare enn veggen? då MÅ stykka overlappe
 winSpansPx(w, segLenPx, mpp)      // {t0,t1} per stk, i biletpikslar
 winGeom(z, w)                     // {seg, segLen, width, mpp} i biletpikslar
 winFreezePos(w, width, segLen)    // frys den jamne rekkja til faktiske posisjonar
@@ -253,7 +267,7 @@ Invariantar:
   `posT:null` — plasseringa gjeld kjeldeveggen, og ein annan vegg har annan
   lengd. Utan dette ville kopiane dessutan dele same array som originalen.
 - **Endra antal går gjennom `winSetAntal`**, aldri `w.antal=n`. Nye stk vert
-  lagde etter den siste med same luft som ei jamn rekkje; er det ikkje plass,
+  lagde etter den siste med ei halv vindaugsbreidde i luft; er det ikkje plass,
   fell heile gruppa tilbake til jamn fordeling.
 - **Segment-remappinga tek `posT` med** (`_mapWinPos`, same lineære omrekning
   som `t0`/`t1`). Hamnar ei stk utanfor den nye veggen, fell gruppa tilbake til
@@ -999,6 +1013,10 @@ Viktig bughistorikk:
   har si plassering i w.posT; bruk winCentres/winSpansPx, og endra antal berre
   gjennom winSetAntal. posT skal ALDRI følgje med ein kopi (kopi/limeinn/del sone
   set posT:null) — sjå «antal er eitt SIMIEN-element og mange stk på veggen»
+- Ei gruppe vert fordelt jamnt utover HEILE veggen (rute på segLen/n, stk midt i
+  ruta), ikkje klumpa rundt klikkpunktet. Det er den tettaste fordelinga som
+  finst, så stykka overlappar aldri når dei får plass — og når dei ikkje får
+  plass, seier winForTrongt frå tre stader i staden for å teikne ein stabel
 - Omkalibrering må skalere w.breddeMm og rekne gavlflater på nytt — elles slutta
   vindauga å følgje bygget, og glasandelen i SXI vart stille feil
 - PDF-renderskala er adaptiv (pdfRenderScale): eit fast 4.0 gav 288 DPI uansett
