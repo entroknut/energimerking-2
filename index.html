@@ -3665,18 +3665,27 @@ function draw(){
     flateListe(z,flateLag).forEach((fl,fli)=>{
       if((fl.pts||[]).length<3)return;
       const isActive=flateLag==='tak'&&mode==='tegn-takflate'&&activeTakflateZone===z;
+      const sc2=FL_PAL[fli%FL_PAL.length];
+      // Fyllet brukar heile ringen — nonzero winding gjer at eit nøkkelhòl
+      // står tomt av seg sjølv
       ctx.beginPath();
       const tp0=i2s(fl.pts[0].x,fl.pts[0].y);ctx.moveTo(tp0.x,tp0.y);
       fl.pts.slice(1).forEach(p=>{const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);});
       ctx.closePath();
-      const sc2=FL_PAL[fli%FL_PAL.length];
       ctx.fillStyle=_hex2rgba(sc2,0.24);ctx.fill();
+      // Konturen hoppar over brua, som ikkje finst i bygget
+      const kon=flateKonturar(fl.pts);
+      ctx.beginPath();
+      kon.deler.forEach(del=>{
+        const d0=i2s(del[0].x,del[0].y);ctx.moveTo(d0.x,d0.y);
+        del.slice(1).forEach(p=>{const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);});
+        if(kon.lukka)ctx.closePath();
+      });
       ctx.strokeStyle=isActive?'#fff':sc2;ctx.lineWidth=isActive?2.5:1.8;
       ctx.setLineDash(flateLag==='gulv'?[2,3]:[5,3]);ctx.stroke();ctx.setLineDash([]);
       // Merkelapp: namn + type (og vinkel/retning på eit skrått tak)
-      const tcx=fl.pts.reduce((s,p)=>s+p.x,0)/fl.pts.length;
-      const tcy=fl.pts.reduce((s,p)=>s+p.y,0)/fl.pts.length;
-      const tcp=i2s(tcx,tcy);
+      const mp=flateMerkepunkt(fl.pts);
+      const tcp=i2s(mp.x,mp.y);
       const ftype=flateType(z,flateLag,fl);
       let tlbl=(fl.name||FLATE[flateLag].lbl)+' · ';
       if(flateLag==='tak'&&ftype==='Tak'){
@@ -3963,7 +3972,12 @@ function draw(){
     if(klippSnap){
       const ksp=i2s(klippSnap.x,klippSnap.y);
       ctx.save();
-      if(klippSnap.type==='corner'||klippSnap.type==='zone'){
+      if(klippSnap.type==='lukk'){
+        // Ring rundt startpunktet: klikk her lukkar sløyfa
+        ctx.beginPath();ctx.arc(ksp.x,ksp.y,10,0,Math.PI*2);
+        ctx.strokeStyle='#22c55e';ctx.lineWidth=2.5;ctx.stroke();
+        ctx.fillStyle='rgba(34,197,94,0.18)';ctx.fill();
+      } else if(klippSnap.type==='corner'||klippSnap.type==='zone'){
         // Grønt kvadrat for hjørner
         ctx.strokeStyle='#22c55e';ctx.lineWidth=2;ctx.strokeRect(ksp.x-7,ksp.y-7,14,14);
         ctx.fillStyle='rgba(34,197,94,0.15)';ctx.fillRect(ksp.x-7,ksp.y-7,14,14);
@@ -3983,8 +3997,17 @@ function draw(){
       klippTakflatePts.forEach((p,i)=>{if(i>0){const sp=i2s(p.x,p.y);ctx.lineTo(sp.x,sp.y);}});
       // Live segment — snap-punkt eller mus
       const liveEnd=klippSnap?i2s(klippSnap.x,klippSnap.y):(mouse||null);
+      const lukkar=klippSnap&&klippSnap.type==='lukk'&&klippTakflatePts.length>=3;
       if(liveEnd)ctx.lineTo(liveEnd.x,liveEnd.y);
       ctx.strokeStyle='#ef4444';ctx.lineWidth=2.5;ctx.stroke();
+      // Peikar brukaren på startpunktet, vert biten som vert klippt ut fylt
+      // — då ser ein kva som faktisk blir eit eige element
+      if(lukkar){
+        ctx.beginPath();ctx.moveTo(sp0.x,sp0.y);
+        klippTakflatePts.forEach((pp,i)=>{if(i>0){const sp=i2s(pp.x,pp.y);ctx.lineTo(sp.x,sp.y);}});
+        ctx.closePath();
+        ctx.fillStyle='rgba(239,68,68,0.18)';ctx.fill();
+      }
       // Forlengd retningslinje bak første segment og framfor siste
       if(klippTakflatePts.length===1&&liveEnd){
         const dx=liveEnd.x-sp0.x,dy=liveEnd.y-sp0.y,len=Math.hypot(dx,dy)||1;
@@ -4005,7 +4028,9 @@ function draw(){
       if(klippTakflatePts.length>=2&&mouse){
         ctx.font='bold 10px Inter,sans-serif';
         ctx.fillStyle='rgba(239,68,68,0.9)';
-        const lbl=`${klippTakflatePts.length} pt · Enter for å klippe`;
+        const lbl=(klippSnap&&klippSnap.type==='lukk')
+          ?`Klikk for å klippe ut biten`
+          :`${klippTakflatePts.length} pt · Enter for å klippe`;
         const tw=ctx.measureText(lbl).width+10;
         ctx.beginPath();ctx.roundRect(mouse.x+8,mouse.y-14,tw,16,4);ctx.fill();
         ctx.fillStyle='#fff';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(lbl,mouse.x+13,mouse.y-6);
@@ -4541,6 +4566,279 @@ function _splitPolygonByPolyline(poly,polyline){
   return[poly1,poly2];
 }
 
+// ── Flategeometri: hòl midt i flata, og samanslåing ──────────
+// Ei flate er alltid EIN ring med punkt. Eit hòl midt i flata vert lagra som
+// eit nøkkelhòl: ei smal bru ut til hòlet, hòlet gjennomløpt andre vegen, og
+// bru tilbake. Brua har null areal, så både shoelace-arealet (calcAreaM2) og
+// canvas-fyllet (nonzero winding) vert rett — og vi slepp å innføre fleire
+// ringar i datamodellen, som ville ha råka teikning, 3D, eksport og lagring.
+const _FLATE_TOL=0.25;                                 // biletpikslar
+const _pk=p=>p.x.toFixed(2)+','+p.y.toFixed(2);        // punktnøkkel
+
+function _ringAreaSigned(pts){
+  let a=0;
+  for(let i=0;i<pts.length;i++){const j=(i+1)%pts.length;a+=pts[i].x*pts[j].y-pts[j].x*pts[i].y;}
+  return a/2;
+}
+
+// Ligg brua fritt? Vi krympar henne litt i begge endar, elles ville kantane
+// som deler endepunkt telje som treff.
+function _bruaFri(a,b,ringar){
+  const dx=b.x-a.x,dy=b.y-a.y;
+  const p1={x:a.x+dx*0.001,y:a.y+dy*0.001};
+  const p2={x:a.x+dx*0.999,y:a.y+dy*0.999};
+  for(const r of ringar){
+    for(let i=0;i<r.length;i++){
+      if(_segSegIntersect(p1,p2,r[i],r[(i+1)%r.length]))return false;
+    }
+  }
+  return true;
+}
+
+// Byggjer eit nøkkelhòl-polygon av ytterring + hòlring.
+function _byggNokkelhol(poly,hole){
+  // Hòlet må gå motsett veg av ytterkanten for at arealet skal trekkjast frå
+  const h=(_ringAreaSigned(hole)>0)===(_ringAreaSigned(poly)>0)?[...hole].reverse():[...hole];
+  // Prøv dei næraste hjørneparaa fyrst, men berre bruer som ligg fritt
+  const par=[];
+  poly.forEach((a,i)=>h.forEach((b,j)=>par.push({i,j,d:Math.hypot(a.x-b.x,a.y-b.y)})));
+  par.sort((m,n)=>m.d-n.d);
+  for(const{i,j}of par.slice(0,400)){
+    const a=poly[i],b=h[j];
+    if(!_bruaFri(a,b,[poly,h]))continue;
+    const midt={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    if(!pointInPolygon(midt,poly)||pointInPolygon(midt,h))continue;
+    const ut=[];
+    for(let k=0;k<=i;k++)ut.push({...poly[k]});
+    for(let k=0;k<=h.length;k++)ut.push({...h[(j+k)%h.length]});
+    ut.push({...poly[i]});
+    for(let k=i+1;k<poly.length;k++)ut.push({...poly[k]});
+    return ut;
+  }
+  return null;
+}
+
+// Konturane i eit flatepolygon, utan bru-kantane i eit nøkkelhòl.
+// Brua er to motsette kantar oppå kvarandre; å teikne henne ville gitt ein
+// strek tvers over flata som ikkje finst i bygget. Fyllet skal derimot
+// bruke heile ringen — det er brua som gjer at hòlet ikkje vert fylt.
+function flateKonturar(pts){
+  const n=pts.length;
+  const finst=new Set();
+  for(let i=0;i<n;i++)finst.add(_pk(pts[i])+'|'+_pk(pts[(i+1)%n]));
+  const behald=[];
+  for(let i=0;i<n;i++)behald.push(!finst.has(_pk(pts[(i+1)%n])+'|'+_pk(pts[i])));
+  const start=behald.indexOf(false);
+  if(start<0)return{lukka:true,deler:[pts]};      // vanleg polygon
+  const deler=[];let cur=null;
+  for(let k=1;k<=n;k++){
+    const i=(start+k)%n;
+    if(behald[i]){
+      if(!cur){cur=[pts[i]];deler.push(cur);}
+      cur.push(pts[(i+1)%n]);
+    } else cur=null;
+  }
+  return{lukka:false,deler};
+}
+
+// Eit punkt godt inne i flata, til merkelappen. Tyngdepunktet til eit
+// nøkkelhòl-polygon kan hamne midt i sjølve hòlet.
+function flateMerkepunkt(pts){
+  const cx=pts.reduce((t,p)=>t+p.x,0)/pts.length;
+  const cy=pts.reduce((t,p)=>t+p.y,0)/pts.length;
+  if(pointInPolygon({x:cx,y:cy},pts))return{x:cx,y:cy};
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  pts.forEach(p=>{minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);});
+  let best=null,bestD=-1;
+  for(let i=1;i<10;i++)for(let j=1;j<10;j++){
+    const q={x:minX+(maxX-minX)*i/10,y:minY+(maxY-minY)*j/10};
+    if(!pointInPolygon(q,pts))continue;
+    let d=Infinity;
+    for(let k=0;k<pts.length;k++){
+      const a=pts[k],b=pts[(k+1)%pts.length];
+      const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;
+      const t=L2<1e-9?0:Math.max(0,Math.min(1,((q.x-a.x)*dx+(q.y-a.y)*dy)/L2));
+      d=Math.min(d,Math.hypot(q.x-(a.x+dx*t),q.y-(a.y+dy*t)));
+    }
+    if(d>bestD){bestD=d;best=q;}
+  }
+  return best||{x:cx,y:cy};
+}
+
+// Klipp ein bit ut MIDT i ei flate. `loop` er ei lukka sløyfe heilt inne i
+// polygonet. Returnerer [restenMedNøkkelhòl, biten] eller null.
+function _splitPolygonByHole(poly,loop){
+  if(!poly||poly.length<3||!loop||loop.length<3)return null;
+  for(const p of loop)if(!pointInPolygon(p,poly))return null;
+  // Sløyfa må ikkje krysse kanten — då er det eit vanleg gjennomgåande kutt
+  for(let i=0;i<loop.length;i++){
+    const a=loop[i],b=loop[(i+1)%loop.length];
+    for(let j=0;j<poly.length;j++){
+      if(_segSegIntersect(a,b,poly[j],poly[(j+1)%poly.length]))return null;
+    }
+  }
+  if(Math.abs(_ringAreaSigned(loop))<1)return null;   // for lite til å vere ein bit
+  const ytre=_byggNokkelhol(poly,loop);
+  if(!ytre)return null;
+  return[ytre,loop.map(p=>({...p}))];
+}
+
+// Slår saman to flatepolygon som deler ein kant.
+//
+// Metoden er kantkansellering: kantar som finst i begge polygona, men i kvar
+// si retning, er innvendige og fell bort; det som står att er ytterkanten av
+// summen. Det handterer nøkkelhòl heilt av seg sjølv — brua er to motsette
+// kantar og kansellerer seg sjølv når hòlet vert lagt tilbake.
+function _unionPolygons(a,b){
+  // 1. Del kantane ved motpartens hjørne, så delte kantar vert identiske.
+  //    Vi set inn motpartens PUNKT, ikkje projeksjonen, så nøklane matchar.
+  const refine=(poly,other)=>{
+    const ut=[];
+    for(let i=0;i<poly.length;i++){
+      const p=poly[i],q=poly[(i+1)%poly.length];
+      ut.push({...p});
+      const dx=q.x-p.x,dy=q.y-p.y,L2=dx*dx+dy*dy;
+      if(L2<1e-9)continue;
+      const paa=[];
+      other.forEach(o=>{
+        const t=((o.x-p.x)*dx+(o.y-p.y)*dy)/L2;
+        if(t<=1e-6||t>=1-1e-6)return;
+        if(Math.hypot(o.x-(p.x+dx*t),o.y-(p.y+dy*t))>_FLATE_TOL)return;
+        paa.push({t,pt:{...o}});
+      });
+      paa.sort((m,n)=>m.t-n.t);
+      let sist=-1;
+      paa.forEach(({t,pt})=>{if(t-sist>1e-6){ut.push(pt);sist=t;}});
+    }
+    return ut;
+  };
+  const A=refine(a,b),B=refine(b,a);
+
+  // 2. Kanseller motsette kantar
+  const kantar=new Map();
+  const legg=(p,q)=>{
+    const kp=_pk(p),kq=_pk(q);
+    if(kp===kq)return;
+    const rev=kq+'|'+kp;
+    if(kantar.has(rev)){kantar.delete(rev);return;}
+    kantar.set(kp+'|'+kq,{p:{...p},q:{...q}});
+  };
+  [A,B].forEach(r=>{for(let i=0;i<r.length;i++)legg(r[i],r[(i+1)%r.length]);});
+  if(!kantar.size)return null;
+
+  // 3. Spor sløyfene som står att
+  const fraa=new Map();
+  kantar.forEach(e=>{const k=_pk(e.p);if(!fraa.has(k))fraa.set(k,[]);fraa.get(k).push(e);});
+  const brukt=new Set(),loops=[];
+  const ek=e=>_pk(e.p)+'|'+_pk(e.q);
+  kantar.forEach(start=>{
+    if(brukt.has(ek(start)))return;
+    const loop=[];let cur=start,vakt=0;
+    while(cur&&vakt++<20000){
+      const k=ek(cur);
+      if(brukt.has(k))break;
+      brukt.add(k);
+      loop.push({...cur.p});
+      cur=(fraa.get(_pk(cur.q))||[]).find(x=>!brukt.has(ek(x)));
+    }
+    if(loop.length>=3)loops.push(loop);
+  });
+  if(!loops.length)return null;
+
+  // 4. Største sløyfa er ytterkanten; eventuelle andre er hòl
+  loops.sort((x,y)=>Math.abs(_ringAreaSigned(y))-Math.abs(_ringAreaSigned(x)));
+  let ut=loops[0];
+  for(let i=1;i<loops.length;i++){
+    const nytt=_byggNokkelhol(ut,loops[i]);
+    if(!nytt)return null;
+    ut=nytt;
+  }
+  return ut;
+}
+
+// Samanslåing med fasitsjekk: arealet av resultatet MÅ vere summen av dei to.
+// Er det ikkje det, har sporinga gått feil — då er det betre å seie frå enn å
+// skrive eit polygon vi ikkje stolar på inn i energimerket.
+function _slaaSamanPolygon(aPts,bPts){
+  const ut=_unionPolygons(aPts,bPts);
+  if(!ut||ut.length<3)return null;
+  const forventa=Math.abs(_ringAreaSigned(aPts))+Math.abs(_ringAreaSigned(bPts));
+  const fekk=Math.abs(_ringAreaSigned(ut));
+  if(!(forventa>0)||Math.abs(fekk-forventa)/forventa>0.005)return null;
+  return ut;
+}
+
+// Lengda (biletpikslar) av den felles kanten mellom to flatepolygon.
+// Brukt til å finne kva nabo ei sletta flate skal gå tilbake til.
+function _felleskantLen(aPts,bPts){
+  let sum=0;
+  for(let i=0;i<aPts.length;i++){
+    const p=aPts[i],q=aPts[(i+1)%aPts.length];
+    const mx=(p.x+q.x)/2,my=(p.y+q.y)/2;
+    for(let j=0;j<bPts.length;j++){
+      const r=bPts[j],t2=bPts[(j+1)%bPts.length];
+      const dx=t2.x-r.x,dy=t2.y-r.y,L2=dx*dx+dy*dy;
+      if(L2<1e-9)continue;
+      let t=((mx-r.x)*dx+(my-r.y)*dy)/L2;
+      if(t<-1e-6||t>1+1e-6)continue;
+      t=Math.max(0,Math.min(1,t));
+      if(Math.hypot(mx-(r.x+dx*t),my-(r.y+dy*t))>_FLATE_TOL)continue;
+      sum+=Math.hypot(q.x-p.x,q.y-p.y);break;
+    }
+  }
+  return sum;
+}
+
+// Sett sona sin eigen type frå den største flata og fjern oppdelinga.
+// Brukt av «↺ Slå saman» og av sletting av den siste flata — begge stader
+// skal sona ende opp heilt dekt av éin type, ikkje utan tak eller golv.
+function _fjernFlateoppdeling(z,kind){
+  const F=FLATE[kind];
+  let best=null,bestA=-1;
+  flateListe(z,kind).forEach(fl=>{const a=flateAreaM2(z,fl);if(a>bestA){bestA=a;best=fl;}});
+  if(best){
+    const bt=flateType(z,kind,best);
+    z[F.zoneFelt]=bt;
+    if(kind==='tak')z.takvinkel=(bt==='Tak'&&best.vinkel>0)?best.vinkel:null;
+  }
+  z[F.arr]=[];
+  if(kind==='tak')z.gavlflater=[];
+  return z[F.zoneFelt]||F.std;
+}
+
+// Slettar ei flate og gir arealet tilbake til nabo­flata, slik at sona alltid
+// er heilt dekt av tak og golv. Returnerer ei melding, eller null om
+// samanslåinga ikkje lét seg gjere (då står flata att).
+function slettFlate(z,kind,idx){
+  const F=FLATE[kind];
+  const arr=z[F.arr]||[];
+  const fl=arr[idx];
+  if(!fl)return null;
+  const namn=fl.name||F.lbl;
+  // Siste flata: oppdelinga forsvinn, og sona er dekt av éin type igjen
+  if(arr.length===1){
+    snapshot();
+    const t=_fjernFlateoppdeling(z,kind);
+    return 'Oppdelinga av '+F.eining+' er fjerna — heile flata er no «'+t+'».';
+  }
+  // Nabo med lengst felles kant arvar arealet
+  let best=-1,bestLen=0;
+  arr.forEach((g,i)=>{
+    if(i===idx)return;
+    const L=_felleskantLen(fl.pts,g.pts);
+    if(L>bestLen){bestLen=L;best=i;}
+  });
+  if(best<0)return '⚠ «'+namn+'» grensar ikkje til nokon annan flate, så arealet har ingen stad å gå. Bruk «↺ Slå saman» for å nullstille oppdelinga.';
+  const nyPts=_slaaSamanPolygon(arr[best].pts,fl.pts);
+  if(!nyPts)return '⚠ Klarte ikkje å slå «'+namn+'» saman med «'+(arr[best].name||F.lbl)+'» utan å endre arealet. Flata står att — bruk «↺ Slå saman» om du vil starte oppdelinga på nytt.';
+  snapshot();
+  const tilNamn=arr[best].name||F.lbl;
+  arr[best].pts=nyPts;
+  arr.splice(idx,1);
+  if(kind==='tak')z.gavlflater=[];
+  return '«'+namn+'» er sletta — arealet gjekk til «'+tilNamn+'».';
+}
+
 // Held gavlflater i sync: om dei er berekna, oppdater dei. Kallast etter takflate-endringar.
 function _syncGavlflater(z){
   if((z.gavlflater||[]).length>0)z.gavlflater=_calcGavlflater(z);
@@ -4656,7 +4954,8 @@ function startKlippFlate(z,kind,tfi,fi){
   klippTakflateTarget={z,tfi,kind};
   klippTakflatePts=[];
   setMode('klipp-takflate');draw();
-  hintText.textContent='Klipp «'+(fl.name||FLATE[kind].lbl)+'» · klikk første punkt for klippelinja. Esc for å avbryte.';
+  hintText.textContent='Klipp «'+(fl.name||FLATE[kind].lbl)+'» · dra ei linje heilt igjennom for å dele i to, '
+    +'eller teikn ei lukka sløyfe inni for å klippe ut ein bit midt i flata. Esc for å avbryte.';
 }
 
 // ── Sonekortet: tak- og golvseksjonen ─────────────────────────
@@ -4831,11 +5130,12 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
     aLbl.textContent=flateAreaM2(z,fl).toFixed(1)+' m²';
     const klippFl=ikon('✂','Del denne flata i to','#dc2626');
     klippFl.onclick=()=>startKlippFlate(z,kind,fli,fi);
-    const delFl=ikon('✕','Slett flata','#dc2626');
+    const delFl=ikon('✕',list.length>1
+      ?'Slett flata — arealet går til naboflata, så sona alltid er heilt dekt'
+      :'Fjern oppdelinga — heile '+F.eining+' får igjen éin type','#dc2626');
     delFl.onclick=()=>{
-      snapshot();
-      z[F.arr].splice(fli,1);
-      if(kind==='tak')z.gavlflater=[];
+      const m=slettFlate(z,kind,fli);
+      if(m)hintText.textContent=m;
       updateResults();renderTable();draw();
     };
     r1.appendChild(dot);r1.appendChild(nInp);r1.appendChild(aLbl);r1.appendChild(klippFl);r1.appendChild(delFl);
@@ -4896,7 +5196,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
       rSel.style.cssText='font-size:10.5px;border:1px solid var(--border2);border-radius:4px;padding:2px 3px;flex:1;min-width:0;background:#fff';
       const valgt=fl.retning??180;
       RETNING_ALLE.filter(o=>_fasadeAz.has(o.v)||o.v===valgt).forEach(o=>{
-        const op=document.createElement('option');op.value=o.v;op.textContent='↘ '+o.l;
+        const op=document.createElement('option');op.value=o.v;op.textContent=o.l;
         if(o.v===valgt)op.selected=true;rSel.appendChild(op);
       });
       rSel.onchange=()=>{fl.retning=parseInt(rSel.value);markDirty();_syncGavlflater(z);updateResults();renderTable();draw();};
@@ -4929,20 +5229,10 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
   reset.onmouseleave=()=>{reset.style.background='transparent';reset.style.color='var(--text3)';};
   reset.onclick=()=>{
     snapshot();
-    // Typen til den største flata vert sona sin type, så oppdelinga ikkje
-    // forsvinn stilt inn i ein type brukaren aldri valde
-    let best=null,bestA=-1;
-    flateListe(z,kind).forEach(fl=>{const a=flateAreaM2(z,fl);if(a>bestA){bestA=a;best=fl;}});
-    if(best){
-      const bt=flateType(z,kind,best);
-      z[F.zoneFelt]=bt;
-      if(kind==='tak')z.takvinkel=(bt==='Tak'&&best.vinkel>0)?best.vinkel:null;
-    }
-    z[F.arr]=[];
-    if(kind==='tak')z.gavlflater=[];
+    const t=_fjernFlateoppdeling(z,kind);   // største flata gir sona sin type
     delete window._flateCollapsed[key];     // tilbake til standardtilstanden
     updateResults();renderTable();draw();
-    hintText.textContent=F.eining[0].toUpperCase()+F.eining.slice(1)+' er slege saman til éi flate av typen «'+(z[F.zoneFelt]||F.std)+'».';
+    hintText.textContent=F.eining[0].toUpperCase()+F.eining.slice(1)+' er slege saman til éi flate av typen «'+t+'».';
   };
   bunn.appendChild(sumTxt);bunn.appendChild(reset);
   body.appendChild(bunn);
@@ -5062,7 +5352,15 @@ function _finishKlipp(){
   const arr=z[F.arr]||[];
   const tf=arr[tfi];
   if(!tf){klippTakflatePts=[];klippTakflateTarget=null;setMode('navigate');return;}
-  const result=_splitPolygonByPolyline(tf.pts,klippTakflatePts);
+  const linje=klippTakflatePts.slice();
+  // Ei linje som går heilt igjennom deler flata i to. Ei lukka sløyfe heilt
+  // inne i flata klippar i staden ut ein bit MIDT i sona; resten vert eit
+  // polygon med nøkkelhòl, så sona framleis er heilt dekt.
+  let result=_splitPolygonByPolyline(tf.pts,linje),hol=false;
+  if(!result&&linje.length>=3){
+    const r=_splitPolygonByHole(tf.pts,linje);
+    if(r){result=r;hol=true;}
+  }
   // Rydd klippetilstanden FØR teikninga — elles ligg den raude
   // forhandsvisninga att på lerretet til noko anna utløyser ei ny draw()
   klippTakflatePts=[];klippTakflateTarget=null;klippSnap=null;
@@ -5071,23 +5369,30 @@ function _finishKlipp(){
     const[p1,p2]=result;
     snapshot();markDirty();
     const baseName=tf.name||(F.lbl+' '+(tfi+1));
-    const tf2={...JSON.parse(JSON.stringify(tf)),pts:p2,name:baseName+' B',id:kind+'_'+Date.now()};
-    tf.pts=p1;tf.name=baseName+' A';
+    // Ved eit hòl held restflata på namnet sitt — biten er det nye
+    const tf2={...JSON.parse(JSON.stringify(tf)),pts:p2,id:kind+'_'+Date.now(),
+               name:hol?baseName+' midt':baseName+' B'};
+    tf.pts=p1;
+    if(!hol)tf.name=baseName+' A';
     if(kind==='tak'){
-      // Fallretninga følgjer den næraste ytterfasaden til kvar nye halvdel
+      // Fallretninga følgjer den næraste ytterfasaden til kvar nye del
       const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
-      tf.retning=_autoRetningForTakflate(p1,z,segs);
+      if(!hol)tf.retning=_autoRetningForTakflate(p1,z,segs);
       tf2.retning=_autoRetningForTakflate(p2,z,segs);
       z.gavlflater=[]; // strukturendring — gavlflater må reberegnast
     }
     arr.splice(tfi+1,0,tf2);
     updateResults();renderTable();draw();
-    hintText.textContent='Flata er klippt i to — sjekk typen på kvar del i sonekortet.';
+    hintText.textContent=hol
+      ?'Ein bit er klippt ut midt i flata — sjekk typen på han i sonekortet.'
+      :'Flata er klippt i to — sjekk typen på kvar del i sonekortet.';
   }else{
     // Bomskot: la brukaren prøve på nytt på same flate i staden for å
     // kaste han ut av klippemodus
     klippTakflateTarget={z,tfi,kind};
-    hintText.textContent='Klippelinja treffer ikkje flata — dra linja heilt igjennom og prøv igjen.';
+    hintText.textContent=linje.length>=3
+      ?'Verken eit gjennomgåande kutt eller ei lukka sløyfe inne i flata — prøv igjen.'
+      :'Klippelinja treffer ikkje flata — dra linja heilt igjennom, eller teikn ei lukka sløyfe inni for å klippe ut ein bit.';
     draw();
   }
 }
@@ -6873,6 +7178,13 @@ function _snapKlippPt(sx,sy){
     const d=Math.hypot(sx-sp.x,sy-sp.y);
     if(d<bestD){bestD=d;best={x,y,sx:sp.x,sy:sp.y,type};}
   };
+  // Startpunktet i den pågåande linja har høgst prioritet — det er slik ei
+  // sløyfe vert lukka, og då klippar ein ut ein bit midt i flata
+  if(klippTakflatePts.length>=3){
+    const p0=klippTakflatePts[0];
+    check(p0.x,p0.y,'lukk');
+    if(best&&best.type==='lukk')return best;
+  }
   flateListe(z,_kind).forEach(tf=>{
     const pts=tf.pts||[];
     // Hjørner
@@ -7783,6 +8095,8 @@ cv.addEventListener('click',e=>{
       if(klippTakflatePts.length>=2)_finishKlipp();
       return;
     }
+    // Klikk på startpunktet lukkar sløyfa og klippar ut ein bit midt i flata
+    if(klippSnap&&klippSnap.type==='lukk'&&klippTakflatePts.length>=3){_finishKlipp();return;}
     let ip=klippSnap?{x:klippSnap.x,y:klippSnap.y}:s2i(sx,sy);
     if(!klippSnap&&shiftHeld&&klippTakflatePts.length>0){
       const prev=i2s(klippTakflatePts[klippTakflatePts.length-1].x,klippTakflatePts[klippTakflatePts.length-1].y);
@@ -7791,6 +8105,8 @@ cv.addEventListener('click',e=>{
     klippTakflatePts.push(ip);
     if(klippTakflatePts.length===1){
       hintText.textContent='Klikk neste punkt · Shift for 90°/45° · Enter eller dobbelklikk for å klippe · Esc for å avbryte';
+    } else if(klippTakflatePts.length===3){
+      hintText.textContent='Klikk på startpunktet for å klippe ut ein bit midt i flata · eller dra linja heilt igjennom og trykk Enter';
     }
     draw();return;
   }
@@ -12102,9 +12418,13 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
               ]
             };
             scene3.add(tfMesh);
-            const edgePts3=tfPtsM.map(p=>{const proj=p.x*ux+p.z*uz;return new THREE.Vector3(p.x,baseY+fh+Math.max(0,(proj-minProj))*tanV,p.z);});
-            edgePts3.push(edgePts3[0].clone());
-            scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePts3),new THREE.LineBasicMaterial({color:tfColor,linewidth:1})));
+            // Kontur — hoppar over nøkkelhòl-brua, som ikkje er ein ekte kant
+            const kon3=flateKonturar(tf.pts);
+            kon3.deler.forEach(del=>{
+              const dp=del.map(toM).map(p=>{const proj=p.x*ux+p.z*uz;return new THREE.Vector3(p.x,baseY+fh+Math.max(0,(proj-minProj))*tanV,p.z);});
+              if(kon3.lukka&&dp.length)dp.push(dp[0].clone());
+              if(dp.length>1)scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(dp),new THREE.LineBasicMaterial({color:tfColor,linewidth:1})));
+            });
           });
         } else {
           // Flatt tak (eksisterande åtferd)

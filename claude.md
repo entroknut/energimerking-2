@@ -757,7 +757,13 @@ eksportFlater(z,kind)       // ALLTID minst éi oppføring — udelt og oppdelt 
 flateAvvikM2(z,kind)        // sonearealet minus summen av flatene
 initFlater(z,kind)          // start oppdelinga: éi flate = heile sona
 startKlippFlate(z,kind,i,fi)
-byggFlateSeksjon(z,kind,fi) // heile sonekort-seksjonen, begge laga
+slettFlate(z,kind,i)        // slettar OG gir arealet til naboflata
+_fjernFlateoppdeling(z,kind)// største flata gir sona sin type; lista vert tom
+byggFlateSeksjon(z,kind,fi,zi,settings)
+_splitPolygonByHole(poly,loop)   // klipp ut ein bit midt i flata
+_unionPolygons(a,b) / _slaaSamanPolygon(a,b)
+flateKonturar(pts)          // konturane utan nøkkelhòl-brua
+flateMerkepunkt(pts)        // eit punkt godt inne i flata, til merkelappen
 ```
 
 Invariantar:
@@ -793,6 +799,42 @@ Invariantar:
   ligg framleis på sona.
 - Del sone og kopiering mellom etasjar nullstiller begge listene — dei peikar på
   den gamle soneforma.
+
+**Sona skal alltid vere heilt dekt av tak og golv.** Difor forsvinn ei flate
+aldri berre: `slettFlate` gir arealet tilbake til den naboflata ho deler lengst
+kant med (`_felleskantLen`), og den siste flata tek med seg heile oppdelinga
+(`_fjernFlateoppdeling`) i staden for å late sona stå utan tak. Lèt
+samanslåinga seg ikkje gjere, står flata att og brukaren får beskjed —
+`flateAvvikM2`-varselet er difor berre eit nett for gamle prosjekt og for soner
+som har fått endra geometri etter oppdelinga.
+
+- **`_unionPolygons` er kantkansellering**, ikkje ein generell boolsk operasjon:
+  kantar som finst i begge polygona i kvar si retning er innvendige og fell
+  bort. Kantane vert fyrst delte ved motpartens hjørne, og då set vi inn
+  motpartens PUNKT — ikkje projeksjonen — så nøklane matchar eksakt.
+- **`_slaaSamanPolygon` har fasitsjekk**: arealet av resultatet må vere summen av
+  dei to innanfor 0,5 %. Slår det ikkje til, returnerer han null. Eit polygon vi
+  ikkje stolar på skal aldri inn i energimerket.
+
+**Eit hòl midt i flata er eit nøkkelhòl, ikkje ein ekstra ring.** Teiknar
+brukaren ei lukka sløyfe heilt inne i ei flate (klikk tilbake på startpunktet),
+vert sløyfa ei eiga flate, og restflata får ei smal bru ut til hòlet, hòlet
+gjennomløpt **andre vegen**, og bru tilbake.
+
+- Motsett omløp er heile poenget: shoelace (`calcAreaM2`) trekkjer då hòlet frå,
+  og canvas-fyllet med nonzero winding lèt hòlet stå tomt. Datamodellen er
+  framleis éin `pts`-ring, så teikning, 3D, eksport og lagring er urørte.
+- `flateKantLenM` tel berre kantar som ligg på sona sin ytterkant, så både brua
+  og hòlkanten gir 0 — ein bit midt i sona har rett nok ingen perimeter.
+- **Brua skal aldri teiknast.** Ho er to motsette kantar oppå kvarandre og ville
+  vist seg som ein strek tvers over flata. `flateKonturar()` finn kantane som
+  har ein motsett tvilling i same ringen og hoppar over dei; fyllet brukar
+  framleis heile ringen. Same hjelparen i 3D.
+- Tyngdepunktet til eit nøkkelhòl-polygon kan hamne midt i hòlet — difor
+  `flateMerkepunkt()`, som søkjer opp eit punkt godt inne i flata.
+- Samanslåinga treng ingen særhandsaming av nøkkelhòl: brua er to motsette
+  kantar og kansellerer seg sjølv når hòlet vert lagt tilbake. Ein bit som vert
+  sletta gir difor eksakt det opphavlege polygonet tilbake.
 
 Sidepanelet — plassen er knapp, så seksjonen veks med behovet:
 
@@ -984,4 +1026,8 @@ Viktig bughistorikk:
   identisk SXI som før (verifisert med full XML-samanlikning) — sjå «Oppdeling
   av tak og golv». Ei himling er <partition>, ikkje <roof>, uansett kva lag ho
   ligg i, og perimeter/kjellervegg reknast per delflate med flateKantLenM
+- Ei tak- eller golvflate som vert sletta skal ALDRI berre forsvinne — arealet
+  går til naboflata, elles ville sona stått utan tak eller golv i SXI-fila utan
+  at nokon såg det. Eit hòl midt i flata er eit nøkkelhòl med motsett omløp;
+  brua skal ikkje teiknast (flateKonturar)
 ```
