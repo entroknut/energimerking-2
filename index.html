@@ -764,7 +764,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.4.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.4.1</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -2075,30 +2075,40 @@ function winSpanPx(w,segLenPx,mpp){
 // og 3D-modellen — står dei som antal stykk.
 //
 // `w.posT` held senterposisjonen (0-1 langs segmentet) for kvar stk. Feltet er
-// VALFRITT: manglar det, vert stykka fordelte jamnt rundt gruppesenteret, slik
-// dei alltid har vore. Difor ser gamle prosjekt og nye vindauge ut som før, og
+// VALFRITT: manglar det, vert stykka fordelte jamnt utover HEILE veggen.
 // posT dukkar først opp når brukaren faktisk flyttar ei enkelt stk.
 //
-// t0/t1 er framleis gruppa sitt ANKER — senteret ei jamn fordeling vert bygd
-// rundt, og det remap-funksjonane, kopieringa og deling av sone les. Når posT
-// endrar seg må ankeret følgje snittet (winSyncAnchor), elles ville gruppa
-// hoppe tilbake til den gamle staden om posT fall bort.
-const WIN_GAP_FRAC=0.02;   // luft mellom stykka i ei jamn rekkje
+// t0/t1 er framleis gruppa sitt ANKER — plasseringa av éi einsleg stk, og det
+// remap-funksjonane, kopieringa og deling av sone les. Når posT endrar seg må
+// ankeret følgje snittet (winSyncAnchor), elles ville gruppa hoppe tilbake til
+// den gamle staden om posT fall bort.
+const WIN_GAP_FRAC=0.02;   // minste luft når ei ny stk vert lagd til ei gruppe
 function winCount(w){const n=parseInt(w.antal);return n>0?n:1;}
 function winHasPos(w){return Array.isArray(w.posT)&&w.posT.length===winCount(w);}
 // Senterposisjon (t) for kvar stk. `width` og `segLen` i SAME eining.
+//
+// Ei gruppe vert fordelt jamnt utover heile veggen: kvar stk får si eiga rute
+// på segLen/n og står midt i ruta. Då er avstanden mellom stykka lik overalt,
+// med halve avstanden ned til kvar ende — slik ein fasade med like vindauge
+// faktisk ser ut. Det er òg den tettaste fordelinga som finst, så er det plass
+// til stykka i det heile, ligg dei ikkje oppå kvarandre.
+//
+// Klikkpunktet (t0/t1) styrer berre eit einsleg vindauge. For ei gruppe er det
+// veggen som avgjer — å klumpe stykka rundt der brukaren tilfeldigvis klikka
+// gav ein 3D-modell som ikkje likna på bygget.
 function winCentres(w,width,segLen){
   const n=winCount(w);
   if(winHasPos(w))return w.posT.map(t=>isFinite(t)?Math.max(0,Math.min(1,t)):0.5);
   const c=(w.t0+w.t1)/2;
   const centre=isFinite(c)?c:0.5;
-  if(n<=1||!(segLen>0)||!(width>0))return Array.from({length:n},()=>centre);
-  const gap=Math.max(WIN_GAP_FRAC*segLen,(segLen*0.1)/n);
-  const span=width*n+gap*(n-1);
-  // Skyv heile rekkja inn på veggen om senteret ligg for nær enden
-  let start=centre*segLen-span/2;
-  if(span<=segLen)start=Math.max(0,Math.min(start,segLen-span));
-  return Array.from({length:n},(_,i)=>(start+i*(width+gap)+width/2)/segLen);
+  if(n<=1||!(segLen>0))return Array.from({length:n},()=>centre);
+  return Array.from({length:n},(_,i)=>(i+0.5)/n);
+}
+// Er gruppa breiare enn veggen? Då kan ikkje stykka stå utan å overlappe,
+// uansett kor dei vert plasserte. Vi teiknar dei framleis så tett som råd,
+// men brukaren må få vite det — tala går rett inn i energimerket.
+function winForTrongt(w,width,segLen){
+  return winCount(w)>1&&width>0&&segLen>0&&winCount(w)*width>segLen*1.0001;
 }
 // Utstrekninga til kvar stk i BILETpikslar — teikning og treff-testing.
 function winSpansPx(w,segLenPx,mpp){
@@ -2127,7 +2137,7 @@ function winFreezePos(w,width,segLen){
   return w.posT;
 }
 // Endrar antalet og tek vare på plasseringa av dei som alt står der.
-// Nye stk vert lagde etter den siste med same luft som ei jamn rekkje; er det
+// Nye stk vert lagde etter den siste med ei halv vindaugsbreidde i luft; er det
 // ikkje plass, fell heile gruppa tilbake til jamn fordeling (posT=null).
 function winSetAntal(w,n,width,segLen){
   n=Math.max(1,Math.round(n)||1);
@@ -2136,7 +2146,7 @@ function winSetAntal(w,n,width,segLen){
     const cs=w.posT.slice();
     if(n<old)w.posT=cs.slice(0,n);
     else{
-      const gap=Math.max(WIN_GAP_FRAC*segLen,(segLen*0.1)/n);
+      const gap=Math.max(WIN_GAP_FRAC*segLen,width*0.5);
       const stepT=(width+gap)/(segLen||1);
       const halfT=(width/2)/(segLen||1);
       let t=Math.max.apply(null,cs),plass=true;
@@ -5697,10 +5707,20 @@ document.getElementById('winOk').onclick=()=>{
   const _brystCb=document.getElementById('winBrystCb');
   const _brystVal=parseInt(document.getElementById('winBryst').value);
   const _brystMm=(type!=='dor'&&_brystCb.checked&&!isNaN(_brystVal))?Math.max(0,_brystVal):null;
-  _existW.push({segIdx:pendingWin.segIdx,dir:pendingWin.dir,t0:pendingWin.t0,t1:pendingWin.t1,breddeMm:w,hoyMm:h,antal:n,type,name:_wname,brystningMm:_brystMm});
+  const _ny={segIdx:pendingWin.segIdx,dir:pendingWin.dir,t0:pendingWin.t0,t1:pendingWin.t1,breddeMm:w,hoyMm:h,antal:n,type,name:_wname,brystningMm:_brystMm};
+  _existW.push(_ny);
+  const _z=zones[pendingWin.zi];
   pendingWin=null;winPts=[];
   winOverlay.classList.remove('show');
   updateResults();renderTable();draw();
+  // Ei gruppe vert fordelt jamnt utover veggen. Får ho ikkje plass, seier vi
+  // frå med ein gong — tala går rett inn i energimerket.
+  if(n>1){
+    const g=winGeom(_z,_ny);
+    hintText.textContent=(g.mpp&&winForTrongt(_ny,g.width,g.segLen))
+      ?`⚠ ${n} × ${w} mm er breiare enn veggen (${(g.segLen*(g.mpp||0)/1000).toFixed(2)} m) — stykka overlappar. Sjekk breidda eller antalet.`
+      :`${n} stk fordelte jamnt utover fasaden — drag ei enkelt stk for å flytte henne.`;
+  }
 };
 document.getElementById('winCancel').onclick=()=>{winOverlay.classList.remove('show');winPts=[];pendingWin=null;draw();};
 
@@ -6046,7 +6066,10 @@ function updateResults(){
           const info=document.createElement('div');info.className='win-card-info';
           const icon=w.type==='dor'?'🚪':'▭';
           const _plassert=(winCount(w)>1&&winHasPos(w))?' · plassert':'';
-          info.innerHTML=`<strong style="color:var(--text)">${icon} ${_wlbl}</strong> <span style="color:var(--text3)">${dir} · ${w.breddeMm}×${w.hoyMm}mm · ${w.antal} stk${_plassert}</span>`;
+          const _wg=winCount(w)>1?winGeom(z,w):null;
+          const _trongt=(_wg&&_wg.mpp&&winForTrongt(w,_wg.width,_wg.segLen))
+            ?' <span style="color:#c0302a;font-weight:600" title="Gruppa er breiare enn veggen, så stykka overlappar. Sjekk breidda eller antalet.">⚠ breiare enn veggen</span>':'';
+          info.innerHTML=`<strong style="color:var(--text)">${icon} ${_wlbl}</strong> <span style="color:var(--text3)">${dir} · ${w.breddeMm}×${w.hoyMm}mm · ${w.antal} stk${_plassert}</span>${_trongt}`;
           const cpW=document.createElement('button');cpW.className='win-card-del';cpW.title='Kopier';cpW.textContent='⎘';
           cpW.style.cssText='background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 2px;transition:color .1s';
           cpW.onmouseenter=()=>{cpW.style.color='var(--accent)';};cpW.onmouseleave=()=>{cpW.style.color='var(--text3)';};
@@ -7970,8 +7993,20 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   box.appendChild(mkRow('Høgde (mm)',hoI));
   box.appendChild(mkRow('Antal stk',antI));
   const antNote=document.createElement('div');
-  antNote.style.cssText='font-size:10.5px;color:var(--text3);margin:-6px 0 10px 120px;line-height:1.4';
-  antNote.textContent='Fleire stk = eitt element i SIMIEN med dette antalet. Kvar stk kan dragast for seg på veggen.';
+  antNote.style.cssText='font-size:10.5px;margin:-6px 0 10px 120px;line-height:1.4';
+  // Lever på breidde og antal medan brukaren skriv: ei gruppe som er breiare
+  // enn veggen kan ikkje stå utan å overlappe, og det skal han sjå med ein gong
+  const _segLenM=(()=>{const g=winGeom(z,w);return g.mpp?g.segLen*g.mpp/1000:null;})();
+  const oppdaterAntNote=()=>{
+    const br=parseInt(brI.value),ant=parseInt(antI.value);
+    const trongt=_segLenM&&br>0&&ant>1&&(ant*br/1000)>_segLenM*1.0001;
+    antNote.style.color=trongt?'#c0302a':'var(--text3)';
+    antNote.textContent=trongt
+      ?`⚠ ${ant} × ${br} mm = ${(ant*br/1000).toFixed(2)} m på ein vegg på ${_segLenM.toFixed(2)} m — stykka vil overlappe.`
+      :'Fleire stk = eitt element i SIMIEN med dette antalet, fordelt jamnt utover veggen. Kvar stk kan dragast for seg.';
+  };
+  oppdaterAntNote();
+  antI.oninput=oppdaterAntNote;brI.oninput=oppdaterAntNote;
   box.appendChild(antNote);
   box.appendChild(mkRow('U-verdi W/m²K',uI));
   if(w.type!=='dor') box.appendChild(brystRow);
