@@ -794,20 +794,25 @@ Invariantar:
 - Del sone og kopiering mellom etasjar nullstiller begge listene — dei peikar på
   den gamle soneforma.
 
-Sidepanelet:
+Sidepanelet — plassen er knapp, så seksjonen veks med behovet:
 
-- Begge seksjonane er **kollapsbare** og brukar `.sub-sec`-mønsteret frå
-  vindaugslista. Tilstanden ligg i `window._flateCollapsed[`fl_<fi>_<zi>_<kind>`]`
-  og overlever dei hyppige rebuildane. Lister lengre enn
-  `FLATELIST_AUTO_COLLAPSE` startar samanslegne.
-- **Samandraget står i headeren** (`.sub-count`): konstruksjonstypen når laget er
-  udelt (pluss takvinkelen), «n flater» når det er delt, og gul pille med ⚠ når
-  flatene ikkje dekkjer sonearealet. Poenget er at ein ser verdien utan å opne
-  seksjonen — elles ville det å gøyme han vore å gøyme informasjon.
+- **Udelt lag = éi rad**, same rytme som Kategori/Byggeår/Etg.høgde over:
+  `Golv [type ▾] ✂` og `Tak [type ▾] [30]° ✂`. Takvinkelen ligg inline; den
+  gamle avkryssingsboksen «Skråtak» er borte fordi han aldri skilde mellom noko
+  — `getTakvinkel()` les både `null` og `0` som flatt. Tomt felt = flatt tak.
+- **Oppdelt lag** veks til ein kollapsbar `.sub-sec` med eitt kompakt kort per
+  flate (namn/areal/✂/✕, så type + U-verdi, og på tak mot det fri vinkel +
+  fallretning på ei tredje rad).
+- Kollapstilstanden ligg i ``window._flateCollapsed[`fl_<fi>_<zi>_<kind>`]`` og
+  overlever dei hyppige rebuildane. Lister lengre enn `FLATELIST_AUTO_COLLAPSE`
+  startar samanslegne, så eit oppdelt lag kan vere éi linje det òg.
+- **Samandraget står i headeren** (`.sub-count`): «n flater», og gul pille med ⚠
+  når flatene ikkje dekkjer sonearealet. Poenget er at ein ser kva som ligg der
+  utan å opne seksjonen — elles ville det å gøyme han vore å gøyme informasjon.
 - **Alt+klikk på headeren** set same tilstand på alle soner. Eit prosjekt med 30
   soner skal kunne ryddast med eitt klikk, ikkje eitt per sonekort.
-- Klippeknappen (✂) bur i headeren, ikkje som ein brei knapp i kroppen — dei
-  fleste soner vert aldri delte opp.
+- Sum og «↺ Slå saman» deler botnrada; klippeknappen bur i headeren. Ingen av
+  dei får ei eiga full-breidde rad — dei fleste soner vert aldri delte opp.
 - `_finishKlipp` ryddar `klippTakflatePts`/`klippTakflateTarget` og går ut av
   klippemodus **før** `draw()`. Gjer han det etterpå, blir den raude
   forhandsvisninga ståande att på lerretet til noko anna utløyser ei ny
