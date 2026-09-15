@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 4.3.2 | Single-file HTML applikasjon
+**Versjon:** 4.4.0 | Single-file HTML applikasjon
 
 ---
 
@@ -118,7 +118,10 @@ zones = [{
   segOverrides: {segIdx: {...}},    // manuelle lengd/areal per segment
   skMergedGroups: [{segs:[], name}],// samanslåtte skiljeveggar
   yvMergedGroups: [{segs:[], name}],// samanslåtte ytterveggar
-  takflater: [{pts, vinkel, retning, name}],
+  takflater: [{id, pts, type, name, vinkel, retning, uverdi}],
+                  // oppdeling av taket — `type` er ein av TAK_TYPER.
+                  // vinkel/retning berre på type 'Tak'. Tom liste = udelt.
+  gulvflater: [{id, pts, type, name, uverdi}],   // det same for golvet
   gavlflater: [{segIdx, profile, area, lenM, dir}],
   groupId,        // kopling mellom soner (berre SIMIEN-gruppering)
   tekniskeSystem, // [{id,namn,kategori}] frå EntroPi (beta) — ikkje i SXI
@@ -733,6 +736,131 @@ skade om dei blir gjorde feil:
 - Eit heilt tomt startprosjekt («Etasje 1», ingen soner, inga teikning) vert
   fjerna når importen kjem inn.
 
+## Oppdeling av tak og golv
+
+Taket og golvet i ei sone kan delast opp i fleire flater, og **kvar flate har sin
+eigen konstruksjonstype**. Halve taket kan vere tak mot det fri og den andre
+halvdelen himling mot eit kaldt loft; halve golvet kan vere golv på grunn og
+resten kjellergolv. Utan oppdeling gjeld sona sin eigen `taktype`/`gulvtype` for
+heile flata — det er framleis normaltilfellet.
+
+`FLATE[kind]` (`kind` = `'tak'` | `'gulv'`) held alt som skil dei to laga, så UI,
+teikning og eksport deler kode. Legg eit nytt lag inn der, ikkje som ein ny
+kodeveg.
+
+```javascript
+flateListe(z,kind)          // z.takflater / z.gulvflater
+flateType(z,kind,fl)        // fl.type, elles sona sin type (migrering av gamle filer)
+flateAreaM2(z,fl)
+flateKantLenM(z,fl,pred)    // lengda av flatekanten som ligg på sona sin ytterkant
+eksportFlater(z,kind)       // ALLTID minst éi oppføring — udelt og oppdelt i same løkka
+flateAvvikM2(z,kind)        // sonearealet minus summen av flatene
+initFlater(z,kind)          // start oppdelinga: éi flate = heile sona
+startKlippFlate(z,kind,i,fi)
+slettFlate(z,kind,i)        // slettar OG gir arealet til naboflata
+_fjernFlateoppdeling(z,kind)// største flata gir sona sin type; lista vert tom
+byggFlateSeksjon(z,kind,fi,zi,settings)
+_splitPolygonByHole(poly,loop)   // klipp ut ein bit midt i flata
+_unionPolygons(a,b) / _slaaSamanPolygon(a,b)
+flateKonturar(pts)          // konturane utan nøkkelhòl-brua
+flateMerkepunkt(pts)        // eit punkt godt inne i flata, til merkelappen
+```
+
+Invariantar:
+
+- **Udelt sone gir teikn for teikn same SXI som før.** `eksportFlater` returnerer
+  då `{fl:null, …}`, og eksporten fell tilbake på `getTakAreal`, `direction="100"`,
+  `getUtvOmkrets` og `getKjellerVeggLen` — nøyaktig dei gamle uttrykka. Dette er
+  verifisert med ein full XML-samanlikning mot førre versjon; bryt han ikkje.
+- **Gamle takflater manglar `type`.** `flateType` fell difor tilbake på sona sin
+  `taktype`. Ikkje migrer feltet ved lasting — fallbacken er den som held gamle
+  prosjekt uendra.
+- **Elementtypen kjem av typen, ikkje av laget.** Ei himling vert `<partition>`
+  med `nextId('partition')`, eit tak `<roof>`, eit kjellergolv `<cellar>`. Same
+  felle som alltid: SIMIEN slår opp elementtype på id-prefikset.
+- **Perimeter og kjellervegg vert rekna per delflate** med `flateKantLenM`. Ei
+  delflate midt inne i sona har ingen ytterkant — då er både perimeteren og
+  kjellerveggen 0, og det er rett svar. Utan dette ville kvar delflate fått heile
+  sona sin omkrets.
+- **Sum av flatene mot sonearealet vert vist, aldri sila bort.** Slettar
+  brukaren ei flate, står arealet att som eit avvik i sonekortet og i tabellen —
+  det ville elles forsvunne stille ut av energimerket.
+- **`uverdi` per flate.** Ei himling mot ei varm sone har ein heilt annan U-verdi
+  enn taket ved sida av. Blank = sona sin.
+- **Berre eitt lag vert teikna oppå planen** (`flateLag`). Tak og golv ligg på
+  same koordinatar, og to fyllfargar over kvarandre er uleseleg. Varm palett for
+  taket, kald og prikka kant for golvet.
+- **Klippeverktøyet er felles.** `klippTakflateTarget={z,tfi,kind}` — `kind` må
+  med overalt som slår opp flatelista (`_snapKlippPt`, `draw`, `_finishKlipp`).
+- **Berre `type==='Tak'` med vinkel > 0 gir gavlflater** og skrå flate i 3D. Ei
+  himling er flat og får ein dempa gråtone i modellen.
+- **`isKjeller(z)`** ser på golvflatene når dei finst, elles på `z.gulvtype`.
+  Alt anna kjellerarbeid (KJ/YV/SK-rollene på veggane, oppfylling) er uendra og
+  ligg framleis på sona.
+- Del sone og kopiering mellom etasjar nullstiller begge listene — dei peikar på
+  den gamle soneforma.
+
+**Sona skal alltid vere heilt dekt av tak og golv.** Difor forsvinn ei flate
+aldri berre: `slettFlate` gir arealet tilbake til den naboflata ho deler lengst
+kant med (`_felleskantLen`), og den siste flata tek med seg heile oppdelinga
+(`_fjernFlateoppdeling`) i staden for å late sona stå utan tak. Lèt
+samanslåinga seg ikkje gjere, står flata att og brukaren får beskjed —
+`flateAvvikM2`-varselet er difor berre eit nett for gamle prosjekt og for soner
+som har fått endra geometri etter oppdelinga.
+
+- **`_unionPolygons` er kantkansellering**, ikkje ein generell boolsk operasjon:
+  kantar som finst i begge polygona i kvar si retning er innvendige og fell
+  bort. Kantane vert fyrst delte ved motpartens hjørne, og då set vi inn
+  motpartens PUNKT — ikkje projeksjonen — så nøklane matchar eksakt.
+- **`_slaaSamanPolygon` har fasitsjekk**: arealet av resultatet må vere summen av
+  dei to innanfor 0,5 %. Slår det ikkje til, returnerer han null. Eit polygon vi
+  ikkje stolar på skal aldri inn i energimerket.
+
+**Eit hòl midt i flata er eit nøkkelhòl, ikkje ein ekstra ring.** Teiknar
+brukaren ei lukka sløyfe heilt inne i ei flate (klikk tilbake på startpunktet),
+vert sløyfa ei eiga flate, og restflata får ei smal bru ut til hòlet, hòlet
+gjennomløpt **andre vegen**, og bru tilbake.
+
+- Motsett omløp er heile poenget: shoelace (`calcAreaM2`) trekkjer då hòlet frå,
+  og canvas-fyllet med nonzero winding lèt hòlet stå tomt. Datamodellen er
+  framleis éin `pts`-ring, så teikning, 3D, eksport og lagring er urørte.
+- `flateKantLenM` tel berre kantar som ligg på sona sin ytterkant, så både brua
+  og hòlkanten gir 0 — ein bit midt i sona har rett nok ingen perimeter.
+- **Brua skal aldri teiknast.** Ho er to motsette kantar oppå kvarandre og ville
+  vist seg som ein strek tvers over flata. `flateKonturar()` finn kantane som
+  har ein motsett tvilling i same ringen og hoppar over dei; fyllet brukar
+  framleis heile ringen. Same hjelparen i 3D.
+- Tyngdepunktet til eit nøkkelhòl-polygon kan hamne midt i hòlet — difor
+  `flateMerkepunkt()`, som søkjer opp eit punkt godt inne i flata.
+- Samanslåinga treng ingen særhandsaming av nøkkelhòl: brua er to motsette
+  kantar og kansellerer seg sjølv når hòlet vert lagt tilbake. Ein bit som vert
+  sletta gir difor eksakt det opphavlege polygonet tilbake.
+
+Sidepanelet — plassen er knapp, så seksjonen veks med behovet:
+
+- **Udelt lag = éi rad**, same rytme som Kategori/Byggeår/Etg.høgde over:
+  `Golv [type ▾] ✂` og `Tak [type ▾] [30]° ✂`. Takvinkelen ligg inline; den
+  gamle avkryssingsboksen «Skråtak» er borte fordi han aldri skilde mellom noko
+  — `getTakvinkel()` les både `null` og `0` som flatt. Tomt felt = flatt tak.
+- **Oppdelt lag** veks til ein kollapsbar `.sub-sec` med eitt kompakt kort per
+  flate (namn/areal/✂/✕, så type + U-verdi, og på tak mot det fri vinkel +
+  fallretning på ei tredje rad).
+- Kollapstilstanden ligg i ``window._flateCollapsed[`fl_<fi>_<zi>_<kind>`]`` og
+  overlever dei hyppige rebuildane. Lister lengre enn `FLATELIST_AUTO_COLLAPSE`
+  startar samanslegne, så eit oppdelt lag kan vere éi linje det òg.
+- **Samandraget står i headeren** (`.sub-count`): «n flater», og gul pille med ⚠
+  når flatene ikkje dekkjer sonearealet. Poenget er at ein ser kva som ligg der
+  utan å opne seksjonen — elles ville det å gøyme han vore å gøyme informasjon.
+- **Alt+klikk på headeren** set same tilstand på alle soner. Eit prosjekt med 30
+  soner skal kunne ryddast med eitt klikk, ikkje eitt per sonekort.
+- Sum og «↺ Slå saman» deler botnrada; klippeknappen bur i headeren. Ingen av
+  dei får ei eiga full-breidde rad — dei fleste soner vert aldri delte opp.
+- `_finishKlipp` ryddar `klippTakflatePts`/`klippTakflateTarget` og går ut av
+  klippemodus **før** `draw()`. Gjer han det etterpå, blir den raude
+  forhandsvisninga ståande att på lerretet til noko anna utløyser ei ny
+  teikning. Bomskot (linja treffer ikkje flata) held derimot på målet, så
+  brukaren kan prøve igjen utan å starte på nytt.
+
 ## Skjulte soner
 
 `z.skjult` tek sona ut av **visinga**: planteikninga (inkludert ghost-laget frå
@@ -894,4 +1022,12 @@ Viktig bughistorikk:
 - Fasadeark er IKKJE etasjar. saveFloorState/syncFloorState har vakter for
   viewMode, og alt som slår opp soner må hoppe over fasadevisinga — sjå
   «Fasadeteikningar»
+- Tak og golv kan delast opp i flater med kvar sin type. Udelt sone MÅ gi
+  identisk SXI som før (verifisert med full XML-samanlikning) — sjå «Oppdeling
+  av tak og golv». Ei himling er <partition>, ikkje <roof>, uansett kva lag ho
+  ligg i, og perimeter/kjellervegg reknast per delflate med flateKantLenM
+- Ei tak- eller golvflate som vert sletta skal ALDRI berre forsvinne — arealet
+  går til naboflata, elles ville sona stått utan tak eller golv i SXI-fila utan
+  at nokon såg det. Eit hòl midt i flata er eit nøkkelhòl med motsett omløp;
+  brua skal ikkje teiknast (flateKonturar)
 ```
