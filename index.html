@@ -2928,7 +2928,17 @@ function applyHistoryState(prev){
       mmPerImgPx:pf.mmPerImgPx,ownCal:pf.ownCal||false,defaultHoyde:pf.defaultHoyde??3.0,
       sc:pf.sc,offX:pf.offX,offY:pf.offY,floorDxImg:pf.floorDxImg||0,floorDyImg:pf.floorDyImg||0,
       measurements:normMaal(pf.measurements!==undefined?pf.measurements:cur.measurements),
-      zones:pf.zones.map(z=>({...z,skillevegg:new Set(z.skillevegg||[]),zoneConnections:new Map(z.zoneConnections||[])}))
+      zones:pf.zones.map(z=>{
+        const nz={...z,skillevegg:new Set(z.skillevegg||[])};
+        if(z.zoneConnections && Array.isArray(z.zoneConnections)){
+          nz.zoneConnections=new Map(z.zoneConnections);
+        } else if(z.zoneConnections instanceof Map){
+          nz.zoneConnections=new Map(z.zoneConnections);
+        } else {
+          nz.zoneConnections=new Map();
+        }
+        return nz;
+      })
     };
   });
   // Fasadearka. Eldre snapshots manglar feltet — då står arka som dei er.
@@ -2959,7 +2969,17 @@ function getCurrentState(){
       mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
       sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
       measurements:normMaal(f.measurements),
-      zones:JSON.parse(JSON.stringify(f.zones.map(z=>({...z,skillevegg:Array.from(z.skillevegg||[]),zoneConnections:z.zoneConnections?Array.from(z.zoneConnections.entries()):[]}))))
+      zones:JSON.parse(JSON.stringify(f.zones.map(z=>{
+        const obj={...z,skillevegg:Array.from(z.skillevegg||[])};
+        if(z.zoneConnections && z.zoneConnections instanceof Map){
+          obj.zoneConnections=Array.from(z.zoneConnections.entries());
+        } else if(Array.isArray(z.zoneConnections)){
+          obj.zoneConnections=z.zoneConnections;
+        } else {
+          obj.zoneConnections=[];
+        }
+        return obj;
+      })))
     })),
     fasadar:fasadar.map(_fasadeMinne),
     activeFloor,activeFasade,globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId
@@ -6339,12 +6359,15 @@ function updateResults(){
           const kjZone=isKjeller(z);
           const rolle=segRolle(z,seg.idx);
           const isKJ=rolle==='KJ';
+          const isZoneConn=isSK&&z.zoneConnections?.has(seg.idx);
           const ROLLE_FARGE={
             SK:{bg:'#fef3c7',hov:'#fde68a',kant:'#d97706',tekst:'#92400e',pill:'#d97706',pillTekst:'#fff'},
             KJ:{bg:'#f3ece0',hov:'#e8ddc9',kant:'#8a6a3b',tekst:'#5f4520',pill:'#8a6a3b',pillTekst:'#fff'},
-            YV:{bg:'#f8fafb',hov:'#eef1f4',kant:'#e5e7eb',tekst:'var(--accent)',pill:'#e5e7eb',pillTekst:'#6b7280'}
+            YV:{bg:'#f8fafb',hov:'#eef1f4',kant:'#e5e7eb',tekst:'var(--accent)',pill:'#e5e7eb',pillTekst:'#6b7280'},
+            ZC:{bg:'#d1fae5',hov:'#a7f3d0',kant:'#10b981',tekst:'#047857',pill:'#10b981',pillTekst:'#fff'}
           };
-          const fg=ROLLE_FARGE[rolle];
+          let fg=ROLLE_FARGE[rolle];
+          if(isZoneConn)fg=ROLLE_FARGE.ZC;
           const row=document.createElement('div');
           row.style.cssText=`display:flex;align-items:center;justify-content:space-between;padding:5px 8px;margin:2px 0;border-radius:6px;cursor:pointer;background:${fg.bg};border:1px solid ${fg.kant};transition:all .15s`;
           row.title=kjZone
@@ -6362,8 +6385,8 @@ function updateResults(){
           }
           const typePill=document.createElement('span');
           typePill.style.cssText=`font-size:10px;font-weight:600;padding:2px 6px;border-radius:8px;background:${fg.pill};color:${fg.pillTekst}`;
-          typePill.textContent=rolle;
-          typePill.title=isKJ?'Med i kjellerelementet — vert ikkje eigen fasade i SXI-fila':'';
+          typePill.textContent=isZoneConn?'SK (Kobling)':rolle;
+          typePill.title=isZoneConn?'Sonekobling — vert <zone_connection> i SXI-fila':isKJ?'Med i kjellerelementet — vert ikkje eigen fasade i SXI-fila':'';
           right.appendChild(typePill);
           // Om SK og fleire ledige nabo-SK — vis samanslå-knappane
           const freeHere=isSK?freeSegsIn(gi):[];
@@ -6383,6 +6406,34 @@ function updateResults(){
           }
           row.appendChild(left);row.appendChild(right);
           if(isSK&&gi>=0)(groupRows[gi]=groupRows[gi]||[]).push({seg,row,left});
+
+          // Høgreklikk-meny for sonekoblingar (berre SK)
+          if(isSK){
+            row.oncontextmenu=e=>{
+              e.preventDefault();
+              const isZoneConn=z.zoneConnections?.has(seg.idx);
+              const menuEl=document.createElement('div');
+              menuEl.style.cssText='position:fixed;left:'+e.clientX+'px;top:'+e.clientY+'px;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;min-width:200px';
+
+              const item1=document.createElement('button');
+              item1.style.cssText='display:block;width:100%;padding:8px 12px;text-align:left;border:none;background:none;cursor:pointer;font-family:inherit;font-size:13px';
+              item1.textContent=isZoneConn?'Fjern sonekobling':'Marker som sonekobling';
+              item1.onmouseover=()=>item1.style.background='#f3f4f6';
+              item1.onmouseout=()=>item1.style.background='none';
+              item1.onclick=()=>{
+                const opposingZoneId='zone#'+(floors[activeFloor].zones.indexOf(z)+1);
+                toggleZoneConnection(z,seg.idx,opposingZoneId);
+                facSection.textContent='';
+                document.body.removeChild(menuEl);
+                updateResults();renderTable();draw();
+              };
+              menuEl.appendChild(item1);
+              document.body.appendChild(menuEl);
+
+              setTimeout(()=>{if(menuEl.parentNode)document.body.removeChild(menuEl);},5000);
+            };
+          }
+
           row.onmouseenter=()=>{row.style.background=fg.hov;};
           row.onmouseleave=()=>{row.style.background=fg.bg;};
           row.onclick=()=>{
