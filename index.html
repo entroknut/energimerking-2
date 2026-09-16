@@ -2903,7 +2903,7 @@ function snapshot(){
     sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
     measurements:normMaal(f.measurements),
     zones:JSON.parse(JSON.stringify(f.zones.map(z=>({
-      ...z,skillevegg:Array.from(z.skillevegg||[])
+      ...z,skillevegg:Array.from(z.skillevegg||[]),zoneConnections:z.zoneConnections?Array.from(z.zoneConnections.entries()):[]
     }))))
   }));
   history.push({floors:s,fasadar:fasadar.map(_fasadeMinne),activeFloor,activeFasade,
@@ -2928,7 +2928,7 @@ function applyHistoryState(prev){
       mmPerImgPx:pf.mmPerImgPx,ownCal:pf.ownCal||false,defaultHoyde:pf.defaultHoyde??3.0,
       sc:pf.sc,offX:pf.offX,offY:pf.offY,floorDxImg:pf.floorDxImg||0,floorDyImg:pf.floorDyImg||0,
       measurements:normMaal(pf.measurements!==undefined?pf.measurements:cur.measurements),
-      zones:pf.zones.map(z=>({...z,skillevegg:new Set(z.skillevegg||[])}))
+      zones:pf.zones.map(z=>({...z,skillevegg:new Set(z.skillevegg||[]),zoneConnections:new Map(z.zoneConnections||[])}))
     };
   });
   // Fasadearka. Eldre snapshots manglar feltet — då står arka som dei er.
@@ -2959,7 +2959,7 @@ function getCurrentState(){
       mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
       sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
       measurements:normMaal(f.measurements),
-      zones:JSON.parse(JSON.stringify(f.zones.map(z=>({...z,skillevegg:Array.from(z.skillevegg||[])}))))
+      zones:JSON.parse(JSON.stringify(f.zones.map(z=>({...z,skillevegg:Array.from(z.skillevegg||[]),zoneConnections:z.zoneConnections?Array.from(z.zoneConnections.entries()):[]}))))
     })),
     fasadar:fasadar.map(_fasadeMinne),
     activeFloor,activeFasade,globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId
@@ -4454,7 +4454,7 @@ function autoSkilleveggForNySone(nz){
 function finishZone(){
   if(curPts.length<3)return;
   snapshot();markDirty();
-  const nz={name:'Sone '+(++_nextZoneId),pts:[...curPts],windows:[],skillevegg:new Set(),takflater:[],gulvflater:[],gavlflater:[]};
+  const nz={name:'Sone '+(++_nextZoneId),pts:[...curPts],windows:[],skillevegg:new Set(),zoneConnections:new Map(),takflater:[],gulvflater:[],gavlflater:[]};
   if(piBygg.byggeaar)nz.byggeaar=piBygg.byggeaar;   // byggeåret frå EntroPi
   zones.push(nz);
   curPts=[];
@@ -6533,6 +6533,7 @@ function showCopyZoneMenu(z, zi, f, fi){
       const copy=JSON.parse(JSON.stringify(z));
       copy.name='Sone '+(++_nextZoneId);
       copy.skillevegg=new Set(z.skillevegg||[]);
+      copy.zoneConnections=new Map();
       delete copy.groupId;
       _adjustPtsForFloorOffset(copy, f, tf);
       tf.zones.push(copy);
@@ -7744,6 +7745,7 @@ function showZoneContextMenu(clientX,clientY,z,zi,f,fi){
         const copy=JSON.parse(JSON.stringify(z));
         copy.name='Sone '+(++_nextZoneId);
         copy.skillevegg=new Set(Array.from(z.skillevegg||[]));
+        copy.zoneConnections=new Map();
         delete copy.groupId;
         _adjustPtsForFloorOffset(copy, f, tf);
         tf.zones.push(copy);
@@ -8388,6 +8390,7 @@ document.addEventListener('keydown',e=>{
       const copy=JSON.parse(JSON.stringify(zoneClipboard));
       copy.name='Sone '+(++_nextZoneId);
       copy.skillevegg=new Set(zoneClipboard.skillevegg||[]);
+      copy.zoneConnections=new Map();
       delete copy.groupId;
       // Juster for offset-forskjell mellom kjeldeetasje og aktiv etasje
       const _srcF={floorDxImg:zoneClipboard._srcFloorDxImg||0,floorDyImg:zoneClipboard._srcFloorDyImg||0};
@@ -8679,7 +8682,7 @@ function serialiserEtasje(f,opts){
     pdfPage:f.pdfPage,totalPages:f.totalPages,
     paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
     measurements:normMaal(f.measurements),
-    zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]}))
+    zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[],zoneConnections:z.zoneConnections?Array.from(z.zoneConnections.entries()):[]}))
   };
   _serBgInn(f,obj,o);
   return obj;
@@ -8784,7 +8787,7 @@ async function deserialiserEtasje(f){
     paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
     pdfDoc:null,bgImg:null,
     measurements:normMaal(f.measurements),
-    zones:(f.zones||[]).map(z=>{const nz={...z,skillevegg:new Set(z.skillevegg||[])};sanitizeZoneSegRefs(nz);return nz;})
+    zones:(f.zones||[]).map(z=>{const nz={...z,skillevegg:new Set(z.skillevegg||[]),zoneConnections:new Map(z.zoneConnections||[])};sanitizeZoneSegRefs(nz);return nz;})
   };
   const kilde=f.bgImgData||(f.bgBlob?URL.createObjectURL(f.bgBlob):null);
   if(kilde){
@@ -11414,6 +11417,26 @@ function buildProfitsimXml(nextId){
     +' result_input_doc_table="yes" result_input_tables="yes"></profitsim>';
 }
 
+// Toggle sonekobling på ein skiljevegg
+function toggleZoneConnection(zone, segIdx, opposingZoneId){
+  if(!zone.zoneConnections){zone.zoneConnections=new Map();}
+
+  if(zone.zoneConnections.has(segIdx)){
+    zone.zoneConnections.delete(segIdx);
+    markDirty();
+    updateResults();
+    hintText.textContent='Fjerna sonekobling.';
+  } else {
+    const opposingZone=zones.find(z=>z===opposingZoneId)||opposingZoneId;
+    const name=`Sonekobling ${zone.name} og ${typeof opposingZone==='string'?opposingZone:opposingZone.name}`;
+    zone.zoneConnections.set(segIdx,{facingZoneId:opposingZoneId,name});
+    snapshot();
+    markDirty();
+    updateResults();
+    hintText.textContent='Markerte skiljevegg som sonekobling.';
+  }
+}
+
 function buildSXI(proj){
   const {prosjektnamn,adresse,klimasted,byggeaar,kommunenr} = proj;
   const tiltakValgte = Array.isArray(proj.tiltak)?proj.tiltak:[];
@@ -11549,6 +11572,9 @@ function buildSXI(proj){
         const grossA=(ov.areaM2??seg.areaM2??(lenM*fhM))??0;
 
         if(isSK){
+          // Sjekk om dette segmentet er markert som sonekobling
+          const isZoneConn=lz.zoneConnections?.has(seg.idx);
+
           // Sjekk om dette segmentet er del av eit samanslått sett
           const isMergedEntry=(lz.skMergedGroups||[]).find(g=>g.segs.includes(seg.idx))||null;
           if(isMergedEntry){
@@ -11559,13 +11585,30 @@ function buildSXI(proj){
             const grpSegs=segs.filter(s2=>isMergedEntry.segs.includes(s2.idx));
             const totalGrossA=grpSegs.reduce((s,gs)=>{const gov=lz.segOverrides?.[gs.idx]||{};return s+(gov.areaM2??gs.areaM2??((gov.lenM??gs.lenM??0)*fhM)??0);},0);
             const uSK=lz.uPerSeg?.['seg_'+seg.idx]??0.80;
-            const iwId=nextId('partition');
-            const grpName=xesc((isMergedEntry.name||'Skillekonstruksjon')+flSuffix);
-            facXml+=`    <partition id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
+
+            if(isZoneConn){
+              const zcData=lz.zoneConnections.get(seg.idx);
+              const facingZoneId=zcData.facingZoneId;
+              const iwId=nextId('zone-connection');
+              const grpName=xesc((isMergedEntry.name||'Sonekobling')+flSuffix);
+              facXml+=`    <zone_connection id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="${facingZoneId}" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" heat_loss_coeff="0.95" zone_temperature="5.0"></zone_connection>\n`;
+            } else {
+              const iwId=nextId('partition');
+              const grpName=xesc((isMergedEntry.name||'Skillekonstruksjon')+flSuffix);
+              facXml+=`    <partition id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
+            }
           } else {
             const uSK=lz.uPerSeg?.['seg_'+seg.idx]??0.80;
-            const iwId=nextId('partition');
-            facXml+=`    <partition id="${iwId}" name="${nm}${flSuffix}" comment="" area="${grossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
+
+            if(isZoneConn){
+              const zcData=lz.zoneConnections.get(seg.idx);
+              const facingZoneId=zcData.facingZoneId;
+              const iwId=nextId('zone-connection');
+              facXml+=`    <zone_connection id="${iwId}" name="${nm}${flSuffix}" comment="" area="${grossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="${facingZoneId}" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" heat_loss_coeff="0.95" zone_temperature="5.0"></zone_connection>\n`;
+            } else {
+              const iwId=nextId('partition');
+              facXml+=`    <partition id="${iwId}" name="${nm}${flSuffix}" comment="" area="${grossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
+            }
           }
         } else {
           if(isKjellervegg(lz,seg.idx))return;   // dekt av <cellar>
