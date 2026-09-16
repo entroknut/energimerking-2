@@ -6447,7 +6447,21 @@ function updateResults(){
               item1.onmouseover=()=>item1.style.background='#f3f4f6';
               item1.onmouseout=()=>item1.style.background='none';
               item1.onclick=()=>{
-                const opposingZoneId='zone#'+(floors[activeFloor].zones.indexOf(z)+1);
+                // Finn sona på den andre sida av skiljevegg-segmentet
+                let opposingZone=null;
+                for(const otherZone of zones){
+                  if(otherZone===z)continue;
+                  if(otherZone.skillevegg?.has(seg.idx)){
+                    opposingZone=otherZone;
+                    break;
+                  }
+                }
+                if(!opposingZone){
+                  hintText.textContent='Fann ikkje nabosone. Sonekobling krev at two soner ligg inntil kvarandre på denne veggen.';
+                  document.body.removeChild(menuEl);
+                  return;
+                }
+                const opposingZoneId='zone#'+(floors[activeFloor].zones.indexOf(opposingZone)+1);
                 toggleZoneConnection(z,seg.idx,opposingZoneId);
                 facSection.textContent='';
                 document.body.removeChild(menuEl);
