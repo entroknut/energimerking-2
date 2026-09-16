@@ -3500,15 +3500,21 @@ function draw(){
     ctx.closePath();ctx.fillStyle=FILLS[ci];ctx.fill();
     const isEditing=mode==='edit'&&editZoneIdx===zi;
     const sk_set=z.skillevegg||new Set();
+    ensureZoneConnectionsMap(z);
+    const zc_set=z.zoneConnections;
     const yvMerged_set=new Set((z.yvMergedGroups||[]).flatMap(g=>g.segs));
     for(let si=0;si<z.pts.length;si++){
       const sp1=i2s(z.pts[si].x,z.pts[si].y);
       const sp2=i2s(z.pts[(si+1)%z.pts.length].x,z.pts[(si+1)%z.pts.length].y);
-      const segIsSK=sk_set.has(si);
-      const segIsKJ=!segIsSK&&isKjellervegg(z,si);
-      const segIsYvMerged=!segIsSK&&!segIsKJ&&yvMerged_set.has(si);
+      const segIsZC=zc_set.has(si);
+      const segIsSK=!segIsZC&&sk_set.has(si);
+      const segIsKJ=!segIsSK&&!segIsZC&&isKjellervegg(z,si);
+      const segIsYvMerged=!segIsSK&&!segIsKJ&&!segIsZC&&yvMerged_set.has(si);
       ctx.beginPath();ctx.moveTo(sp1.x,sp1.y);ctx.lineTo(sp2.x,sp2.y);
-      if(segIsSK){
+      if(segIsZC){
+        // Sonekobling — grøn farge
+        ctx.strokeStyle='#10b981';ctx.lineWidth=isEditing?3:2.5;ctx.setLineDash([7,4]);
+      } else if(segIsSK){
         ctx.strokeStyle='#d97706';ctx.lineWidth=isEditing?3:2.5;ctx.setLineDash([7,4]);
       } else if(segIsKJ){
         // Kjellervegg — tjukk jordfarga strek med tett prikkemønster
@@ -3581,14 +3587,16 @@ function draw(){
       if(segs){
         const labels=getFacadeLabels(z,segs);
         const sk=z.skillevegg||new Set();
+        const zc=z.zoneConnections;
         const yvMergedSet=new Set((z.yvMergedGroups||[]).flatMap(g=>g.segs));
         // Namn på SK-samanslåinga, så ein ser på teikninga kva veggar som er eitt element
         const skMergedName=new Map();
         (z.skMergedGroups||[]).forEach(g=>g.segs.forEach(i=>skMergedName.set(i,g.name||'SK')));
         segs.forEach((seg,si)=>{
-          const isSK2=sk.has(seg.idx);
-          const isKJ2=!isSK2&&isKjellervegg(z,seg.idx);
-          const isMergedYv=!isSK2&&!isKJ2&&yvMergedSet.has(seg.idx);
+          const isZC2=zc.has(seg.idx);
+          const isSK2=!isZC2&&sk.has(seg.idx);
+          const isKJ2=!isSK2&&!isZC2&&isKjellervegg(z,seg.idx);
+          const isMergedYv=!isSK2&&!isKJ2&&!isZC2&&yvMergedSet.has(seg.idx);
           const nm=labels[si];
           const mp=i2s(seg.midImgX,seg.midImgY);
           const dx=seg.midImgX-cxI,dy=seg.midImgY-cyI;
@@ -3597,15 +3605,17 @@ function draw(){
           const wins=(z.windows||[]).filter(w=>w.segIdx===seg.idx);
           const winNote=wins.length?` [${wins.length}×▭]`:'';
           const skMName=isSK2?skMergedName.get(seg.idx):null;
-          const labelTxt=(isMergedYv?'⊞ ':'')+(skMName?'⊞ '+skMName+' · ':'')+(isKJ2?'⛰ ':'')+nm+winNote;
+          const zcName=isZC2?'Sonekobling':'';
+          const labelTxt=(isMergedYv?'⊞ ':'')+(zcName?'⊙ '+zcName+' · ':(skMName?'⊞ '+skMName+' · ':''))+(isKJ2?'⛰ ':'')+nm+winNote;
           ctx.font='bold 9px Inter,sans-serif';
           const tw=ctx.measureText(labelTxt).width+10;
-          ctx.fillStyle=isSK2?'#fef3c7':isKJ2?'#f3ece0':isMergedYv?'#dbeafe':'rgba(255,255,255,.88)';
+          ctx.fillStyle=isZC2?'#d1fae5':isSK2?'#fef3c7':isKJ2?'#f3ece0':isMergedYv?'#dbeafe':'rgba(255,255,255,.88)';
           ctx.beginPath();ctx.roundRect(nx-tw/2,ny-9,tw,17,3);ctx.fill();
-          if(isSK2){ctx.strokeStyle='#d97706';ctx.lineWidth=1;ctx.stroke();}
+          if(isZC2){ctx.strokeStyle='#10b981';ctx.lineWidth=1;ctx.stroke();}
+          else if(isSK2){ctx.strokeStyle='#d97706';ctx.lineWidth=1;ctx.stroke();}
           else if(isKJ2){ctx.strokeStyle='#8a6a3b';ctx.lineWidth=1;ctx.stroke();}
           else if(isMergedYv){ctx.strokeStyle='#3b82f6';ctx.lineWidth=1;ctx.stroke();}
-          ctx.fillStyle=isSK2?'#92400e':isKJ2?'#5f4520':isMergedYv?'#1e40af':COLORS[ci];ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillStyle=isZC2?'#047857':isSK2?'#92400e':isKJ2?'#5f4520':isMergedYv?'#1e40af':COLORS[ci];ctx.textAlign='center';ctx.textBaseline='middle';
           ctx.fillText(labelTxt,nx,ny);
         });
       }
@@ -6499,6 +6509,19 @@ function updateResults(){
           row.onmouseleave=()=>{row.style.background=fg.bg;};
           row.onclick=()=>{
             if(row._pickToggle){row._pickToggle();return;}
+            // Sjekk om dette er ein sonekobling — då kan brukaren trykka for å endra det til SK eller YV
+            ensureZoneConnectionsMap(z);
+            if(z.zoneConnections.has(seg.idx)){
+              // Toggle mellom sonekobling og skiljevegg
+              z.zoneConnections.delete(seg.idx);
+              if(!z.skillevegg)z.skillevegg=new Set();
+              z.skillevegg.add(seg.idx);
+              snapshot();
+              markDirty();
+              updateResults();renderTable();draw();
+              hintText.textContent='Endra frå sonekobling til skiljevegg.';
+              return;
+            }
             if(!z.skillevegg)z.skillevegg=new Set();
             const uttaKj=()=>{
               // Ta segmentet ut av kjellerelementet — materialiser lista først,
