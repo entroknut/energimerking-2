@@ -4466,13 +4466,12 @@ function autoSkilleveggForNySone(nz){
   // 2. Del opp veggane, så eit felles stykke er eit heilt segment i begge soner
   cuts.forEach((m,z)=>_kuttSegment(z,m));
 
-  // 3. Marker dei felles veggane
-  const merk=(z,si)=>{
-    if(!z.skillevegg)z.skillevegg=new Set();
-    if(z.skillevegg.has(si))return false;
-    z.skillevegg.add(si);
-    // Ein SK-vegg høyrer ikkje heime i ei YV-samanslåing
-    if(z.yvMergedGroups)z.yvMergedGroups=z.yvMergedGroups.filter(g=>!g.segs.includes(si));
+  // 3. Marker dei felles veggane som sonekoblingar
+  const merk=(z,si,opposingZone)=>{
+    ensureZoneConnectionsMap(z);
+    if(z.zoneConnections.has(si))return false;
+    const opposingZoneId='zone#'+(zones.indexOf(opposingZone)+1);
+    z.zoneConnections.set(si,{facingZoneId:opposingZoneId,name:`Sonekobling ${z.name} og ${opposingZone.name}`});
     return true;
   };
   let tal=0;
@@ -4483,7 +4482,7 @@ function autoSkilleveggForNySone(nz){
       const m=z.pts.length;
       for(let j=0;j<m;j++){
         if(!_sammeVegg(a1,a2,z.pts[j],z.pts[(j+1)%m],tol))continue;
-        const nyA=merk(nz,i),nyB=merk(z,j);
+        const nyA=merk(nz,i,z),nyB=merk(z,j,nz);
         if(nyA||nyB)tal++;
       }
     });
@@ -5535,10 +5534,32 @@ function _finishDelSone(){
   });
   curFloor().zones.splice(zi,1,zA,zB);
   zones=curFloor().zones;
+
+  // Legg automatisk til sonekoblingar for segmenta som kjem frå klippelinja
+  ensureZoneConnectionsMap(zA);
+  ensureZoneConnectionsMap(zB);
+  const zoneAIdx=zones.indexOf(zA)+1,zoneBIdx=zones.indexOf(zB)+1;
+  const facingZoneAId='zone#'+zoneBIdx,facingZoneBId='zone#'+zoneAIdx;
+  // Finn alle klippelinja-segmenta (der originalindeksen er -1)
+  for(let i=0;i<zA.pts.length;i++){
+    const midPt={x:(zA.pts[i].x+zA.pts[(i+1)%zA.pts.length].x)/2,y:(zA.pts[i].y+zA.pts[(i+1)%zA.pts.length].y)/2};
+    const oi=paaOpphavleg(midPt);
+    if(oi<0){  // klippelinja-segment
+      zA.zoneConnections.set(i,{facingZoneId:facingZoneAId,name:`Sonekobling ${zA.name} og ${zB.name}`});
+    }
+  }
+  for(let i=0;i<zB.pts.length;i++){
+    const midPt={x:(zB.pts[i].x+zB.pts[(i+1)%zB.pts.length].x)/2,y:(zB.pts[i].y+zB.pts[(i+1)%zB.pts.length].y)/2};
+    const oi=paaOpphavleg(midPt);
+    if(oi<0){  // klippelinja-segment
+      zB.zoneConnections.set(i,{facingZoneId:facingZoneBId,name:`Sonekobling ${zB.name} og ${zA.name}`});
+    }
+  }
+
   delSonePts=[];delSoneTarget=null;delSoneSnap=null;
   setMode('navigate');
   updateResults();renderTable();renderFloorTabs();draw();
-  hintText.textContent='Delt i «'+zA.name+'» og «'+zB.name+'» — klippelinja er sett som skiljekonstruksjon i begge.'
+  hintText.textContent='Delt i «'+zA.name+'» og «'+zB.name+'» — klippelinja er sett som sonekobling i begge.'
     +(mista?' '+mista+' vindauge/dør kunne ikkje plasserast og vart fjerna.':'');
 }
 
