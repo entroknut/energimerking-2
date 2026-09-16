@@ -2902,9 +2902,21 @@ function snapshot(){
     mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
     sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
     measurements:normMaal(f.measurements),
-    zones:JSON.parse(JSON.stringify(f.zones.map(z=>({
-      ...z,skillevegg:Array.from(z.skillevegg||[]),zoneConnections:z.zoneConnections?Array.from(z.zoneConnections.entries()):[]
-    }))))
+    zones:JSON.parse(JSON.stringify(f.zones.map(z=>{
+      const obj={...z,skillevegg:Array.from(z.skillevegg||[])};
+      if(z.zoneConnections){
+        if(z.zoneConnections instanceof Map){
+          obj.zoneConnections=Array.from(z.zoneConnections.entries());
+        } else if(Array.isArray(z.zoneConnections)){
+          obj.zoneConnections=z.zoneConnections;
+        } else {
+          obj.zoneConnections=[];
+        }
+      } else {
+        obj.zoneConnections=[];
+      }
+      return obj;
+    })))
   }));
   history.push({floors:s,fasadar:fasadar.map(_fasadeMinne),activeFloor,activeFasade,
     globalNorth:globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId});
@@ -2930,10 +2942,17 @@ function applyHistoryState(prev){
       measurements:normMaal(pf.measurements!==undefined?pf.measurements:cur.measurements),
       zones:pf.zones.map(z=>{
         const nz={...z,skillevegg:new Set(z.skillevegg||[])};
-        if(z.zoneConnections && Array.isArray(z.zoneConnections)){
-          nz.zoneConnections=new Map(z.zoneConnections);
-        } else if(z.zoneConnections instanceof Map){
-          nz.zoneConnections=new Map(z.zoneConnections);
+        if(z.zoneConnections){
+          if(Array.isArray(z.zoneConnections)){
+            nz.zoneConnections=new Map(z.zoneConnections);
+          } else if(z.zoneConnections instanceof Map){
+            nz.zoneConnections=new Map(z.zoneConnections);
+          } else if(typeof z.zoneConnections==='object'){
+            // Gamal format: objekt {key: value} → konverter til Map
+            nz.zoneConnections=new Map(Object.entries(z.zoneConnections));
+          } else {
+            nz.zoneConnections=new Map();
+          }
         } else {
           nz.zoneConnections=new Map();
         }
@@ -2971,10 +2990,15 @@ function getCurrentState(){
       measurements:normMaal(f.measurements),
       zones:JSON.parse(JSON.stringify(f.zones.map(z=>{
         const obj={...z,skillevegg:Array.from(z.skillevegg||[])};
-        if(z.zoneConnections && z.zoneConnections instanceof Map){
-          obj.zoneConnections=Array.from(z.zoneConnections.entries());
-        } else if(Array.isArray(z.zoneConnections)){
-          obj.zoneConnections=z.zoneConnections;
+        // zoneConnections kan vere Map eller array — konverter begge til array for lagring
+        if(z.zoneConnections){
+          if(z.zoneConnections instanceof Map){
+            obj.zoneConnections=Array.from(z.zoneConnections.entries());
+          } else if(Array.isArray(z.zoneConnections)){
+            obj.zoneConnections=z.zoneConnections;
+          } else {
+            obj.zoneConnections=[];
+          }
         } else {
           obj.zoneConnections=[];
         }
@@ -6359,6 +6383,7 @@ function updateResults(){
           const kjZone=isKjeller(z);
           const rolle=segRolle(z,seg.idx);
           const isKJ=rolle==='KJ';
+          ensureZoneConnectionsMap(z);
           const isZoneConn=isSK&&z.zoneConnections?.has(seg.idx);
           const ROLLE_FARGE={
             SK:{bg:'#fef3c7',hov:'#fde68a',kant:'#d97706',tekst:'#92400e',pill:'#d97706',pillTekst:'#fff'},
@@ -6411,6 +6436,7 @@ function updateResults(){
           if(isSK){
             row.oncontextmenu=e=>{
               e.preventDefault();
+              ensureZoneConnectionsMap(z);
               const isZoneConn=z.zoneConnections?.has(seg.idx);
               const menuEl=document.createElement('div');
               menuEl.style.cssText='position:fixed;left:'+e.clientX+'px;top:'+e.clientY+'px;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;min-width:200px';
@@ -8733,7 +8759,21 @@ function serialiserEtasje(f,opts){
     pdfPage:f.pdfPage,totalPages:f.totalPages,
     paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
     measurements:normMaal(f.measurements),
-    zones:f.zones.map(z=>({...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[],zoneConnections:z.zoneConnections?Array.from(z.zoneConnections.entries()):[]}))
+    zones:f.zones.map(z=>{
+      const obj={...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]};
+      if(z.zoneConnections){
+        if(z.zoneConnections instanceof Map){
+          obj.zoneConnections=Array.from(z.zoneConnections.entries());
+        } else if(Array.isArray(z.zoneConnections)){
+          obj.zoneConnections=z.zoneConnections;
+        } else {
+          obj.zoneConnections=[];
+        }
+      } else {
+        obj.zoneConnections=[];
+      }
+      return obj;
+    })
   };
   _serBgInn(f,obj,o);
   return obj;
@@ -8838,7 +8878,26 @@ async function deserialiserEtasje(f){
     paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
     pdfDoc:null,bgImg:null,
     measurements:normMaal(f.measurements),
-    zones:(f.zones||[]).map(z=>{const nz={...z,skillevegg:new Set(z.skillevegg||[]),zoneConnections:new Map(z.zoneConnections||[])};sanitizeZoneSegRefs(nz);return nz;})
+    zones:(f.zones||[]).map(z=>{
+      const nz={...z,skillevegg:new Set(z.skillevegg||[])};
+      // zoneConnections kan vere array (nyaste format), objekt (gamal format), eller Map. Konverter alle til Map.
+      if(z.zoneConnections){
+        if(Array.isArray(z.zoneConnections)){
+          nz.zoneConnections=new Map(z.zoneConnections);
+        } else if(z.zoneConnections instanceof Map){
+          nz.zoneConnections=new Map(z.zoneConnections);
+        } else if(typeof z.zoneConnections==='object'){
+          // Gamal format: objekt {key: value} → konverter til Map
+          nz.zoneConnections=new Map(Object.entries(z.zoneConnections));
+        } else {
+          nz.zoneConnections=new Map();
+        }
+      } else {
+        nz.zoneConnections=new Map();
+      }
+      sanitizeZoneSegRefs(nz);
+      return nz;
+    })
   };
   const kilde=f.bgImgData||(f.bgBlob?URL.createObjectURL(f.bgBlob):null);
   if(kilde){
@@ -8858,6 +8917,8 @@ async function lastProsjekt(proj,opts){
   if(!proj||!Array.isArray(proj.floors))throw new Error('Ugyldig prosjektfil.');
   const newFloors=await Promise.all(proj.floors.map(f=>deserialiserEtasje(f)));
   floors=newFloors;
+  // Sikra at alle soner har korrekt zoneConnections-format (kan vere object, array, eller Map)
+  ensureAllZoneConnectionsMaps();
   activeFloor=Math.min(proj.activeFloor??0,floors.length-1);
   // Vis den oppdelinga prosjektet faktisk har. Berre eitt lag om gongen, og
   // taket vinn — utan oppdelt tak ville golvlaget elles ligge usynleg.
@@ -9035,6 +9096,8 @@ window.addEventListener('pagehide',()=>{if(isDirty)autosave();});
 setTimeout(()=>{
   const H=window.EntroHost;
   if(H&&H.framed&&(H.embedRequested()||H.willLoadProject()))return;
+  // Sikra at alle soner har korrekt zoneConnections-format før autolagring
+  ensureAllZoneConnectionsMaps();
   restoreAutosave();
 // Brua vert definert lenger ned i fila, så «er vi i ein iframe» vert rekna
 // direkte her — window.EntroHost finst ikkje enno på dette tidspunktet.
@@ -11468,9 +11531,30 @@ function buildProfitsimXml(nextId){
     +' result_input_doc_table="yes" result_input_tables="yes"></profitsim>';
 }
 
+// Sikra at zoneConnections er ein Map (kan vere array frå historikk/lagring, eller objekt frå gamle versjonar)
+function ensureZoneConnectionsMap(zone){
+  if(!zone.zoneConnections){
+    zone.zoneConnections=new Map();
+  } else if(Array.isArray(zone.zoneConnections)){
+    zone.zoneConnections=new Map(zone.zoneConnections);
+  } else if(!(zone.zoneConnections instanceof Map)){
+    // Gamal format: objekt {key: value} — konverter til Map
+    zone.zoneConnections=new Map(Object.entries(zone.zoneConnections));
+  }
+}
+
+// Sikra at alle soner har zoneConnections som Map
+function ensureAllZoneConnectionsMaps(){
+  floors.forEach(f=>{
+    if(f.zones){
+      f.zones.forEach(z=>ensureZoneConnectionsMap(z));
+    }
+  });
+}
+
 // Toggle sonekobling på ein skiljevegg
 function toggleZoneConnection(zone, segIdx, opposingZoneId){
-  if(!zone.zoneConnections){zone.zoneConnections=new Map();}
+  ensureZoneConnectionsMap(zone);
 
   if(zone.zoneConnections.has(segIdx)){
     zone.zoneConnections.delete(segIdx);
@@ -11623,6 +11707,8 @@ function buildSXI(proj){
         const grossA=(ov.areaM2??seg.areaM2??(lenM*fhM))??0;
 
         if(isSK){
+          // Sikra at zoneConnections er ein Map
+          ensureZoneConnectionsMap(lz);
           // Sjekk om dette segmentet er markert som sonekobling
           const isZoneConn=lz.zoneConnections?.has(seg.idx);
 
