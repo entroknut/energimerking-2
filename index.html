@@ -6432,10 +6432,13 @@ function updateResults(){
                     facSection.textContent='';
                     updateResults();renderTable();draw();
                   };
-                  row.appendChild(nameTag);row.appendChild(statsSpan);row.appendChild(remBtn);
+                  row.appendChild(nameTag);row.appendChild(statsSpan);
+                  // remBtn er kommentert ut medan eg arbeider med feilretting
+                  // row.appendChild(remBtn);
 
                   // Høgreklikk-meny for å fjerne eller endra sonekobling
-                  row.oncontextmenu=e=>{
+                  // row.oncontextmenu=e=>{ // DISABLA medan eg arbeiter med feilretting
+                  if(false){ /*
                     e.preventDefault();
                     const menuEl=document.createElement('div');
                     menuEl.style.cssText='position:fixed;left:'+e.clientX+'px;top:'+e.clientY+'px;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;min-width:200px';
@@ -6481,7 +6484,7 @@ function updateResults(){
                     menuEl.appendChild(item1);
                     document.body.appendChild(menuEl);
                     setTimeout(()=>{if(menuEl.parentNode)document.body.removeChild(menuEl);},5000);
-                  };
+                  */ } // End DISABLA
 
                   facSection.appendChild(row);
                   return;
@@ -11958,14 +11961,9 @@ function buildSXI(proj){
             }
           }
 
-          // Hoppa over andre sonekobling-segment (same gruppe allereie eksportert)
+          // Hoppa over ALLE sonekobling-segment (både eksporterte og ikkje, dei vert handtert som gruppe ovanfor)
           if(isZoneConn){
-            const zcData=lz.zoneConnections.get(seg.idx);
-            const facingZoneIdx=zcData.facingZoneIdx;
-            if(typeof facingZoneIdx==='number' && facingZoneIdx>=0){
-              const pairKey=myLogicalIdx+','+facingZoneIdx;
-              if(exportedZoneConnections.has(pairKey))return;  // Allereie eksportert som gruppe
-            }
+            return;  // Denne er sonekobling, ikkje ein normal SK-partition
           }
 
           // Sjekk om dette segmentet er del av eit samanslått sett (og IKKJE ein sonekobling)
