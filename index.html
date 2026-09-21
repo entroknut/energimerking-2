@@ -6559,8 +6559,7 @@ function updateResults(){
                   document.body.removeChild(menuEl);
                   return;
                 }
-                const opposingZoneId='zone#'+(floors[activeFloor].zones.indexOf(opposingZone)+1);
-                toggleZoneConnection(z,seg.idx,opposingZoneId);
+                toggleZoneConnection(z,seg.idx,opposingZone);
                 facSection.textContent='';
                 document.body.removeChild(menuEl);
                 updateResults();renderTable();draw();
