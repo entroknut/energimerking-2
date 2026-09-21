@@ -2168,9 +2168,9 @@ function getFacadeLabels(z, segs){
   let skN=0;
   return segs.map(seg=>{
     const isSK=sk.has(seg.idx);
-    if(isSK) return 'SK'+(++skN);
-    dirSeen[seg.dir]=(dirSeen[seg.dir]||0)+1;
-    return dirCount[seg.dir]>1 ? seg.dir+'-'+dirSeen[seg.dir] : seg.dir;
+    const autoName=isSK?'SK'+(++skN):(dirSeen[seg.dir]=(dirSeen[seg.dir]||0)+1,dirCount[seg.dir]>1 ? seg.dir+'-'+dirSeen[seg.dir] : seg.dir);
+    const customName=z.segOverrides?.[seg.idx]?.name;
+    return customName?customName+' - '+autoName:autoName;
   });
 }
 
