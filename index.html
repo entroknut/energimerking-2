@@ -3609,6 +3609,9 @@ function draw(){
           // Only mark as "first" if this is the lower-indexed zone in the pair
           if(myZoneIdx<facing)firstZcSegPerGroup.add(segs[0]);
         });
+        // Track first segment of each SK-merged group
+        const firstSkSegPerGroup=new Set();
+        (z.skMergedGroups||[]).forEach(g=>{if(g.segs.length>0)firstSkSegPerGroup.add(g.segs[0]);});
 
         segs.forEach((seg,si)=>{
           const isZC2=zc.has(seg.idx);
@@ -3622,10 +3625,11 @@ function draw(){
           const nx=mp.x+dx/dlen*16,ny=mp.y+dy/dlen*16;
           const wins=(z.windows||[]).filter(w=>w.segIdx===seg.idx);
           const winNote=wins.length?` [${wins.length}×▭]`:'';
-          const skMName=isSK2&&!isZC2?skMergedName.get(seg.idx):null;  // IKKJE SK-namn på sonekobling-segment
+          const skMName=isSK2&&!isZC2&&firstSkSegPerGroup.has(seg.idx)?skMergedName.get(seg.idx):null;  // Vis SK-namn berre på fyrste segment
           // Vis "Sonekobling" berre på første segment i gruppa, elles ingenting
           const zcName=isZC2&&firstZcSegPerGroup.has(seg.idx)?'Sonekobling':'';
           const labelTxt=isZC2&&!firstZcSegPerGroup.has(seg.idx)?'' // Sonekobling-segment unntatt første får ingen merkelapps
+            :(isSK2&&!firstSkSegPerGroup.has(seg.idx))?''  // SK-merged segment unntatt første får ingen merkelapps
             :(isMergedYv?'⊞ ':'')+(zcName?'⊙ '+zcName+' · ':(skMName?'⊞ '+skMName+' · ':''))+(isKJ2?'⛰ ':'')+nm+winNote;
           if(labelTxt){  // Teikn berre viss merkelappen har tekst
             ctx.font='bold 9px Inter,sans-serif';
