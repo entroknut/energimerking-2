@@ -6449,6 +6449,7 @@ function updateResults(){
                   remBtn.style.cssText='font-size:9px;padding:2px 5px;border:1px solid #10b981;border-radius:3px;background:#fff;color:#047857;cursor:pointer;font-family:inherit;white-space:nowrap';
                   remBtn.textContent='Fjern';
                   remBtn.onclick=()=>{
+                    if(!confirm('Fjern sonekoplinga? Det kan ikkje reversast — det blir vanlege skiljekostruksjonar i begge sonane.')){return;}
                     snapshot();
                     // Konvertera sonekobling til vanleg skiljevegg
                     zcSegs.forEach(s=>{
