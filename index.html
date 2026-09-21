@@ -6210,7 +6210,28 @@ function updateResults(){
         setMode('edit');editZoneIdx=zi;draw();
       };
       const db=document.createElement('button');db.className='card-btn danger';db.textContent='Slett';
-      db.onclick=()=>{snapshot();f.zones.splice(zi,1);if(fi===activeFloor&&editZoneIdx===zi)editZoneIdx=null;zones=curFloor().zones;renderFloorTabs();updateResults();renderTable();draw();};
+      db.onclick=()=>{
+        snapshot();
+        // Konvertera sonekopling til skiljevegg i nabosonar når denne sona blir sletta
+        if(z.zoneConnections){
+          z.zoneConnections.forEach((zcData,segIdx)=>{
+            const facingZoneIdx=zcData.facingZoneIdx;
+            if(typeof facingZoneIdx==='number' && facingZoneIdx>=0 && facingZoneIdx<f.zones.length){
+              const opposingZone=f.zones[facingZoneIdx];
+              if(opposingZone){
+                ensureZoneConnectionsMap(opposingZone);
+                opposingZone.zoneConnections.delete(segIdx);
+                if(!opposingZone.skillevegg)opposingZone.skillevegg=new Set();
+                opposingZone.skillevegg.add(segIdx);
+              }
+            }
+          });
+        }
+        f.zones.splice(zi,1);
+        if(fi===activeFloor&&editZoneIdx===zi)editZoneIdx=null;
+        zones=curFloor().zones;
+        renderFloorTabs();updateResults();renderTable();draw();
+      };
 
       // Kopier sone — opnar kopier-meny
       const cpBtn=document.createElement('button');cpBtn.className='card-btn';
@@ -6428,13 +6449,28 @@ function updateResults(){
                   remBtn.style.cssText='font-size:9px;padding:2px 5px;border:1px solid #10b981;border-radius:3px;background:#fff;color:#047857;cursor:pointer;font-family:inherit;white-space:nowrap';
                   remBtn.textContent='Fjern';
                   remBtn.onclick=()=>{
-                    zcSegs.forEach(s=>{z.zoneConnections.delete(s.idx);});
+                    snapshot();
+                    // Konvertera sonekobling til vanleg skiljevegg
+                    zcSegs.forEach(s=>{
+                      // Fjern frå denne sona
+                      z.zoneConnections.delete(s.idx);
+                      if(!z.skillevegg)z.skillevegg=new Set();
+                      z.skillevegg.add(s.idx);
+
+                      // Fjern frå nabosona òg
+                      if(opposingZone){
+                        ensureZoneConnectionsMap(opposingZone);
+                        opposingZone.zoneConnections.delete(s.idx);
+                        if(!opposingZone.skillevegg)opposingZone.skillevegg=new Set();
+                        opposingZone.skillevegg.add(s.idx);
+                      }
+                    });
                     facSection.textContent='';
+                    markDirty();
                     updateResults();renderTable();draw();
                   };
                   row.appendChild(nameTag);row.appendChild(statsSpan);
-                  // remBtn er kommentert ut medan eg arbeider med feilretting
-                  // row.appendChild(remBtn);
+                  row.appendChild(remBtn);
 
                   // Høgreklikk-meny for å fjerne eller endra sonekobling
                   // row.oncontextmenu=e=>{ // DISABLA medan eg arbeiter med feilretting
