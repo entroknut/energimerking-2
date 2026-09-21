@@ -764,7 +764,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.4.1</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v4.4.2</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -4480,8 +4480,8 @@ function autoSkilleveggForNySone(nz){
   const merk=(z,si,opposingZone)=>{
     ensureZoneConnectionsMap(z);
     if(z.zoneConnections.has(si))return false;
-    const opposingZoneId='zone#'+(zones.indexOf(opposingZone)+1);
-    z.zoneConnections.set(si,{facingZoneId:opposingZoneId,name:`Sonekobling ${z.name} og ${opposingZone.name}`});
+    const opposingZoneIdx=zones.indexOf(opposingZone);
+    z.zoneConnections.set(si,{facingZoneIdx:opposingZoneIdx,name:`Sonekobling ${z.name} og ${opposingZone.name}`});
     return true;
   };
   let tal=0;
@@ -5548,21 +5548,20 @@ function _finishDelSone(){
   // Legg automatisk til sonekoblingar for segmenta som kjem frå klippelinja
   ensureZoneConnectionsMap(zA);
   ensureZoneConnectionsMap(zB);
-  const zoneAIdx=zones.indexOf(zA)+1,zoneBIdx=zones.indexOf(zB)+1;
-  const facingZoneAId='zone#'+zoneBIdx,facingZoneBId='zone#'+zoneAIdx;
+  const zoneAIdx=zones.indexOf(zA),zoneBIdx=zones.indexOf(zB);
   // Finn alle klippelinja-segmenta (der originalindeksen er -1)
   for(let i=0;i<zA.pts.length;i++){
     const midPt={x:(zA.pts[i].x+zA.pts[(i+1)%zA.pts.length].x)/2,y:(zA.pts[i].y+zA.pts[(i+1)%zA.pts.length].y)/2};
     const oi=paaOpphavleg(midPt);
     if(oi<0){  // klippelinja-segment
-      zA.zoneConnections.set(i,{facingZoneId:facingZoneAId,name:`Sonekobling ${zA.name} og ${zB.name}`});
+      zA.zoneConnections.set(i,{facingZoneIdx:zoneBIdx,name:`Sonekobling ${zA.name} og ${zB.name}`});
     }
   }
   for(let i=0;i<zB.pts.length;i++){
     const midPt={x:(zB.pts[i].x+zB.pts[(i+1)%zB.pts.length].x)/2,y:(zB.pts[i].y+zB.pts[(i+1)%zB.pts.length].y)/2};
     const oi=paaOpphavleg(midPt);
     if(oi<0){  // klippelinja-segment
-      zB.zoneConnections.set(i,{facingZoneId:facingZoneBId,name:`Sonekobling ${zB.name} og ${zA.name}`});
+      zB.zoneConnections.set(i,{facingZoneIdx:zoneAIdx,name:`Sonekobling ${zB.name} og ${zA.name}`});
     }
   }
 
@@ -11671,10 +11670,22 @@ function buildSXI(proj){
   // Build zones XML
   let zonesXml='';
   const zoneIds=[];
-  logicalZones.forEach(({z,instances})=>{
+  const zoneToSxiId=new Map();  // Map zone object -> SXI zone ID
+  const exportedZoneConnections=new Set();  // Track (zoneIdx, facingZoneIdx) pairs already exported
+
+  // BUILD zoneToSxiId FOR ALL ZONES FIRST — must map all zones before export
+  // so facing-zone lookup works for all zone pairs
+  logicalZones.forEach(({z})=>{
     const thisZoneId='zone#'+(idN);
     idN++;
     zoneIds.push(thisZoneId);
+    zoneToSxiId.set(z,thisZoneId);
+  });
+
+  // NOW process each zone for SXI export
+  logicalZones.forEach(({z,instances})=>{
+    const zoneIdx=logicalZones.findIndex(lz=>lz.z===z);
+    const thisZoneId=zoneIds[zoneIdx];
 
     // Bygningskategori — hent frå sona, fall tilbake til Kontorbygg
     const btCfg = BYGKAT_SXI[z.bygkat] || BYGKAT_SXI['Kontorbygg'];
@@ -11741,6 +11752,7 @@ function buildSXI(proj){
     // Collect all segments from all instances
     const nd=parseFloat(northI.value)||0;
     let facXml='';
+    const myLogicalIdx=zoneIdx;  // Index of this zone in logicalZones for zone_connection tracking
 
     instances.forEach(lz=>{
       const segs=calcSegments(lz.pts,getHoyde(lz),mppForZone(lz));
@@ -11769,6 +11781,20 @@ function buildSXI(proj){
           ensureZoneConnectionsMap(lz);
           // Sjekk om dette segmentet er markert som sonekobling
           const isZoneConn=lz.zoneConnections?.has(seg.idx);
+          // Sonekobling skal berre eksporterast éin gong per sone-par (ikkje ein per segment)
+          let shouldExportZoneConn=false;
+          if(isZoneConn && z===lz){
+            const zcData=lz.zoneConnections.get(seg.idx);
+            const facingZoneIdx=zcData.facingZoneIdx;
+            if(typeof facingZoneIdx==='number' && facingZoneIdx>=0 && facingZoneIdx<zones.length){
+              // Berre eksportera frå den lågare-indekserte sona per par
+              // (SIMIEN viser sonekobling automatisk i båda sonene)
+              if(myLogicalIdx<facingZoneIdx){
+                const pairKey=myLogicalIdx+','+facingZoneIdx;
+                shouldExportZoneConn=!exportedZoneConnections.has(pairKey);
+              }
+            }
+          }
 
           // Sjekk om dette segmentet er del av eit samanslått sett
           const isMergedEntry=(lz.skMergedGroups||[]).find(g=>g.segs.includes(seg.idx))||null;
@@ -11781,9 +11807,13 @@ function buildSXI(proj){
             const totalGrossA=grpSegs.reduce((s,gs)=>{const gov=lz.segOverrides?.[gs.idx]||{};return s+(gov.areaM2??gs.areaM2??((gov.lenM??gs.lenM??0)*fhM)??0);},0);
             const uSK=lz.uPerSeg?.['seg_'+seg.idx]??0.80;
 
-            if(isZoneConn){
+            if(shouldExportZoneConn){
               const zcData=lz.zoneConnections.get(seg.idx);
-              const facingZoneId=zcData.facingZoneId;
+              const facingZoneIdx=zcData.facingZoneIdx;
+              const pairKey=myLogicalIdx+','+facingZoneIdx;
+              exportedZoneConnections.add(pairKey);
+              const opposingZone=zones[facingZoneIdx];
+              const facingZoneId=zoneToSxiId.get(opposingZone) || 'zone#0';
               const iwId=nextId('zone-connection');
               const grpName=xesc((isMergedEntry.name||'Sonekobling')+flSuffix);
               facXml+=`    <zone_connection id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="${facingZoneId}" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" heat_loss_coeff="0.95" zone_temperature="5.0"></zone_connection>\n`;
@@ -11795,9 +11825,13 @@ function buildSXI(proj){
           } else {
             const uSK=lz.uPerSeg?.['seg_'+seg.idx]??0.80;
 
-            if(isZoneConn){
+            if(shouldExportZoneConn){
               const zcData=lz.zoneConnections.get(seg.idx);
-              const facingZoneId=zcData.facingZoneId;
+              const facingZoneIdx=zcData.facingZoneIdx;
+              const pairKey=myLogicalIdx+','+facingZoneIdx;
+              exportedZoneConnections.add(pairKey);
+              const opposingZone=zones[facingZoneIdx];
+              const facingZoneId=zoneToSxiId.get(opposingZone) || 'zone#0';
               const iwId=nextId('zone-connection');
               facXml+=`    <zone_connection id="${iwId}" name="${nm}${flSuffix}" comment="" area="${grossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="${facingZoneId}" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" heat_loss_coeff="0.95" zone_temperature="5.0"></zone_connection>\n`;
             } else {
