@@ -4504,6 +4504,9 @@ function autoSkilleveggForNySone(nz){
     if(z.zoneConnections.has(si))return false;
     const opposingZoneIdx=zones.indexOf(opposingZone);
     z.zoneConnections.set(si,{facingZoneIdx:opposingZoneIdx,name:`Sonekobling ${z.name} og ${opposingZone.name}`});
+    // Marker òg som skiljevegg så det vises i sidepanelet
+    if(!z.skillevegg)z.skillevegg=new Set();
+    z.skillevegg.add(si);
     return true;
   };
   let tal=0;
