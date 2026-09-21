@@ -6579,14 +6579,24 @@ function updateResults(){
             // Sjekk om dette er ein sonekobling — då kan brukaren trykka for å endra det til SK eller YV
             ensureZoneConnectionsMap(z);
             if(z.zoneConnections.has(seg.idx)){
-              // Toggle mellom sonekobling og skiljevegg
+              // Toggle mellom sonekobling og skiljevegg — gjer på båda sonene
+              const zcData=z.zoneConnections.get(seg.idx);
+              const facingZoneIdx=zcData.facingZoneIdx;
+              const opposingZone=facingZoneIdx>=0&&facingZoneIdx<zones.length?zones[facingZoneIdx]:null;
+              // Fjern frå båda sonene
               z.zoneConnections.delete(seg.idx);
               if(!z.skillevegg)z.skillevegg=new Set();
               z.skillevegg.add(seg.idx);
+              if(opposingZone){
+                ensureZoneConnectionsMap(opposingZone);
+                opposingZone.zoneConnections.delete(seg.idx);
+                if(!opposingZone.skillevegg)opposingZone.skillevegg=new Set();
+                opposingZone.skillevegg.add(seg.idx);
+              }
               snapshot();
               markDirty();
               updateResults();renderTable();draw();
-              hintText.textContent='Endra frå sonekobling til skiljevegg.';
+              hintText.textContent='Endra frå sonekobling til skiljevegg i begge sonene.';
               return;
             }
             if(!z.skillevegg)z.skillevegg=new Set();
@@ -11680,20 +11690,43 @@ function ensureAllZoneConnectionsMaps(){
 // Toggle sonekobling på ein skiljevegg
 function toggleZoneConnection(zone, segIdx, opposingZoneId){
   ensureZoneConnectionsMap(zone);
+  const opposingZone=typeof opposingZoneId==='string'?zones.find(z=>z===opposingZoneId)||null:opposingZoneId;
 
   if(zone.zoneConnections.has(segIdx)){
+    // Fjern frå båda sonene
     zone.zoneConnections.delete(segIdx);
-    markDirty();
-    updateResults();
-    hintText.textContent='Fjerna sonekobling.';
-  } else {
-    const opposingZone=zones.find(z=>z===opposingZoneId)||opposingZoneId;
-    const name=`Sonekobling ${zone.name} og ${typeof opposingZone==='string'?opposingZone:opposingZone.name}`;
-    zone.zoneConnections.set(segIdx,{facingZoneId:opposingZoneId,name});
+    // Marker som skiljevegg (dersom ikkje allereie det)
+    if(!zone.skillevegg)zone.skillevegg=new Set();
+    zone.skillevegg.add(segIdx);
+    // Fjern frå den nabosona òg
+    if(opposingZone){
+      ensureZoneConnectionsMap(opposingZone);
+      opposingZone.zoneConnections.delete(segIdx);
+      if(!opposingZone.skillevegg)opposingZone.skillevegg=new Set();
+      opposingZone.skillevegg.add(segIdx);
+    }
     snapshot();
     markDirty();
     updateResults();
-    hintText.textContent='Markerte skiljevegg som sonekobling.';
+    hintText.textContent='Fjerna sonekobling — endrast til skiljevegg i begge sonene.';
+  } else {
+    // Legg til sonekobling på båda sonene
+    const name=`Sonekobling ${zone.name} og ${typeof opposingZone==='string'?opposingZone:opposingZone?.name||'nabosone'}`;
+    const opposingZoneIdx=opposingZone?zones.indexOf(opposingZone):-1;
+    zone.zoneConnections.set(segIdx,{facingZoneIdx:opposingZoneIdx,name});
+    // Fjern frå skiljevegg-lista (no er det sonekobling)
+    zone.skillevegg?.delete(segIdx);
+    // Legg òg til på nabosona
+    if(opposingZone){
+      ensureZoneConnectionsMap(opposingZone);
+      const zoneIdx=zones.indexOf(zone);
+      opposingZone.zoneConnections.set(segIdx,{facingZoneIdx:zoneIdx,name});
+      opposingZone.skillevegg?.delete(segIdx);
+    }
+    snapshot();
+    markDirty();
+    updateResults();
+    hintText.textContent='Markerte skiljevegg som sonekobling i begge sonene.';
   }
 }
 
