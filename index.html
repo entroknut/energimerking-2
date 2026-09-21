@@ -6418,14 +6418,14 @@ function updateResults(){
                   const opposingZone=facingZoneIdx<zones.length?zones[facingZoneIdx]:null;
                   const grpName=(zcData.name||'Sonekobling');
                   const row=document.createElement('div');
-                  row.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;margin:2px 0;border-radius:6px;background:#d1fae5;border:1px solid #10b981';
-                  const nameTag=document.createElement('span');nameTag.style.cssText='font-size:11px;font-weight:700;color:#047857;white-space:nowrap';
+                  row.style.cssText='display:flex;align-items:center;gap:4px;padding:3px 6px;margin:2px 0;border-radius:4px;background:#d1fae5;border:1px solid #10b981;font-size:10px';
+                  const nameTag=document.createElement('span');nameTag.style.cssText='font-weight:700;color:#047857;white-space:nowrap;font-size:10px';
                   nameTag.textContent=grpName;
-                  const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:10.5px;color:#6b7280;font-family:'DM Mono',monospace;flex:1";
+                  const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:9.5px;color:#6b7280;font-family:'DM Mono',monospace;flex:1";
                   statsSpan.textContent=`${zcSegs.length} veggar · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx?fmtM2(totalA):'—'}`;
                   row.title='Sonekobling — ein <zone_connection> element i SXI-fila: '+zcSegs.map((s2,i)=>labels2[segs.indexOf(s2)]).join(', ');
                   const remBtn=document.createElement('button');
-                  remBtn.style.cssText='font-size:10px;padding:2px 6px;border:1px solid #10b981;border-radius:4px;background:#fff;color:#047857;cursor:pointer;font-family:inherit;white-space:nowrap';
+                  remBtn.style.cssText='font-size:9px;padding:2px 5px;border:1px solid #10b981;border-radius:3px;background:#fff;color:#047857;cursor:pointer;font-family:inherit;white-space:nowrap';
                   remBtn.textContent='Fjern';
                   remBtn.onclick=()=>{
                     zcSegs.forEach(s=>{z.zoneConnections.delete(s.idx);});
