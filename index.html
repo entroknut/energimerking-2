@@ -6448,15 +6448,27 @@ function updateResults(){
                     item1.onclick=()=>{
                       // Fjern sonekobling frå båda sonene
                       zcSegs.forEach(seg=>{
+                        // Finn nabosona frå skillevegg (same som normal SK-handling)
+                        let nabozOne=null;
+                        for(const otherZone of zones){
+                          if(otherZone===z)continue;
+                          if(otherZone.skillevegg?.has(seg.idx)){
+                            nabozOne=otherZone;
+                            break;
+                          }
+                        }
+
+                        // Fjern frå denne sona
                         z.zoneConnections.delete(seg.idx);
                         if(!z.skillevegg)z.skillevegg=new Set();
                         z.skillevegg.add(seg.idx);
+
                         // Fjern frå nabosona òg
-                        if(opposingZone){
-                          ensureZoneConnectionsMap(opposingZone);
-                          opposingZone.zoneConnections.delete(seg.idx);
-                          if(!opposingZone.skillevegg)opposingZone.skillevegg=new Set();
-                          opposingZone.skillevegg.add(seg.idx);
+                        if(nabozOne){
+                          ensureZoneConnectionsMap(nabozOne);
+                          nabozOne.zoneConnections.delete(seg.idx);
+                          if(!nabozOne.skillevegg)nabozOne.skillevegg=new Set();
+                          nabozOne.skillevegg.add(seg.idx);
                         }
                       });
                       facSection.textContent='';
