@@ -7202,8 +7202,9 @@ function renderTable(){
         const ov=z.segOverrides['sk_merged']||{};
         const totalLen=ov.lenM!=null?ov.lenM:allSK.reduce((s,s2)=>s+(s2.lenM||0),0);
         const totalArea=ov.areaM2!=null?ov.areaM2:allSK.reduce((s,s2)=>s+(s2.areaM2||0),0);
+        const skName=(z.segOverrides?.['sk_merged']?.name||'SK')+` (${allSK.length} seg)`;
         html+=`<tr style="background:#fef3c7">
-          <td style="color:#d97706;font-weight:700">SK <span style="font-weight:400;color:#92400e">(${allSK.length} seg)</span></td>
+          <td style="color:#d97706;font-weight:700"><input class="tbl-input" data-fad-name="${fli},${zi},sk_merged" value="${skName}" style="width:120px;border:none;background:none;font-weight:700;color:#d97706;padding:0;font-size:inherit" title="Namn på skiljevegg-gruppe"></td>
           <td style="color:#d97706;font-weight:600">Skillevegg</td>
           <td class="${ov.lenM!=null?'cell-overridden':''}"><input class="tbl-input${ov.lenM!=null?' overridden':''}" data-segov="${fli},${zi},sk_merged,lenM" value="${totalLen.toFixed(2)}" style="width:60px" title="${ov.lenM!=null?'Manuelt justert — slett for å tilbakestille':''}"></td>
           <td class="${ov.areaM2!=null?'cell-overridden':''}"><input class="tbl-input${ov.areaM2!=null?' overridden':''}" data-segov="${fli},${zi},sk_merged,areaM2" value="${totalArea.toFixed(2)}" style="width:60px" title="${ov.areaM2!=null?'Manuelt justert — slett for å tilbakestille':''}"></td>
@@ -7223,8 +7224,10 @@ function renderTable(){
       const areaStr2=areaVal2!=null?areaVal2.toFixed(2):'—';
       const nettoStr=isSK||nettoVal==null?'—':nettoVal.toFixed(2);
       const rowBg=isSK?'background:#fef3c7':'';
+      const displayName=ov.name??(isSK?'SK':'');
+      const nameDisplay=displayName?`${displayName} · ${nm}`:`${nm}`;
       html+=`<tr style="${rowBg}">
-        <td style="color:${zColor};font-weight:600">${nm}</td>
+        <td style="color:${zColor};font-weight:600"><input class="tbl-input" data-fad-name="${fli},${zi},${seg.idx}" value="${nameDisplay}" style="width:120px;border:none;background:none;font-weight:600;color:${zColor};padding:0;font-size:inherit" title="Namn på fasade${isSK?' eller skiljevegg':''}"></td>
         <td style="color:${isSK?'#d97706':'#94a3b8'};font-weight:${isSK?'600':'400'}">${isSK?'Skillevegg':'Yttervegg'}</td>
         <td class="${ov.lenM!=null?'cell-overridden':''}"><input class="tbl-input${ov.lenM!=null?' overridden':''}" data-segov="${fli},${zi},${seg.idx},lenM" value="${lenStr}" placeholder="—" style="width:60px" title="${ov.lenM!=null?'Manuelt justert — slett for å tilbakestille':''}"></td>
         <td class="${ov.areaM2!=null?'cell-overridden':''}"><input class="tbl-input${ov.areaM2!=null?' overridden':''}" data-segov="${fli},${zi},${seg.idx},areaM2" value="${areaStr2}" placeholder="—" style="width:60px" title="${ov.areaM2!=null?'Manuelt justert — slett for å tilbakestille':''}"></td>
@@ -7439,6 +7442,21 @@ function renderTable(){
     const _z=floors[parseInt(_fi)]?.zones[parseInt(_zi)];
     if(!_z)return;
     inp.onchange=()=>{const v=inp.value.trim();if(!_z.uPerSeg)_z.uPerSeg={};if(v==='')delete _z.uPerSeg[segKey];else _z.uPerSeg[segKey]=parseFloat(v);renderTable();};
+  });
+  wrap.querySelectorAll('[data-fad-name]').forEach(inp=>{
+    const parts=inp.dataset.fadName.split(',');
+    const [_fi,_zi,sidxRaw]=[parseInt(parts[0]),parseInt(parts[1]),parts[2]];
+    const _z=floors[_fi]?.zones[_zi];
+    if(!_z)return;
+    const sidx=sidxRaw==='sk_merged'?'sk_merged':parseInt(sidxRaw);
+    inp.onchange=()=>{
+      const v=inp.value.trim();
+      if(!_z.segOverrides)_z.segOverrides={};
+      if(!_z.segOverrides[sidx])_z.segOverrides[sidx]={};
+      if(v==='')delete _z.segOverrides[sidx].name;
+      else _z.segOverrides[sidx].name=v;
+      renderTable();
+    };
   });
   wrap.querySelectorAll('[data-wuv]').forEach(inp=>{
     const [_fi,_zi,_wi]=inp.dataset.wuv.split(',').map(Number);
