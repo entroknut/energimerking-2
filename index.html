@@ -3593,6 +3593,8 @@ function draw(){
         const skMergedName=new Map();
         (z.skMergedGroups||[]).forEach(g=>g.segs.forEach(i=>skMergedName.set(i,g.name||'SK')));
         // Group zone connections by facingZoneIdx to track which is first
+        // Only show label on lower-indexed zone of the pair
+        const myZoneIdx=floors.flatMap(f=>f.zones).indexOf(z);
         const zcGroups=new Map();
         segs.forEach((seg,si)=>{
           if(zc.has(seg.idx)){
@@ -3603,7 +3605,10 @@ function draw(){
           }
         });
         const firstZcSegPerGroup=new Set();
-        zcGroups.forEach(segs=>firstZcSegPerGroup.add(segs[0]));
+        zcGroups.forEach((segs,facing)=>{
+          // Only mark as "first" if this is the lower-indexed zone in the pair
+          if(myZoneIdx<facing)firstZcSegPerGroup.add(segs[0]);
+        });
 
         segs.forEach((seg,si)=>{
           const isZC2=zc.has(seg.idx);
@@ -3617,20 +3622,23 @@ function draw(){
           const nx=mp.x+dx/dlen*16,ny=mp.y+dy/dlen*16;
           const wins=(z.windows||[]).filter(w=>w.segIdx===seg.idx);
           const winNote=wins.length?` [${wins.length}×▭]`:'';
-          const skMName=isSK2?skMergedName.get(seg.idx):null;
-          // Vis "Sonekobling" berre på første segment i gruppa, elles berre segmentnamnet
+          const skMName=isSK2&&!isZC2?skMergedName.get(seg.idx):null;  // IKKJE SK-namn på sonekobling-segment
+          // Vis "Sonekobling" berre på første segment i gruppa, elles ingenting
           const zcName=isZC2&&firstZcSegPerGroup.has(seg.idx)?'Sonekobling':'';
-          const labelTxt=(isMergedYv?'⊞ ':'')+(zcName?'⊙ '+zcName+' · ':(skMName?'⊞ '+skMName+' · ':''))+(isKJ2?'⛰ ':'')+nm+winNote;
-          ctx.font='bold 9px Inter,sans-serif';
-          const tw=ctx.measureText(labelTxt).width+10;
-          ctx.fillStyle=isZC2?'#d1fae5':isSK2?'#fef3c7':isKJ2?'#f3ece0':isMergedYv?'#dbeafe':'rgba(255,255,255,.88)';
-          ctx.beginPath();ctx.roundRect(nx-tw/2,ny-9,tw,17,3);ctx.fill();
-          if(isZC2){ctx.strokeStyle='#10b981';ctx.lineWidth=1;ctx.stroke();}
-          else if(isSK2){ctx.strokeStyle='#d97706';ctx.lineWidth=1;ctx.stroke();}
-          else if(isKJ2){ctx.strokeStyle='#8a6a3b';ctx.lineWidth=1;ctx.stroke();}
-          else if(isMergedYv){ctx.strokeStyle='#3b82f6';ctx.lineWidth=1;ctx.stroke();}
-          ctx.fillStyle=isZC2?'#047857':isSK2?'#92400e':isKJ2?'#5f4520':isMergedYv?'#1e40af':COLORS[ci];ctx.textAlign='center';ctx.textBaseline='middle';
-          ctx.fillText(labelTxt,nx,ny);
+          const labelTxt=isZC2&&!firstZcSegPerGroup.has(seg.idx)?'' // Sonekobling-segment unntatt første får ingen merkelapps
+            :(isMergedYv?'⊞ ':'')+(zcName?'⊙ '+zcName+' · ':(skMName?'⊞ '+skMName+' · ':''))+(isKJ2?'⛰ ':'')+nm+winNote;
+          if(labelTxt){  // Teikn berre viss merkelappen har tekst
+            ctx.font='bold 9px Inter,sans-serif';
+            const tw=ctx.measureText(labelTxt).width+10;
+            ctx.fillStyle=isZC2?'#d1fae5':isSK2?'#fef3c7':isKJ2?'#f3ece0':isMergedYv?'#dbeafe':'rgba(255,255,255,.88)';
+            ctx.beginPath();ctx.roundRect(nx-tw/2,ny-9,tw,17,3);ctx.fill();
+            if(isZC2){ctx.strokeStyle='#10b981';ctx.lineWidth=1;ctx.stroke();}
+            else if(isSK2){ctx.strokeStyle='#d97706';ctx.lineWidth=1;ctx.stroke();}
+            else if(isKJ2){ctx.strokeStyle='#8a6a3b';ctx.lineWidth=1;ctx.stroke();}
+            else if(isMergedYv){ctx.strokeStyle='#3b82f6';ctx.lineWidth=1;ctx.stroke();}
+            ctx.fillStyle=isZC2?'#047857':isSK2?'#92400e':isKJ2?'#5f4520':isMergedYv?'#1e40af':COLORS[ci];ctx.textAlign='center';ctx.textBaseline='middle';
+            ctx.fillText(labelTxt,nx,ny);
+          }
         });
       }
     }
