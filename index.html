@@ -11876,6 +11876,16 @@ function buildSXI(proj){
             }
           }
 
+          // Hoppa over andre sonekobling-segment (same gruppe allereie eksportert)
+          if(isZoneConn){
+            const zcData=lz.zoneConnections.get(seg.idx);
+            const facingZoneIdx=zcData.facingZoneIdx;
+            if(typeof facingZoneIdx==='number' && facingZoneIdx>=0){
+              const pairKey=myLogicalIdx+','+facingZoneIdx;
+              if(exportedZoneConnections.has(pairKey))return;  // Allereie eksportert som gruppe
+            }
+          }
+
           // Sjekk om dette segmentet er del av eit samanslått sett (og IKKJE ein sonekobling)
           const isMergedEntry=(lz.skMergedGroups||[]).find(g=>g.segs.includes(seg.idx))||null;
           if(isMergedEntry&&!isZoneConn){
