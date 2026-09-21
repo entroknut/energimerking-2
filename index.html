@@ -11953,7 +11953,7 @@ function buildSXI(proj){
                   const facingZoneId=zoneToSxiId.get(opposingZone) || 'zone#0';
                   const iwId=nextId('zone-connection');
                   const grpName=xesc((zcData.name||'Sonekobling')+flSuffix);
-                  facXml+=`    <zone_connection id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="${facingZoneId}" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" heat_loss_coeff="0.95" zone_temperature="5.0"></zone_connection>\n`;
+                  facXml+=`    <zone_connection id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="${facingZoneId}" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" heat_loss_coeff="0.95" zone_temperature="5.0"></zone_connection>\n`;
                   exportedZoneConnections.add(pairKey);
                   return;  // Hoppa over den normale SK-handteringa
                 }
