@@ -11953,7 +11953,7 @@ function buildSXI(proj){
                   const facingZoneId=zoneToSxiId.get(opposingZone) || 'zone#0';
                   const iwId=nextId('zone-connection');
                   const grpName=xesc((zcData.name||'Sonekobling')+flSuffix);
-                  facXml+=`    <zone_connection id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="${facingZoneId}" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" heat_loss_coeff="0.95" zone_temperature="5.0"></zone_connection>\n`;
+                  facXml+=`    <zone_connection id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="0.18" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="${facingZoneId}" opening="no" opening_area="0.00" opening_height="2.00" always_open="no" percent_open="0.00" start_opening="8.00" end_opening="17.00" infiltration="25.00" overflow="no" airflow_direction="inn" ventilation_operating_hours="0.00" ventilation_non_operating_hours="0.00" ventilation_off_days="0.00" start_ventilation="8.00" end_ventilation="17.00" thermal_cap2="2.40" internal_layer2="Gips 13 mm"></zone_connection>\n`;
                   exportedZoneConnections.add(pairKey);
                   return;  // Hoppa over den normale SK-handteringa
                 }
