@@ -11891,21 +11891,10 @@ function buildSXI(proj){
             const grpName=xesc((isMergedEntry.name||'Skillekonstruksjon')+flSuffix);
             facXml+=`    <partition id="${iwId}" name="${grpName}" comment="" area="${totalGrossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
           } else {
+            // Enkelt SK-segment (ikkje samanslått og ikkje sonekobling — sonekobling vert handtert som gruppe ovanfor)
             const uSK=lz.uPerSeg?.['seg_'+seg.idx]??0.80;
-
-            if(shouldExportZoneConn){
-              const zcData=lz.zoneConnections.get(seg.idx);
-              const facingZoneIdx=zcData.facingZoneIdx;
-              const pairKey=myLogicalIdx+','+facingZoneIdx;
-              exportedZoneConnections.add(pairKey);
-              const opposingZone=zones[facingZoneIdx];
-              const facingZoneId=zoneToSxiId.get(opposingZone) || 'zone#0';
-              const iwId=nextId('zone-connection');
-              facXml+=`    <zone_connection id="${iwId}" name="${nm}${flSuffix}" comment="" area="${grossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="${facingZoneId}" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" heat_loss_coeff="0.95" zone_temperature="5.0"></zone_connection>\n`;
-            } else {
-              const iwId=nextId('partition');
-              facXml+=`    <partition id="${iwId}" name="${nm}${flSuffix}" comment="" area="${grossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
-            }
+            const iwId=nextId('partition');
+            facXml+=`    <partition id="${iwId}" name="${nm}${flSuffix}" comment="" area="${grossA.toFixed(2)}" uvalue="${uSK}" thermal_cap="2.40" construction="Betongvegg, 150 mm" internal_layer="Gips 13 mm" type="vegg" facing="same_temp_zone" summer_temp="25.0" winter_temp="21.0" summer_humidity="60.0" winter_humidity="40.0" co2="600" air_exchange="0" unheated_zone="" heat_loss_coeff="0.95" zone_temperature="5.0"></partition>\n`;
           }
         } else {
           if(isKjellervegg(lz,seg.idx))return;   // dekt av <cellar>
