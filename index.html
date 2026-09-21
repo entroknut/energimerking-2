@@ -6433,6 +6433,44 @@ function updateResults(){
                     updateResults();renderTable();draw();
                   };
                   row.appendChild(nameTag);row.appendChild(statsSpan);row.appendChild(remBtn);
+
+                  // Høgreklikk-meny for å fjerne eller endra sonekobling
+                  row.oncontextmenu=e=>{
+                    e.preventDefault();
+                    const menuEl=document.createElement('div');
+                    menuEl.style.cssText='position:fixed;left:'+e.clientX+'px;top:'+e.clientY+'px;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10000;min-width:200px';
+
+                    const item1=document.createElement('button');
+                    item1.style.cssText='display:block;width:100%;padding:8px 12px;text-align:left;border:none;background:none;cursor:pointer;font-family:inherit;font-size:13px';
+                    item1.textContent='Fjern sonekobling';
+                    item1.onmouseover=()=>item1.style.background='#f3f4f6';
+                    item1.onmouseout=()=>item1.style.background='none';
+                    item1.onclick=()=>{
+                      // Fjern sonekobling frå båda sonene
+                      zcSegs.forEach(seg=>{
+                        z.zoneConnections.delete(seg.idx);
+                        if(!z.skillevegg)z.skillevegg=new Set();
+                        z.skillevegg.add(seg.idx);
+                        // Fjern frå nabosona òg
+                        if(opposingZone){
+                          ensureZoneConnectionsMap(opposingZone);
+                          opposingZone.zoneConnections.delete(seg.idx);
+                          if(!opposingZone.skillevegg)opposingZone.skillevegg=new Set();
+                          opposingZone.skillevegg.add(seg.idx);
+                        }
+                      });
+                      facSection.textContent='';
+                      document.body.removeChild(menuEl);
+                      snapshot();
+                      markDirty();
+                      updateResults();renderTable();draw();
+                      hintText.textContent='Fjerna sonekobling på båda sonene.';
+                    };
+                    menuEl.appendChild(item1);
+                    document.body.appendChild(menuEl);
+                    setTimeout(()=>{if(menuEl.parentNode)document.body.removeChild(menuEl);},5000);
+                  };
+
                   facSection.appendChild(row);
                   return;
                 } else {
