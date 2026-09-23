@@ -10384,9 +10384,13 @@ async function showFloorContextMenu(clientX,clientY,f){
 
   // Det som vert lagra på sona. Tala er med fordi SXI-eksporten må kunne
   // køyre utan EntroPi — frå ei .entro-fil, i ei anna økt, på ein annan maskin.
-  const kopi=s=>({id:s.id,namn:s.namn,kategori:s.kategori,
-    luft:s.luft||null,gjenvinning:s.gjenvinning!=null?s.gjenvinning:null,
-    sfp:s.sfp!=null?s.sfp:null});
+  const kopi=s=>{
+    const l=s.luft;
+    return {id:s.id,namn:s.namn,kategori:s.kategori,
+      luft:l?{til:l.til||null,fra:l.fra||null,per:!!l.per,redTil:l.redTil||null,redFra:l.redFra||null}:null,
+      gjenvinning:s.gjenvinning!=null?s.gjenvinning:null,
+      sfp:s.sfp!=null?s.sfp:null};
+  };
 
   // Tala kan ha endra seg i EntroPi sidan koplinga vart gjord. Vi oppdaterer
   // dei lagra kopiane, men lagar ikkje eit angre-steg av det — brukaren gjorde
