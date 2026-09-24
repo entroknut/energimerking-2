@@ -2137,24 +2137,64 @@ function winFreezePos(w,width,segLen){
   return w.posT;
 }
 // Endrar antalet og tek vare på plasseringa av dei som alt står der.
-// Nye stk vert lagde etter den siste med ei halv vindaugsbreidde i luft; er det
-// ikkje plass, fell heile gruppa tilbake til jamn fordeling (posT=null).
+// Når antal vert auka utan eksisterende posT: det første stykket vert plassert
+// der brukaren teikna det (t0/t1 sitt senter), resten fordelte rundt det.
+// Nye stk får timestamp for visuell highlight som fader over nokre sekunder.
 function winSetAntal(w,n,width,segLen){
   n=Math.max(1,Math.round(n)||1);
   const old=winCount(w);
-  if(n!==old&&winHasPos(w)){
+  w.antal=n;
+
+  if(n===old)return; // Ingen endring
+
+  if(winHasPos(w)){
+    // Allereie distribuerte stykk — endra eller legg til
     const cs=w.posT.slice();
-    if(n<old)w.posT=cs.slice(0,n);
-    else{
+    if(n<old){
+      w.posT=cs.slice(0,n);
+    } else {
+      // Legger til nye stykk etter dei som alt er der
       const gap=Math.max(WIN_GAP_FRAC*segLen,width*0.5);
       const stepT=(width+gap)/(segLen||1);
       const halfT=(width/2)/(segLen||1);
       let t=Math.max.apply(null,cs),plass=true;
-      for(let i=old;i<n;i++){t+=stepT;if(t+halfT>1){plass=false;break;}cs.push(t);}
+      for(let i=old;i<n;i++){
+        t+=stepT;
+        if(t+halfT>1){plass=false;break;}
+        cs.push(t);
+      }
       w.posT=plass?cs:null;
+      // Marker nye stykk for highlight
+      if(w.posT){w._newWindows=new Set(Array.from({length:n-old},(_,i)=>old+i));}
+    }
+  } else if(n>1){
+    // Fyrste gang antal > 1 — start med første stykket ved t0/t1-senteret
+    const centre=(w.t0+w.t1)/2;
+    const gap=Math.max(WIN_GAP_FRAC*segLen,width*0.5);
+    const stepT=(width+gap)/(segLen||1);
+    const halfT=(width/2)/(segLen||1);
+
+    // Bygg posT med første stykket ved senteret, resten fordelt rundt
+    const cs=[centre];
+    let plass=true;
+
+    // Legg til stykk til høgre
+    for(let i=1;i<n;i++){
+      let t=centre+stepT*i;
+      if(t+halfT>1){plass=false;break;}
+      cs.push(t);
+    }
+
+    // Om det ikkje var plass til høgre, prøv å fordele jamt (fallback)
+    if(!plass){
+      w.posT=null;
+    } else {
+      w.posT=cs;
+      // Marker alle som nye første gangen
+      w._newWindows=new Set(Array.from({length:n},(_,i)=>i));
     }
   }
-  w.antal=n;
+
   if(winHasPos(w))winSyncAnchor(w,width,segLen);
 }
 
@@ -3693,21 +3733,32 @@ function draw(){
         const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
         const isHov=isSameW&&hoveredWin.inst===k;
         const isDrag=dragWin&&dragWin.w===w&&dragWin.inst===k;
+        const isNew=w._newWindows&&w._newWindows.has(k);
+        const newFadeTime=3000; // 3 sekunder fade-ut
+        const timeSinceNew=isNew?Date.now()-w._createdAt:Infinity;
+        const newFade=isNew?Math.max(0,1-timeSinceNew/newFadeTime):0;
+        const isDoor=w.type==='dor';
         const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
         gx+=mx;gy+=my;
         // Highlight glow — outer ring
-        if(isHov||isDrag){
+        if(isHov||isDrag||isNew){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-          ctx.strokeStyle=isDrag?'rgba(29,79,79,.15)':w.type==='dor'?'rgba(245,158,11,.12)':'rgba(6,182,212,.12)';
+          if(isDrag)ctx.strokeStyle='rgba(29,79,79,.15)';
+          else if(isNew)ctx.strokeStyle='rgba(34,197,94,.15)';
+          else ctx.strokeStyle=isDoor?'rgba(245,158,11,.12)':'rgba(6,182,212,.12)';
           ctx.lineWidth=18;ctx.stroke();
           // Inner glow — brighter
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-          ctx.strokeStyle=isDrag?'rgba(29,79,79,.6)':w.type==='dor'?'rgba(245,158,11,.55)':'rgba(6,182,212,.55)';
+          if(isDrag)ctx.strokeStyle='rgba(29,79,79,.6)';
+          else if(isNew)ctx.strokeStyle=`rgba(34,197,94,${0.4+0.2*newFade})`;
+          else ctx.strokeStyle=isDoor?'rgba(245,158,11,.55)':'rgba(6,182,212,.55)';
           ctx.lineWidth=13;ctx.stroke();
         }
         ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-        ctx.strokeStyle=(isHov||isDrag)?'#fff':baseColor;
-        ctx.lineWidth=(isHov||isDrag)?5:3.5;ctx.stroke();
+        if(isHov||isDrag)ctx.strokeStyle='#fff';
+        else if(isNew)ctx.strokeStyle=`rgba(34,197,94,${0.6+0.4*newFade})`;
+        else ctx.strokeStyle=baseColor;
+        ctx.lineWidth=(isHov||isDrag)?5:isNew?4:3.5;ctx.stroke();
         if(isHov||isDrag){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
           ctx.strokeStyle=isDrag?'#1d4f4f':baseColor;ctx.lineWidth=2.5;ctx.stroke();
@@ -5814,7 +5865,7 @@ document.getElementById('winOk').onclick=()=>{
   const _brystCb=document.getElementById('winBrystCb');
   const _brystVal=parseInt(document.getElementById('winBryst').value);
   const _brystMm=(type!=='dor'&&_brystCb.checked&&!isNaN(_brystVal))?Math.max(0,_brystVal):null;
-  const _ny={segIdx:pendingWin.segIdx,dir:pendingWin.dir,t0:pendingWin.t0,t1:pendingWin.t1,breddeMm:w,hoyMm:h,antal:n,type,name:_wname,brystningMm:_brystMm};
+  const _ny={segIdx:pendingWin.segIdx,dir:pendingWin.dir,t0:pendingWin.t0,t1:pendingWin.t1,breddeMm:w,hoyMm:h,antal:n,type,name:_wname,brystningMm:_brystMm,_createdAt:Date.now(),posT:null};
   _existW.push(_ny);
   const _z=zones[pendingWin.zi];
   pendingWin=null;winPts=[];
