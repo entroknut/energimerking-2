@@ -287,6 +287,11 @@ Invariantar:
   plass. `loysOppGruppe` gjer heile gruppa til n sjølvstendige element — det
   endrar SXI-en frå eitt til n `<window>`, og er difor eit eige val, ikkje noko
   som skjer av seg sjølv når brukaren flyttar på stykka.
+- Gruppelappen (`V×3`) står ved det **teikna** stykket, ikkje midt i rekkja:
+  `w.lappStk` (indeks i `posT`, sett av `winMerkTeikna`), elles stykket nærast
+  ankeret (`winLappStk`). Berre visning.
+- Overlappande stk på same vegg (i same gruppe eller ulike element) vert
+  teikna med ein mørk overlappsbit i `draw()` — aldri stille.
 - `expandWindows()` er den eine vegen inn til fasadevising, 3D og kartet; han
   les `winCentres` og treng ingen eigen kunnskap om `posT`.
 
@@ -573,6 +578,13 @@ prosjektfunksjonane.
 **EntroPi (iframe):** brua sender PNG — fila på bygget er den einaste kopien, og JPEG ville tapt kvalitet på nytt for kvar opne-lagre-runde.
 
 Alle felt som skal overleve må leggjast til **fem** stader: `snapshot()`, `applyHistoryState()`, `getCurrentState()`, `serialiserEtasje()` og `deserialiserEtasje()` (eller `serialiserProsjekt()`/`lastProsjekt()` for felt på prosjektnivå).
+
+**PDF-dokumentet** vert lagra som base64 i `proj.pdfar` (éin gong per dokument —
+fleire etasjar frå same PDF deler), og arket ber `pdfRef`. Bytane vert kopierte i
+`opnePdf()` før `getDocument` (pdf.js tømmer bufferen). Autolagringa
+(`utanPdf:true`), etasje-klippbordet og eldre filer har ikkje PDF-en — då står
+sidebla-kontrollen likevel (han forsvann før), dempa, og ber om fila på nytt
+(`_hentPdfPaaNytt`). Synlegheita avheng berre av `totalPages>1`, ikkje av `pdfDoc`.
 
 `.entro`-fila og lokalkopien er stempla med `_eigar {kjelde,byggId,byggNamn}`
 frå `serialiserProsjekt()`. Det er både lokalkopi-stempelet (sjå EntroPi-brua)

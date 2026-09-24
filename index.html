@@ -807,7 +807,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.2.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.3.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -2181,7 +2181,7 @@ async function pickFile(){
       const result={bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,paperWMm:null,paperHMm:null,paperSource:null};
       if(f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf')){
         const ab=await f.arrayBuffer();
-        result.pdfDoc=await pdfjsLib.getDocument({data:ab}).promise;
+        result.pdfDoc=await opnePdf(ab);
         result.totalPages=result.pdfDoc.numPages;
         result.bgImg=await loadPdfPage_with(result.pdfDoc,1);
         const pm=await pdfSidePapirMm(result.pdfDoc,1);
@@ -2471,6 +2471,26 @@ function winNyFade(w,k){
   if(!m||!m.stk.has(k))return 0;
   return Math.max(0,1-(Date.now()-m.at)/WIN_NY_MS);
 }
+// Gruppelappen i planteikninga står ved det stykket brukaren teikna.
+// `w.lappStk` er indeksen i posT; han vert sett når gruppa får posT frå
+// winPosFraKlikk (det teikna stykket står eksakt på centreT). Berre visning.
+// Utan posT (eller med ein indeks som ikkje finst lenger) står lappen ved det
+// stykket som ligg nærast ankeret — i ei jamn rekkje er det der brukaren klikka.
+function _naerastT(cs,t){
+  let bi=0;
+  cs.forEach((c,i)=>{if(Math.abs(c-t)<Math.abs(cs[bi]-t))bi=i;});
+  return bi;
+}
+function winMerkTeikna(w,centreT){
+  if(winHasPos(w))w.lappStk=_naerastT(w.posT,centreT);
+  else delete w.lappStk;
+}
+// spans: [{t0,t1}] per stk, frå winSpansPx
+function winLappStk(w,spans){
+  const k=w.lappStk;
+  if(winHasPos(w)&&Number.isInteger(k)&&k>=0&&k<spans.length)return k;
+  return _naerastT(spans.map(s=>(s.t0+s.t1)/2),(w.t0+w.t1)/2);
+}
 function winSetAntal(w,n,width,segLen){
   n=Math.max(1,Math.round(n)||1);
   const old=winCount(w);
@@ -2501,7 +2521,9 @@ function winSetAntal(w,n,width,segLen){
   } else if(n>1&&old<=1){
     // Fyrste gang antal > 1 — stykket som står der vert ståande, resten
     // vert fordelte utover veggen derifrå (winPosFraKlikk)
-    w.posT=winPosFraKlikk((w.t0+w.t1)/2,n,width,segLen);
+    const _c=(w.t0+w.t1)/2;
+    w.posT=winPosFraKlikk(_c,n,width,segLen);
+    winMerkTeikna(w,_c);
     if(w.posT)markerNyeStk(w,Array.from({length:n},(_,i)=>i));
   }
 
@@ -3440,7 +3462,7 @@ async function handleFile(f){
   if(f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf')){
     hintText.textContent='Laster PDF…';
     const ab=await f.arrayBuffer();
-    result.pdfDoc=await pdfjsLib.getDocument({data:ab}).promise;
+    result.pdfDoc=await opnePdf(ab);
     result.totalPages=result.pdfDoc.numPages;
     result.bgImg=await loadPdfPage_with(result.pdfDoc,1);
     const pm=await pdfSidePapirMm(result.pdfDoc,1);
@@ -3502,11 +3524,51 @@ cwrap.addEventListener('drop',async e=>{e.preventDefault();await handleFile(e.da
 // Difor er dette den einaste staden som styrer synlegheita, og han vert kalla
 // frå syncFloorState() så etasjebyte, ny etasje, prosjektlasting og
 // etasjeimport alle får han med seg.
+//
+// Kontrollen står så lenge arket er ei fleirsidig PDF — også når sjølve
+// PDF-dokumentet manglar. Det gjer det etter ein autolagring (localStorage har
+// ikkje plass til PDF-en) eller for ein etasje henta frå eit anna prosjekt.
+// Før forsvann knappen då utan forklaring; no ber han om fila på nytt.
 function updatePdfSideUI(){
   const f=curArk();
   const n=f.totalPages||1;
-  pgctrl.style.display=(f.pdfDoc&&n>1)?'flex':'none';
+  pgctrl.style.display=n>1?'flex':'none';
   pgLbl.textContent=(f.pdfPage||1)+'/'+n;
+  pgctrl.title=f.pdfDoc?'':'PDF-fila er ikkje med i dette prosjektet — klikk ‹ › for å velje ho på nytt';
+  pgctrl.style.opacity=f.pdfDoc?'1':'.6';
+}
+// Opnar ei PDF og tek vare på ein kopi av bytane, så dokumentet kan lagrast i
+// prosjektfila (serialiserProsjekt → pdfar). pdf.js overfører bufferen til
+// workeren og tømmer han, difor må kopien takast FØR getDocument.
+async function opnePdf(ab){
+  const bytes=new Uint8Array(ab.slice(0));
+  const doc=await pdfjsLib.getDocument({data:ab}).promise;
+  doc._entroBytes=bytes;
+  return doc;
+}
+// Ingen PDF i minnet, men arket er ei fleirsidig PDF: be om fila på nytt.
+// Sidetalet må stemme — elles er det truleg ei anna fil, og då spør vi.
+async function _hentPdfPaaNytt(){
+  const f=curArk();
+  const fil=await new Promise(res=>{
+    const inp=document.createElement('input');
+    inp.type='file';inp.accept='application/pdf,.pdf';
+    inp.onchange=()=>res(inp.files[0]||null);
+    inp.click();
+  });
+  if(!fil)return false;
+  let doc;
+  try{doc=await opnePdf(await fil.arrayBuffer());}
+  catch(e){alert('Klarte ikkje å opne PDF-fila: '+(e.message||e));return false;}
+  if(doc.numPages!==(f.totalPages||1)&&!confirm(
+    `Fila har ${doc.numPages} sider, men teikninga kom frå ei PDF med ${f.totalPages} sider. Bruke ho likevel?`))
+    return false;
+  f.pdfDoc=doc;f.totalPages=doc.numPages;
+  pdfDoc=doc;totalPages=doc.numPages;
+  if(curPage>totalPages)curPage=totalPages;
+  updatePdfSideUI();
+  markDirty();   // PDF-en skal no med i lagringa
+  return true;
 }
 async function _byttPdfSide(nyPg){
   curPage=nyPg;
@@ -3519,8 +3581,12 @@ async function _byttPdfSide(nyPg){
   markDirty();
   fitImage();
 }
-document.getElementById('prevPg').onclick=async()=>{if(!pdfDoc||curPage<=1)return;await _byttPdfSide(curPage-1);};
-document.getElementById('nextPg').onclick=async()=>{if(!pdfDoc||curPage>=totalPages)return;await _byttPdfSide(curPage+1);};
+document.getElementById('prevPg').onclick=async()=>{
+  if(!pdfDoc&&!(await _hentPdfPaaNytt()))return;
+  if(curPage<=1)return;await _byttPdfSide(curPage-1);};
+document.getElementById('nextPg').onclick=async()=>{
+  if(!pdfDoc&&!(await _hentPdfPaaNytt()))return;
+  if(curPage>=totalPages)return;await _byttPdfSide(curPage+1);};
 
 // ── Compass ───────────────────────────────────────────────────
 function drawCompass(){
@@ -4018,6 +4084,7 @@ function draw(){
     // Draw windows/doors on zone
     // Ei gruppe (antal>1) vert teikna som antal stykk — kvar med si eiga
     // plassering, og kvar for seg å ta tak i. Sjå winCentres/winSpansPx.
+    const _winSpennAlle=[];   // alle stk i sona, til overlappsmarkeringa under
     (z.windows||[]).forEach((w,wi)=>{
       const seg=calcSegments(z.pts)?.[w.segIdx];
       if(!seg)return;
@@ -4035,7 +4102,8 @@ function draw(){
       // Samanlikn soneindeksen (zi), ikkje fargeindeksen (ci) — dei er berre
       // like på første etasje utan kopla soner
       const isSameW=hoveredWin&&hoveredWin.wi===wi&&hoveredWin.zi===zi&&hoveredWin.fli===activeFloor;
-      let gx=0,gy=0,merkt=false;
+      let merkt=false;
+      spans.forEach(sp=>_winSpennAlle.push({segIdx:w.segIdx,t0:sp.t0,t1:sp.t1,dor:w.type==='dor',seg,segLen,ux,uy}));
       spans.forEach((sp,k)=>{
         const s0i={x:seg.p1.x+ux*sp.t0*segLen,y:seg.p1.y+uy*sp.t0*segLen};
         const s1i={x:seg.p1.x+ux*sp.t1*segLen,y:seg.p1.y+uy*sp.t1*segLen};
@@ -4047,7 +4115,6 @@ function draw(){
         const isGrp=nStk>1&&!isHov&&!isDrag&&(isSameW||(dragWin&&dragWin.w===w));
         const newFade=winNyFade(w,k);
         const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
-        gx+=mx;gy+=my;
         // Oransje gløw for nye vindauge (fade ut på 1.5 sekunder)
         if(newFade>0){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
@@ -4103,16 +4170,39 @@ function draw(){
           ctx.fillText(nStk>1?'Drag for å flytte denne · høgreklikk for meny':'Drag for å flytte · høgreklikk for meny',lx,ly+14);
         }
       });
-      // Gruppelapp midt i rekkja når ingen enkelt stk er markert
+      // Gruppelappen står ved det stykket brukaren teikna (winLappStk), ikkje
+      // midt i rekkja — på ein lang vegg hamna han elles langt frå der ein
+      // nettopp klikka. Berre når ingen enkelt stk er markert.
       if(!merkt&&spans.length){
-        const mx=gx/spans.length,my=gy/spans.length;
-        const lx=mx+psx/plen*12,ly=my+psy/plen*12;
+        const sp=spans[winLappStk(w,spans)]||spans[0];
+        const m=i2s(seg.p1.x+ux*(sp.t0+sp.t1)/2*segLen,seg.p1.y+uy*(sp.t0+sp.t1)/2*segLen);
+        const lx=m.x+psx/plen*12,ly=m.y+psy/plen*12;
         ctx.font='9px Inter,sans-serif';
         ctx.fillStyle=baseColor;
         ctx.textAlign='center';ctx.textBaseline='middle';
         ctx.fillText((w.name||(w.type==='dor'?'D':'V'))+(nStk>1?'×'+nStk:''),lx,ly);
       }
     });
+    // Overlappande vindauge/dører på same vegg: overlappsbiten vert teikna i
+    // ein mørkare tone oppå, så ein ser han med ein gong. Både stk i same
+    // gruppe og ulike element tel — begge gir eit energimerke med meir glas
+    // enn det er plass til på veggen. Berre visning; tala vert ikkje endra.
+    for(let a=0;a<_winSpennAlle.length;a++){
+      const A=_winSpennAlle[a];
+      for(let b=a+1;b<_winSpennAlle.length;b++){
+        const B=_winSpennAlle[b];
+        if(A.segIdx!==B.segIdx)continue;
+        const o0=Math.max(A.t0,B.t0),o1=Math.min(A.t1,B.t1);
+        if((o1-o0)*A.segLen<0.5)continue;   // berre kant-i-kant
+        const p0=i2s(A.seg.p1.x+A.ux*o0*A.segLen,A.seg.p1.y+A.uy*o0*A.segLen);
+        const p1=i2s(A.seg.p1.x+A.ux*o1*A.segLen,A.seg.p1.y+A.uy*o1*A.segLen);
+        ctx.save();
+        ctx.beginPath();ctx.moveTo(p0.x,p0.y);ctx.lineTo(p1.x,p1.y);
+        ctx.strokeStyle=(A.dor&&B.dor)?'#92400e':(!A.dor&&!B.dor)?'#0e4f5c':'#3f3f46';
+        ctx.lineWidth=5;ctx.lineCap='butt';ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     // Flate-overlay på canvas — tak eller golv, aldri begge samstundes.
     // Varm palett for taket, kald for golvet, så det aldri er tvil om kva
@@ -6367,7 +6457,9 @@ document.getElementById('winOk').onclick=()=>{
   // ein gong, for tala går rett inn i energimerket.
   if(n>1){
     const g=winGeom(_z,_ny);
-    _ny.posT=winPosFraKlikk((_ny.t0+_ny.t1)/2,n,g.width,g.segLen);
+    const _c=(_ny.t0+_ny.t1)/2;
+    _ny.posT=winPosFraKlikk(_c,n,g.width,g.segLen);
+    winMerkTeikna(_ny,_c);
     if(_ny.posT)winSyncAnchor(_ny,g.width,g.segLen);
     hintText.textContent=(g.mpp&&winForTrongt(_ny,g.width,g.segLen))
       ?`⚠ ${n} × ${w} mm er breiare enn veggen (${(g.segLen*(g.mpp||0)/1000).toFixed(2)} m) — stykka overlappar. Sjekk breidda eller antalet.`
@@ -8716,10 +8808,12 @@ function loysUtStk(w,z,inst){
   const cs=winCentres(w,width,segLen);
   const c=cs[inst]!=null?cs[inst]:cs[0];
   const sp=fitSpanT(c,width,segLen);
-  const ny={...w,antal:1,posT:[c],t0:sp.t0,t1:sp.t1,
+  const ny={...w,antal:1,posT:[c],t0:sp.t0,t1:sp.t1,lappStk:0,
             name:uniqueWinName(w.name||(w.type==='dor'?'Dør':'Vindauge'),z.windows)};
   w.antal=n-1;
   w.posT=cs.filter((_,i)=>i!==inst);
+  // Lappen følgjer det teikna stykket; vart det sjølv løyst ut, går han til nabostykket
+  if(Number.isInteger(w.lappStk)&&w.lappStk>=inst)w.lappStk=Math.max(0,w.lappStk-1);
   winSyncAnchor(w,width,segLen);
   const ix=z.windows.indexOf(w);
   z.windows.splice(ix>=0?ix+1:z.windows.length,0,ny);
@@ -9578,7 +9672,41 @@ function serialiserEtasje(f,opts){
     })
   };
   _serBgInn(f,obj,o);
+  _serPdfRef(f,obj,o);
   return obj;
+}
+
+// PDF-dokumentet til eit ark. Sjølve bytane ligg éin gong per dokument i
+// prosjektet sitt `pdfar` — fleire etasjar frå same PDF («Neste side i same
+// PDF») deler dokument, og skulle ikkje få kvar sin kopi. Arket ber berre
+// indeksen. Utan dette forsvann sidebla-kontrollen kvar gong eit prosjekt vart
+// opna att, sidan pdfDoc aldri kom med. opts.pdfReg kjem frå serialiserProsjekt;
+// klippbordet og autolagringa har han ikkje, og hoppar over PDF-en.
+function _serPdfRef(f,obj,o){
+  if(o.pdfReg&&f.pdfDoc&&f.pdfDoc._entroBytes)obj.pdfRef=o.pdfReg(f.pdfDoc);
+}
+function _bytesTilB64(u8){
+  let s='';
+  for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));
+  return btoa(s);
+}
+// pdfar → pdf.js-dokument, i same rekkjefølgje. Eit dokument som ikkje lèt seg
+// opne vert null; arket står då som ei PDF utan dokument, og sidebla-knappen
+// ber om fila på nytt.
+async function _lastPdfar(pdfar){
+  return Promise.all((pdfar||[]).map(async b64=>{
+    try{
+      const bin=atob(b64),u8=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+      const doc=await opnePdf(u8.buffer);
+      doc._entroB64=b64;
+      return doc;
+    }catch(e){return null;}
+  }));
+}
+function _koplPdf(ark,ser,docs){
+  const d=ser&&Number.isInteger(ser.pdfRef)?docs[ser.pdfRef]:null;
+  if(d){ark.pdfDoc=d;ark.totalPages=d.numPages;}
 }
 
 // Bakgrunnsbiletet frå eit ark (etasje eller fasade) inn i `obj.bgImgData`.
@@ -9622,6 +9750,7 @@ function serialiserFasade(fa,opts){
     measurements:normMaal(fa.measurements)
   };
   _serBgInn(fa,obj,o);
+  _serPdfRef(fa,obj,o);
   return obj;
 }
 async function deserialiserFasade(fa){
@@ -9651,11 +9780,21 @@ function serialiserProsjekt(opts){
   // også er oppdatert (det vart lagra då vi bytta vising, men eit ekstra kall
   // kostar ingenting og gjer rekkjefølgja likegyldig).
   saveFloorState();
-  const serFloors=floors.map(f=>serialiserEtasje(f,opts));
+  // PDF-dokumenta vert registrerte etter kvart som arka refererer dei.
+  // opts.utanPdf (autolagringa) held dei ute — localStorage har ikkje plass.
+  const pdfDocs=[];
+  const o={...(opts||{})};
+  if(!o.utanPdf)o.pdfReg=d=>{let i=pdfDocs.indexOf(d);if(i<0){pdfDocs.push(d);i=pdfDocs.length-1;}return i;};
+  const serFloors=floors.map(f=>serialiserEtasje(f,o));
+  const serFasadar=fasadar.map(fa=>serialiserFasade(fa,o));
+  // Base64-strengen vert hugsa på dokumentet — PDF-en endrar seg aldri, og
+  // EntroPi-autolagringa går kvart andre minutt.
+  const pdfar=pdfDocs.map(d=>d._entroB64||(d._entroB64=_bytesTilB64(d._entroBytes)));
   return {version:1,savedAt:new Date().toISOString(),activeFloor,globalNorth,globalMmPerImgPx,
+    ...(pdfar.length?{pdfar}:{}),
     prosjektAdresse,_nextFloorId,_nextGroupId,_nextZoneId,
     // Fasadeteikningane — eige oppmålingslag, utanfor modellen
-    fasadar:fasadar.map(fa=>serialiserFasade(fa,opts)),activeFasade,_nextFasadeId,
+    fasadar:serFasadar,activeFasade,_nextFasadeId,
     // Kva bygg fila kjem frå. Stemplar lokalkopien (sjå _autolagringEigar), og
     // lèt etasje-importen sjå om tekniske system framleis peikar på rett bygg.
     _eigar:_autolagringEigar(),
@@ -9735,6 +9874,11 @@ async function lastProsjekt(proj,opts){
   _nextZoneId=proj._nextZoneId??1;
   // Fasadearka. Eldre prosjektfiler har ikkje feltet — då står lista tom.
   fasadar=await Promise.all((proj.fasadar||[]).map(fa=>deserialiserFasade(fa)));
+  // PDF-dokumenta tilbake på arka. Eldre filer har ikkje pdfar — då står
+  // arka utan dokument, og sidebla-knappen ber om fila (updatePdfSideUI).
+  const _pdfDocs=await _lastPdfar(proj.pdfar);
+  floors.forEach((fl,i)=>_koplPdf(fl,proj.floors[i],_pdfDocs));
+  fasadar.forEach((fa,i)=>_koplPdf(fa,proj.fasadar[i],_pdfDocs));
   activeFasade=Math.min(proj.activeFasade??0,Math.max(0,fasadar.length-1));
   _nextFasadeId=proj._nextFasadeId??(fasadar.length+1);
   // Eit prosjekt vert alltid opna i planvisinga. Må stå FØR syncFloorState(),
@@ -9781,7 +9925,7 @@ function autosave(){
   try{
     // JPEG 85 % — autolagringa må vere liten nok til localStorage
     // _eigar-stempelet kjem frå serialiserProsjekt — sjå _autolagringEigar
-    const proj=serialiserProsjekt({mime:'image/jpeg',qual:0.85});
+    const proj=serialiserProsjekt({mime:'image/jpeg',qual:0.85,utanPdf:true});
     localStorage.setItem(AUTOSAVE_KEY,JSON.stringify(proj));
     markClean(); // elles re-enkodar autolagringa alle bileta kvart minutt for alltid
   }catch(e){/* localStorage full */}
