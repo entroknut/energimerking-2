@@ -351,8 +351,50 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* ── Layout ── */
 #main{display:flex;flex:1;overflow:hidden}
-#cwrap{flex:1;position:relative;overflow:hidden;background:#edf1f5;cursor:grab}
+#canvasRow{flex:1;display:flex;min-height:0;min-width:0;overflow:hidden}
+#cwrap{flex:1 1 0;min-width:0;position:relative;overflow:hidden;background:#edf1f5;cursor:grab}
 #cv{display:block}
+
+/* ── Side om side ────────────────────────────────────────────
+   Plan står alltid til venstre og fasade til høgre. Ruta er berre til å sjå
+   på; lerretet du arbeider i er framleis #cwrap. Dei to rutene er nøyaktig
+   like store (flex 1 1 0, headeren ligg oppå lerretet), så zoom/pan kan
+   gå rett over frå den eine til den andre når brukaren byter. */
+#sidePane{display:none;flex:1 1 0;min-width:0;position:relative;overflow:hidden;background:#d0d6de;cursor:grab}
+[data-side] #sidePane{display:block}
+/* Rekkjefølgja: plan | strek | fasade, uansett kva visinga er framme. */
+#cwrap{order:0}
+#sideSplit{order:1}
+#sidePane{order:2}
+[data-side][data-view="fasade"] #sidePane{order:0}
+[data-side][data-view="fasade"] #cwrap{order:2}
+/* Skiljestreken — dra for å endre breidda, dra heilt ut for å lukke ei rute,
+   dobbeltklikk for halv-halv. */
+#sideSplit{display:none;flex:0 0 6px;cursor:col-resize;background:var(--surface2);position:relative;z-index:5;
+  border-left:1px solid var(--border2);border-right:1px solid var(--border2);
+  transition:background .12s}
+#sideSplit::before{content:'';position:absolute;top:50%;left:50%;width:2px;height:28px;margin:-14px 0 0 -1px;
+  border-radius:1px;background:var(--text3);opacity:.5}
+#sideSplit:hover,#sideSplit.drag{background:var(--accent)}
+[data-side] #sideSplit{display:block}
+/* Rute som vert lukka om brukaren slepp streken no */
+.side-lukkar{opacity:.35;transition:opacity .1s}
+#cv2{display:block}
+#sideHead{position:absolute;top:8px;left:8px;display:flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;
+  background:rgba(255,255,255,.92);border:1px solid var(--border2);border-radius:8px;box-shadow:var(--shadow-sm);
+  backdrop-filter:blur(6px);font-size:11px;color:var(--text2);max-width:calc(100% - 16px)}
+#sideKind{font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;font-size:10px}
+#sideSel{font-size:11px;font-family:inherit;border:1px solid var(--border2);border-radius:5px;padding:2px 4px;
+  background:var(--surface);color:var(--text);min-width:0;max-width:180px}
+#sideSwapBtn{font-size:11px;font-family:inherit;padding:3px 9px;border:1px solid var(--accent);border-radius:5px;
+  background:var(--accent);color:#fff;cursor:pointer;white-space:nowrap;font-weight:600}
+#sideEmpty{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;
+  padding:30px;font-size:12px;line-height:1.8;color:var(--text3);pointer-events:none}
+.view-sw-solo{display:flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid var(--border2);border-radius:7px;
+  background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit;font-size:11px;font-weight:500;
+  white-space:nowrap;margin-right:6px;flex-shrink:0;transition:all .12s}
+.view-sw-solo:hover:not(.on){background:var(--surface3);color:var(--text2)}
+.view-sw-solo.on{background:var(--accent-dim);color:var(--accent);border-color:var(--accent);font-weight:600}
 
 /* ── Sidebar ── */
 #sidebar{width:320px;min-width:200px;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--surface);flex-shrink:0;position:relative}
@@ -748,6 +790,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <button class="view-sw-btn on" id="viewPlanBtn" title="Planteikningar — soner, 3D-modell og SXI-eksport"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.8" y="1.8" width="12.4" height="12.4" rx="1.2"/><path d="M1.8 6.6h12.4M6.6 6.6v7.6"/></svg> Plan</button>
       <button class="view-sw-btn" id="viewFasadeBtn" title="Fasadeteikningar — eige lag berre for oppmåling. Ingen soner, ingen verknad på modellen eller SXI-eksporten."><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.6 6.6 8 2.2l6.4 4.4v7.6H1.6z"/><rect x="4.4" y="8.4" width="2.4" height="2.4"/><rect x="9.2" y="8.4" width="2.4" height="2.4"/></svg> Fasade</button>
     </div>
+    <button id="sideBySideBtn" class="view-sw-solo" title="Side om side — plan til venstre, fasade til høgre. Du arbeider i den eine; den andre er til å sjå på (dobbeltklikk for å byte)."><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.8" y="2.4" width="12.4" height="11.2" rx="1.2"/><path d="M8 2.4v11.2"/></svg> Side om side</button>
     <div id="floor-tabs" class="plan-only"></div>
     <div id="fasade-tabs" class="fasade-only" style="gap:2px;align-items:center;flex:1"></div>
     <button id="addFasadeBtn" class="add-floor-btn fasade-only" title="Legg til eit nytt fasadeark — last opp PDF eller bilete og mål på det">+ Fasade</button>
@@ -764,8 +807,9 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.0.4</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.1.0</span>
   </div>
+  <div id="canvasRow">
   <div id="cwrap">
     <canvas id="cv"></canvas>
     <div id="dropz">
@@ -1037,6 +1081,19 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
   </div>
+  <!-- Side om side: den andre visinga (plan eller fasade) står her, berre til
+       å sjå på. Sjå «Side om side» i JS-en. -->
+  <div id="sideSplit" title="Dra for å endre breidda · dra heilt ut til ei side for å lukke ruta · dobbeltklikk for halv-halv"></div>
+  <div id="sidePane">
+    <canvas id="cv2"></canvas>
+    <div id="sideHead">
+      <span id="sideKind"></span>
+      <select id="sideSel" title="Vel kva teikning som står i ruta"></select>
+      <button id="sideSwapBtn" title="Byt: arbeid i denne teikninga (dobbeltklikk i ruta gjer det same)">✎ Arbeid her</button>
+    </div>
+    <div id="sideEmpty"></div>
+  </div>
+  </div><!-- /canvasRow -->
   </div><!-- /floor-wrap -->
 
   <div id="sidebar">
@@ -1098,6 +1155,17 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 
 // ── Constants ────────────────────────────────────────────────
 const COLORS=['#1a7a6e','#2563eb','#d97706','#dc2626','#7c3aed','#0891b2','#c2410c'];
+// Fargeindeks for sona zi på etasje fli. Kopla soner deler farge med den
+// fyrste sona i gruppa, så same gruppe ser lik ut på alle etasjar.
+function zoneColorIdx(fli,zi,z){
+  const base=fi=>floors.slice(0,fi).reduce((s,fl)=>s+fl.zones.length,0);
+  if(z&&z.groupId){
+    let fst=null;
+    floors.forEach((fl,a)=>fl.zones.forEach((zz,b)=>{if(!fst&&zz.groupId===z.groupId)fst={a,b};}));
+    if(fst)return (base(fst.a)+fst.b)%COLORS.length;
+  }
+  return (base(fli)+zi)%COLORS.length;
+}
 const FILLS=['rgba(26,122,110,.10)','rgba(37,99,235,.10)','rgba(217,119,6,.10)','rgba(220,38,38,.10)','rgba(124,58,237,.10)','rgba(8,145,178,.10)','rgba(194,65,12,.10)'];
 const DIRS=['Nord','Nordøst','Øst','Sørøst','Sør','Sørvest','Vest','Nordvest'];
 
@@ -1249,6 +1317,8 @@ let fasadar=[];
 let activeFasade=0;
 let _nextFasadeId=1;
 let viewMode='plan';   // 'plan' | 'fasade' — kva lerretet viser
+let sideBySide=false;  // den andre visinga står i #sidePane — sjå «Side om side»
+let _sideFit=new WeakSet(); // ark med zoom/pan som passar til ruta i side-om-side
 function iFasade(){return viewMode==='fasade';}
 function curFasade(){return fasadar[activeFasade]||null;}
 // Arket lerretet viser no. Papirformat, PDF-sider og bakgrunnsbilete høyrer
@@ -1626,6 +1696,7 @@ function switchFasade(i){
 // CSS-en. Ein ny fasade-berre kontroll er difor rein markup.
 function applyViewUI(){
   document.documentElement.setAttribute('data-view',viewMode);
+  applySplit();   // planruta byter element når visinga byter — breidda må følgje
   const pb=document.getElementById('viewPlanBtn'),fb=document.getElementById('viewFasadeBtn');
   if(pb)pb.classList.toggle('on',!iFasade());
   if(fb)fb.classList.toggle('on',iFasade());
@@ -1639,6 +1710,8 @@ function setViewMode(v){
   if(v===viewMode)return;
   // Lerret-globalane høyrer til arket vi går FRÅ — lagre dei først.
   if(iFasade())saveFasadeState();else saveFloorState();
+  // Side om side: arket vi går frå flyttar over i sideruta med zoomen sin.
+  if(sideBySide)_sideFit.add(curArk());
   viewMode=v;
   setMode('navigate');
   editZoneIdx=null;curPts=[];draftZones=[];winPts=[];calPts=[];measurePts=[];
@@ -1656,7 +1729,9 @@ function setViewMode(v){
   }
   applyViewUI();
   updateResults();
-  if(bgImg)fitImage();else draw();
+  // Side om side: arket kjem frå sideruta, som er like stor som lerretet —
+  // då står det der brukaren såg det, i staden for å hoppe til heilt bilete.
+  if(bgImg&&!(sideBySide&&_sideFit.has(curArk())))fitImage();else draw();
 }
 
 document.getElementById('viewPlanBtn').onclick=()=>setViewMode('plan');
@@ -1668,6 +1743,212 @@ document.getElementById('addFasadeBtn').onclick=()=>{
   syncFasadeState();renderFasadeTabs();draw();
   hintText.textContent='Nytt fasadeark. Last opp PDF eller bilete, kalibrer skalaen og mål.';
 };
+
+// ── Side om side ─────────────────────────────────────────────
+// Plan til venstre, fasade til høgre. Lerretet (#cv) er framleis det einaste
+// ein arbeider i, og lerret-globalane høyrer til det — sideruta rører dei
+// aldri. Ho viser det aktive arket i den ANDRE visinga (curFloor() medan
+// fasaden er framme, curFasade() medan planen er framme) og les/skriv zoom
+// og pan rett på arkobjektet (a.sc/offX/offY), som er der arket sin tilstand
+// ligg når det ikkje er framme. Difor er bytet berre setViewMode(): arket vi
+// går frå vert lagra med zoomen sin og står att i ruta, og arket vi hentar
+// har alt ein zoom som passar lerretet. Det held same kor breie rutene er:
+// planen står ALLTID i venstre rute og fasaden i høgre, så eit ark har same
+// rute (same storleik og stad) anten det er framme eller ikkje.
+const cv2=document.getElementById('cv2'),ctx2=cv2.getContext('2d');
+const sidePane=document.getElementById('sidePane');
+const sideSel=document.getElementById('sideSel');
+function sideKind(){return iFasade()?'plan':'fasade';}
+function sideArk(){return iFasade()?curFloor():curFasade();}
+function fitSide(){
+  const a=sideArk();
+  if(!a||!a.bgImg)return;
+  const r=sidePane.getBoundingClientRect();
+  if(r.width<40||r.height<40)return;   // ikkje lagt ut enno — prøv ved neste teikning
+  a.sc=Math.min((r.width-30)/a.bgImg.width,(r.height-30)/a.bgImg.height);
+  a.offX=(r.width-a.bgImg.width*a.sc)/2;a.offY=(r.height-a.bgImg.height*a.sc)/2;
+  _sideFit.add(a);
+}
+let _sideSelKey='';
+function renderSideSel(){
+  const plan=sideKind()==='plan';
+  const liste=plan?floors:fasadar,akt=plan?activeFloor:activeFasade;
+  const key=sideKind()+'|'+akt+'|'+liste.map(a=>a.name).join('\u0001');
+  if(key===_sideSelKey)return;
+  _sideSelKey=key;
+  document.getElementById('sideKind').textContent=plan?'Plan':'Fasade';
+  sideSel.innerHTML='';
+  liste.forEach((a,i)=>{const o=document.createElement('option');o.value=i;o.textContent=a.name;if(i===akt)o.selected=true;sideSel.appendChild(o);});
+  sideSel.style.display=liste.length?'':'none';
+  document.getElementById('sideSwapBtn').textContent=liste.length?'✎ Arbeid her':(plan?'✎ Opne plan':'+ Fasade');
+}
+function drawSide(){
+  if(!sideBySide)return;
+  const r=sidePane.getBoundingClientRect();
+  if(cv2.width!==Math.floor(r.width)||cv2.height!==Math.floor(r.height)){cv2.width=r.width;cv2.height=r.height;}
+  renderSideSel();
+  const a=sideArk(),plan=sideKind()==='plan';
+  const lumon=document.documentElement.getAttribute('data-theme')==='lumon';
+  ctx2.fillStyle=lumon?'#000810':'#d0d6de';ctx2.fillRect(0,0,cv2.width,cv2.height);
+  const tom=document.getElementById('sideEmpty');
+  const tomTekst=!a?'Ingen fasadeark enno. Trykk «+ Fasade» for å lage eitt.'
+    :!a.bgImg?'Ingen teikning på «'+a.name+'».':'';
+  tom.textContent=tomTekst;tom.style.display=tomTekst?'flex':'none';
+  if(!a||!a.bgImg)return;
+  if(!_sideFit.has(a))fitSide();
+  const S=a.sc,d=plan?{x:a.floorDxImg||0,y:a.floorDyImg||0}:{x:0,y:0};
+  const T=p=>({x:(p.x+d.x)*S+a.offX,y:(p.y+d.y)*S+a.offY});
+  ctx2.drawImage(a.bgImg,a.offX+d.x*S,a.offY+d.y*S,a.bgImg.width*S,a.bgImg.height*S);
+  if(plan){
+    // `zones` er aliaset til den aktive etasjen òg i fasadevisinga —
+    // floors[activeFloor].zones kan liggje att på ein eldre array.
+    zones.forEach((z,zi)=>{
+      if(z.pts.length<2||z.skjult)return;
+      const ci=zoneColorIdx(activeFloor,zi,z);
+      ctx2.beginPath();
+      z.pts.forEach((p,i)=>{const s=T(p);if(i)ctx2.lineTo(s.x,s.y);else ctx2.moveTo(s.x,s.y);});
+      ctx2.closePath();ctx2.fillStyle=FILLS[ci];ctx2.fill();
+      ctx2.strokeStyle=COLORS[ci];ctx2.lineWidth=2;ctx2.stroke();
+      if(z.pts.length<3)return;
+      const c=T({x:z.pts.reduce((s,p)=>s+p.x,0)/z.pts.length,y:z.pts.reduce((s,p)=>s+p.y,0)/z.pts.length});
+      ctx2.font='bold 11px Inter,sans-serif';
+      const bw=ctx2.measureText(z.name).width+12;
+      ctx2.fillStyle='rgba(255,255,255,.9)';
+      ctx2.beginPath();ctx2.roundRect(c.x-bw/2,c.y-9,bw,18,5);ctx2.fill();
+      ctx2.fillStyle=COLORS[ci];ctx2.textAlign='center';ctx2.textBaseline='middle';
+      ctx2.fillText(z.name,c.x,c.y);
+    });
+  }
+  const mpp=plan?mppForFloor(a):(a.mmPerImgPx||null);
+  (a.measurements||[]).forEach(m=>{
+    const mm=mpp?Math.hypot(m.p2.x-m.p1.x,m.p2.y-m.p1.y)*mpp:null;
+    drawDimension(T(m.p1),T(m.p2),fmtMaal(mm),{ctx:ctx2});
+  });
+}
+// draw() går på kvar musrørsle — sideruta vert teikna éin gong per frame.
+let _sideRaf=0;
+function drawSideSnart(){
+  if(_sideRaf)return;
+  _sideRaf=requestAnimationFrame(()=>{_sideRaf=0;drawSide();});
+}
+// Breidda på planruta (venstre) som del av heile flata. Vert lagt på som
+// flex-grow, så rutene følgjer med når vindauget endrar storleik.
+let sideFrac=0.5;
+const SIDE_LUKK=0.08;   // slepp streken nærare kanten enn dette ⇒ ruta vert lukka
+function applySplit(){
+  const cw=document.getElementById('cwrap'),sp=document.getElementById('sidePane');
+  // Flex-grow under 1 fyller berre ein del av plassen — utan side om side
+  // må lerretet ha standardverdien att, elles står det på halv breidd.
+  if(!sideBySide){cw.style.flex='';sp.style.flex='';return;}
+  const planEl=iFasade()?sp:cw,fasEl=iFasade()?cw:sp;
+  planEl.style.flex=sideFrac+' 1 0';
+  fasEl.style.flex=(1-sideFrac)+' 1 0';
+}
+function setSideBySide(on){
+  sideBySide=!!on;
+  _sideFit=new WeakSet();
+  applySplit();
+  document.documentElement.toggleAttribute('data-side',sideBySide);
+  document.getElementById('sideBySideBtn').classList.toggle('on',sideBySide);
+  _sideSelKey='';
+  // Lerretet endrar breidde — tilpass begge rutene til den nye storleiken.
+  const r=cwrap.getBoundingClientRect();cv.width=r.width;cv.height=r.height;
+  if(sideBySide)fitSide();
+  if(bgImg)fitImage();else draw();
+  if(sideBySide){
+    drawSide();
+    hintText.textContent='Side om side · du arbeider i '+(iFasade()?'fasaden (høgre)':'planen (venstre)')
+      +'. Dobbeltklikk i den andre ruta, eller «✎ Arbeid her», for å byte.';
+  } else hintText.textContent='';
+}
+function sideByt(){setViewMode(sideKind());}
+document.getElementById('sideBySideBtn').onclick=()=>setSideBySide(!sideBySide);
+document.getElementById('sideSwapBtn').onclick=sideByt;
+cv2.addEventListener('dblclick',sideByt);
+sideSel.onchange=()=>{
+  const i=+sideSel.value;
+  if(sideKind()==='plan'){
+    // Fasaden er framme, så syncFloorState() rører berre zones-aliaset.
+    floors[activeFloor].zones=zones;
+    activeFloor=i;
+    syncFloorState();renderFloorTabs();updateResults();
+  } else {
+    activeFasade=i;renderFasadeTabs();
+  }
+  drawSide();
+};
+cv2.addEventListener('wheel',e=>{
+  const a=sideArk();
+  if(!a||!a.bgImg)return;
+  e.preventDefault();
+  const r=cv2.getBoundingClientRect();
+  const mx=e.clientX-r.left,my=e.clientY-r.top,f=e.deltaY<0?1.1:1/1.1;
+  a.offX=mx-(mx-a.offX)*f;a.offY=my-(my-a.offY)*f;a.sc*=f;
+  _sideFit.add(a);drawSide();
+},{passive:false});
+let _sideDrag=null;
+cv2.addEventListener('mousedown',e=>{
+  if(e.button!==0&&e.button!==1)return;
+  const a=sideArk();
+  if(!a||!a.bgImg)return;
+  e.preventDefault();
+  _sideDrag={a,x:e.clientX,y:e.clientY};
+  sidePane.style.cursor='grabbing';
+});
+window.addEventListener('mousemove',e=>{
+  if(!_sideDrag)return;
+  const g=_sideDrag;
+  g.a.offX+=e.clientX-g.x;g.a.offY+=e.clientY-g.y;g.x=e.clientX;g.y=e.clientY;
+  _sideFit.add(g.a);drawSideSnart();
+});
+window.addEventListener('mouseup',()=>{if(_sideDrag){_sideDrag=null;sidePane.style.cursor='';}});
+
+// Skiljestreken. Under draginga vert brøken klipt til [0,02 – 0,98] så ruta
+// aldri forsvinn heilt medan ein dreg; først når streken vert sleppt nær
+// kanten, lukkar vi ruta — og er det ruta ein arbeider i, byter vi fyrst
+// over til den andre, så det er den ein ser som vert ståande.
+const sideSplit=document.getElementById('sideSplit');
+let _splitDrag=null;
+function _splitPaneFor(side){   // 'venstre' (plan) | 'hogre' (fasade) → elementet
+  if(side==='venstre')return iFasade()?sidePane:cwrap;
+  return iFasade()?cwrap:sidePane;
+}
+sideSplit.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  e.preventDefault();
+  _splitDrag={row:document.getElementById('canvasRow').getBoundingClientRect()};
+  sideSplit.classList.add('drag');
+  document.body.style.cursor='col-resize';
+});
+window.addEventListener('mousemove',e=>{
+  if(!_splitDrag)return;
+  const r=_splitDrag.row,raw=(e.clientX-r.left)/r.width;
+  sideFrac=Math.min(0.98,Math.max(0.02,raw));
+  _splitDrag.raw=raw;
+  applySplit();
+  cwrap.classList.toggle('side-lukkar',false);sidePane.classList.toggle('side-lukkar',false);
+  if(raw<SIDE_LUKK)_splitPaneFor('venstre').classList.add('side-lukkar');
+  else if(raw>1-SIDE_LUKK)_splitPaneFor('hogre').classList.add('side-lukkar');
+});
+window.addEventListener('mouseup',()=>{
+  if(!_splitDrag)return;
+  const raw=_splitDrag.raw;
+  _splitDrag=null;
+  sideSplit.classList.remove('drag');
+  document.body.style.cursor='';
+  cwrap.classList.remove('side-lukkar');sidePane.classList.remove('side-lukkar');
+  if(raw==null)return;
+  const lukk=raw<SIDE_LUKK?'venstre':raw>1-SIDE_LUKK?'hogre':null;
+  if(!lukk)return;
+  // Ruta som lukkast er plan (venstre) eller fasade (høgre). Er det den vi
+  // arbeider i, går vi over til den som vert ståande.
+  const lukkPlan=lukk==='venstre';
+  if(lukkPlan!==iFasade())setViewMode(lukkPlan?'fasade':'plan');
+  sideFrac=0.5;
+  setSideBySide(false);
+});
+sideSplit.addEventListener('dblclick',()=>{sideFrac=0.5;applySplit();});
+if(window.ResizeObserver)new ResizeObserver(()=>{if(sideBySide)drawSide();}).observe(sidePane);
 
 // ── Ghost-overlay og etasje-offset ─────────────────────────
 function updateGhostUI(){
@@ -3379,6 +3660,8 @@ function measureLenMm(m){
 // og etiketten liggjande langs linja i eit opphald midt på.
 function drawDimension(s1,s2,label,opts){
   const o=opts||{};
+  // o.ctx: side-om-side-ruta teiknar måla sine på eit anna lerret
+  const ctx=o.ctx||cv.getContext('2d');
   const col=o.color||'#dc2626';
   const dx=s2.x-s1.x,dy=s2.y-s1.y,len=Math.hypot(dx,dy);
   if(len<2)return;
@@ -3492,6 +3775,7 @@ function slettAlleMaal(){
 
 // ── Draw ──────────────────────────────────────────────────────
 function draw(){
+  if(sideBySide)drawSideSnart();
   ctx.clearRect(0,0,cv.width,cv.height);
 
   // Vis/skjul dropzone basert på om det er eit bilete
@@ -3556,15 +3840,7 @@ function draw(){
     if(iFasade())return;
     if(z.pts.length<2||z.skjult)return;
     // Grupperte soner deler farge — bruk global indeks for konsistens
-    let ci;
-    {
-      const _gbase=floors.slice(0,activeFloor).reduce((s,fl)=>s+fl.zones.length,0);
-      if(z.groupId){
-        let _fst=null;
-        floors.forEach((fl,fli)=>fl.zones.forEach((zz,zzi)=>{if(!_fst&&zz.groupId===z.groupId)_fst={fli,zi:zzi};}));
-        ci=_fst?(floors.slice(0,_fst.fli).reduce((s,fl)=>s+fl.zones.length,0)+_fst.zi)%COLORS.length:(_gbase+zi)%COLORS.length;
-      } else { ci=(_gbase+zi)%COLORS.length; }
-    }
+    const ci=zoneColorIdx(activeFloor,zi,z);
     ctx.beginPath();
     const p0=i2s(z.pts[0].x,z.pts[0].y);ctx.moveTo(p0.x,p0.y);
     z.pts.forEach((p,i)=>{if(i>0){const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);}});
@@ -3766,6 +4042,9 @@ function draw(){
         const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
         const isHov=isSameW&&hoveredWin.inst===k;
         const isDrag=dragWin&&dragWin.w===w&&dragWin.inst===k;
+        // Dei andre stykka i same gruppa får ein svak glød, så ein ser kva
+        // som heng saman med det stykket musa er på. Berre visning.
+        const isGrp=nStk>1&&!isHov&&!isDrag&&(isSameW||(dragWin&&dragWin.w===w));
         const newFade=winNyFade(w,k);
         const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
         gx+=mx;gy+=my;
@@ -3787,6 +4066,10 @@ function draw(){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
           ctx.strokeStyle=isDrag?'rgba(29,79,79,.6)':w.type==='dor'?'rgba(245,158,11,.55)':'rgba(6,182,212,.55)';
           ctx.lineWidth=13;ctx.stroke();
+        } else if(isGrp){
+          ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
+          ctx.strokeStyle=w.type==='dor'?'rgba(245,158,11,.22)':'rgba(6,182,212,.22)';
+          ctx.lineWidth=10;ctx.stroke();
         }
         ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
         ctx.strokeStyle=(isHov||isDrag)?'#fff':baseColor;

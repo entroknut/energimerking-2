@@ -965,6 +965,35 @@ Invariantar:
 - Etasje-klippbordet og etasjeimporten tek **ikkje** med fasadeark — dei
   kopierer etasjar.
 
+### Side om side
+
+«Side om side» ved Plan/Fasade-vekslaren deler lerretsflata i to: plan alltid
+til venstre, fasade til høgre. Ein **arbeider berre i éi** — `#cv` i `#cwrap`,
+med alle lerret-globalane som før. Den andre (`#sidePane`/`#cv2`, `drawSide()`)
+er berre til å sjå på: bilete, soner med namn og kontrollmål, med eigen zoom/pan.
+
+- Sideruta viser det aktive arket i den **andre** visinga (`sideArk()`:
+  `curFloor()` i fasadevisinga, `curFasade()` i planvisinga) og les/skriv
+  zoom/pan rett på arkobjektet (`a.sc/offX/offY`). Ho rører **aldri**
+  lerret-globalane.
+- Bytet er berre `setViewMode()`. Arket vi går frå vert lagra med zoomen sin
+  og står att i ruta; arket vi hentar er i `_sideFit` og vert difor **ikkje**
+  `fitImage()`-a. Det held same kor breie rutene er, fordi planen **alltid**
+  står til venstre og fasaden til høgre (CSS `order` på `#cwrap`/`#sidePane`
+  etter `data-view`) — eit ark har same rute om det er framme eller ikkje.
+- Skiljestreken `#sideSplit` set `sideFrac` (planruta sin del). `applySplit()`
+  legg han på som flex-grow på det elementet som er plan og fasade **no**, så
+  han vert kalla frå `applyViewUI()` òg. Utan side om side må flex nullstillast
+  — flex-grow under 1 fyller berre ein del av plassen.
+- Slepp nærare kanten enn `SIDE_LUKK` (8 %) ⇒ ruta vert lukka. Er det ruta ein
+  arbeider i, byter vi fyrst til den andre, så det er den ein ser som står att.
+  Dobbeltklikk på streken gir halv-halv.
+- Planruta i fasadevisinga teiknar frå `zones`-aliaset, ikkje
+  `floors[activeFloor].zones` (same fella som `_fyllFraPi()`). Byte av etasje
+  i ruta skriv `zones` tilbake før `activeFloor` endrar seg.
+- `draw()` ber om ei omteikning av ruta via `requestAnimationFrame`, så ho vert
+  teikna maks éin gong per frame. Valet vert ikkje lagra.
+
 ## Kjende manglar / ikkje implementert
 
 - Import av eksisterande SXI
