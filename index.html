@@ -2093,9 +2093,10 @@ function winHasPos(w){return Array.isArray(w.posT)&&w.posT.length===winCount(w);
 // faktisk ser ut. Det er òg den tettaste fordelinga som finst, så er det plass
 // til stykka i det heile, ligg dei ikkje oppå kvarandre.
 //
-// Klikkpunktet (t0/t1) styrer berre eit einsleg vindauge. For ei gruppe er det
-// veggen som avgjer — å klumpe stykka rundt der brukaren tilfeldigvis klikka
-// gav ein 3D-modell som ikkje likna på bygget.
+// Utan posT styrer klikkpunktet (t0/t1) berre eit einsleg vindauge. Ei ny
+// gruppe får likevel posT med ein gong (winPosFraKlikk): det teikna stykket
+// står der det vart teikna, og resten vert spreidde utover veggen derifrå —
+// aldri klumpa rundt klikket, det gav ein 3D-modell som ikkje likna på bygget.
 function winCentres(w,width,segLen){
   const n=winCount(w);
   if(winHasPos(w))return w.posT.map(t=>isFinite(t)?Math.max(0,Math.min(1,t)):0.5);
@@ -2129,6 +2130,34 @@ function winSyncAnchor(w,width,segLen){
   const mean=cs.reduce((s,t)=>s+t,0)/cs.length;
   const sp=fitSpanT(mean,width,segLen);
   w.t0=sp.t0;w.t1=sp.t1;
+}
+// Plassering for ei ny gruppe: stykket brukaren teikna står der det vart
+// teikna (centreT), og dei n-1 andre vert fordelte utover veggen derifrå.
+// Kvar side av det teikna stykket får sitt eige tal stk, med lik luft mellom
+// stykka og halv luft ned mot hjørnet — same rytme som den jamne rekkja.
+// Fordelinga mellom sidene er den som gir mest luft på den trongaste sida.
+// Klikkar brukaren midt i ei rute i den jamne rekkja, vert resultatet
+// eksakt den jamne rekkja.
+// Returnerer posT (sortert langs veggen), eller null når stykka ikkje får
+// plass rundt det teikna — då fell gruppa tilbake til jamn fordeling.
+function winPosFraKlikk(centreT,n,width,segLen){
+  if(n<=1||!(segLen>0)||!(width>0))return null;
+  const sp=fitSpanT(centreT,width,segLen);
+  const c=(sp.t0+sp.t1)/2*segLen;
+  const A=c-width/2,B=segLen-c-width/2;       // ledig vegg på kvar side
+  const luft=(len,k)=>k===0?Infinity:(len-k*width)/(k+0.5);
+  let best=null;
+  for(let kL=0;kL<n;kL++){
+    const g=Math.min(luft(A,kL),luft(B,n-1-kL));
+    if(!best||g>best.g)best={kL,kR:n-1-kL,g};
+  }
+  if(!best||!(best.g>=0))return null;
+  const pL=width+luft(A,best.kL),pR=width+luft(B,best.kR);
+  const cs=[];
+  for(let i=best.kL;i>=1;i--)cs.push((c-i*pL)/segLen);
+  cs.push(c/segLen);
+  for(let i=1;i<=best.kR;i++)cs.push((c+i*pR)/segLen);
+  return cs;
 }
 // Frys den jamne fordelinga til faktiske posisjonar, slik at dei andre stykka
 // står i ro når brukaren flyttar eitt av dei.
@@ -2167,32 +2196,11 @@ function winSetAntal(w,n,width,segLen){
       // Marker nye stykk for highlight
       if(w.posT){w._newWindows=new Set(Array.from({length:n-old},(_,i)=>old+i));}
     }
-  } else if(n>1){
-    // Fyrste gang antal > 1 — start med første stykket ved t0/t1-senteret
-    const centre=(w.t0+w.t1)/2;
-    const gap=Math.max(WIN_GAP_FRAC*segLen,width*0.5);
-    const stepT=(width+gap)/(segLen||1);
-    const halfT=(width/2)/(segLen||1);
-
-    // Bygg posT med første stykket ved senteret, resten fordelt rundt
-    const cs=[centre];
-    let plass=true;
-
-    // Legg til stykk til høgre
-    for(let i=1;i<n;i++){
-      let t=centre+stepT*i;
-      if(t+halfT>1){plass=false;break;}
-      cs.push(t);
-    }
-
-    // Om det ikkje var plass til høgre, prøv å fordele jamt (fallback)
-    if(!plass){
-      w.posT=null;
-    } else {
-      w.posT=cs;
-      // Marker alle som nye første gangen
-      w._newWindows=new Set(Array.from({length:n},(_,i)=>i));
-    }
+  } else if(n>1&&old<=1){
+    // Fyrste gang antal > 1 — stykket som står der vert ståande, resten
+    // vert fordelte utover veggen derifrå (winPosFraKlikk)
+    w.posT=winPosFraKlikk((w.t0+w.t1)/2,n,width,segLen);
+    if(w.posT)w._newWindows=new Set(Array.from({length:n},(_,i)=>i));
   }
 
   if(winHasPos(w))winSyncAnchor(w,width,segLen);
@@ -5881,15 +5889,21 @@ document.getElementById('winOk').onclick=()=>{
     if(elapsed>3000){clearInterval(fadeInterval);}
     else draw();
   },50);
-  // Ei gruppe vert fordelt jamnt utover veggen. Får ho ikkje plass, seier vi
-  // frå med ein gong — tala går rett inn i energimerket.
+  // Ei gruppe: stykket brukaren teikna står der det vart teikna, resten vert
+  // fordelte utover veggen derifrå. Får dei ikkje plass rundt det, fell gruppa
+  // tilbake til jamn fordeling — og er ho breiare enn veggen, seier vi frå med
+  // ein gong, for tala går rett inn i energimerket.
   if(n>1){
     // Oppdater _newWindows når antal aukar
     _ny._newWindows=new Set(Array.from({length:n},(_,i)=>i));
     const g=winGeom(_z,_ny);
+    _ny.posT=winPosFraKlikk((_ny.t0+_ny.t1)/2,n,g.width,g.segLen);
+    if(_ny.posT)winSyncAnchor(_ny,g.width,g.segLen);
     hintText.textContent=(g.mpp&&winForTrongt(_ny,g.width,g.segLen))
       ?`⚠ ${n} × ${w} mm er breiare enn veggen (${(g.segLen*(g.mpp||0)/1000).toFixed(2)} m) — stykka overlappar. Sjekk breidda eller antalet.`
-      :`${n} stk fordelte jamnt utover fasaden — drag ei enkelt stk for å flytte henne.`;
+      :_ny.posT
+        ?`${n} stk: det teikna står der du sette det, resten fordelte utover fasaden — drag ei enkelt stk for å flytte henne.`
+        :`${n} stk fordelte jamnt utover fasaden (ikkje plass rundt det teikna) — drag ei enkelt stk for å flytte henne.`;
   }
 };
 document.getElementById('winCancel').onclick=()=>{winOverlay.classList.remove('show');winPts=[];pendingWin=null;draw();};
