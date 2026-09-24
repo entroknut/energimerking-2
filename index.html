@@ -764,7 +764,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.0.3</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.0.4</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -2168,7 +2168,28 @@ function winFreezePos(w,width,segLen){
 // Endrar antalet og tek vare på plasseringa av dei som alt står der.
 // Når antal vert auka utan eksisterende posT: det første stykket vert plassert
 // der brukaren teikna det (t0/t1 sitt senter), resten fordelte rundt det.
-// Nye stk får timestamp for visuell highlight som fader over nokre sekunder.
+// Nye stk får ein highlight som fader over nokre sekunder (markerNyeStk).
+// Highlight for nyteikna stk. Ligg i ein WeakMap UTANFOR vindaugsobjektet
+// med vilje: alt på w vert serialisert (lagring, angre, kopi), og eit Set
+// vert til {} i JSON — då krasja draw() på {}.includes() i gamle filer.
+const _winNy=new WeakMap();
+const WIN_NY_MS=1500;
+let _winNyTimer=null;
+function markerNyeStk(w,stk){
+  _winNy.set(w,{at:Date.now(),stk:new Set(stk)});
+  clearInterval(_winNyTimer);
+  const t0=Date.now();
+  _winNyTimer=setInterval(()=>{
+    if(Date.now()-t0>WIN_NY_MS+100){clearInterval(_winNyTimer);_winNyTimer=null;}
+    draw();
+  },50);
+}
+// 0–1: kor sterkt stk k av w skal lysa (0 = ikkje ny lenger)
+function winNyFade(w,k){
+  const m=_winNy.get(w);
+  if(!m||!m.stk.has(k))return 0;
+  return Math.max(0,1-(Date.now()-m.at)/WIN_NY_MS);
+}
 function winSetAntal(w,n,width,segLen){
   n=Math.max(1,Math.round(n)||1);
   const old=winCount(w);
@@ -2194,13 +2215,13 @@ function winSetAntal(w,n,width,segLen){
       }
       w.posT=plass?cs:null;
       // Marker nye stykk for highlight
-      if(w.posT){w._newWindows=new Set(Array.from({length:n-old},(_,i)=>old+i));}
+      if(w.posT)markerNyeStk(w,Array.from({length:n-old},(_,i)=>old+i));
     }
   } else if(n>1&&old<=1){
     // Fyrste gang antal > 1 — stykket som står der vert ståande, resten
     // vert fordelte utover veggen derifrå (winPosFraKlikk)
     w.posT=winPosFraKlikk((w.t0+w.t1)/2,n,width,segLen);
-    if(w.posT)w._newWindows=new Set(Array.from({length:n},(_,i)=>i));
+    if(w.posT)markerNyeStk(w,Array.from({length:n},(_,i)=>i));
   }
 
   if(winHasPos(w))winSyncAnchor(w,width,segLen);
@@ -2581,6 +2602,8 @@ function sanitizeZoneSegRefs(z){
     z.windows=z.windows.filter(w=>Number.isInteger(w.segIdx)&&w.segIdx>=0&&w.segIdx<n);
     // Plasseringslista må ha ei oppføring per stk — elles jamn fordeling
     z.windows.forEach(w=>{if(w.posT&&!winHasPos(w))w.posT=null;});
+    // Rester etter highlight-felta i v5.0.1–5.0.3 — lagra som {} og ubrukelege
+    z.windows.forEach(w=>{delete w._newWindows;delete w._createdAt;});
   }
   if(z.skillevegg&&z.skillevegg.size)z.skillevegg=new Set([...z.skillevegg].filter(i=>i>=0&&i<n));
   if(z.kjellerveggar)z.kjellerveggar=z.kjellerveggar.filter(i=>Number.isInteger(i)&&i>=0&&i<n);
@@ -3743,14 +3766,11 @@ function draw(){
         const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
         const isHov=isSameW&&hoveredWin.inst===k;
         const isDrag=dragWin&&dragWin.w===w&&dragWin.inst===k;
-        const isNew=w._newWindows&&(w._newWindows instanceof Set?w._newWindows.has(k):w._newWindows.includes(k));
-        const newFadeTime=1500;
-        const timeSinceNew=isNew?Date.now()-w._createdAt:Infinity;
-        const newFade=isNew?Math.max(0,1-timeSinceNew/newFadeTime):0;
+        const newFade=winNyFade(w,k);
         const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
         gx+=mx;gy+=my;
         // Oransje gløw for nye vindauge (fade ut på 1.5 sekunder)
-        if(isNew&&newFade>0){
+        if(newFade>0){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
           ctx.strokeStyle=`rgba(249,115,22,${0.15*newFade})`;
           ctx.lineWidth=18;ctx.stroke();
@@ -5877,25 +5897,18 @@ document.getElementById('winOk').onclick=()=>{
   const _brystCb=document.getElementById('winBrystCb');
   const _brystVal=parseInt(document.getElementById('winBryst').value);
   const _brystMm=(type!=='dor'&&_brystCb.checked&&!isNaN(_brystVal))?Math.max(0,_brystVal):null;
-  const _ny={segIdx:pendingWin.segIdx,dir:pendingWin.dir,t0:pendingWin.t0,t1:pendingWin.t1,breddeMm:w,hoyMm:h,antal:n,type,name:_wname,brystningMm:_brystMm,_createdAt:Date.now(),posT:null,_newWindows:new Set([0])};
+  const _ny={segIdx:pendingWin.segIdx,dir:pendingWin.dir,t0:pendingWin.t0,t1:pendingWin.t1,breddeMm:w,hoyMm:h,antal:n,type,name:_wname,brystningMm:_brystMm,posT:null};
   _existW.push(_ny);
   const _z=zones[pendingWin.zi];
   pendingWin=null;winPts=[];
   winOverlay.classList.remove('show');
+  markerNyeStk(_ny,Array.from({length:n},(_,i)=>i));
   updateResults();renderTable();draw();
-  // Tegn på nytt mange gonger medan highlight fade-ar, slik at animasjonen er synleg
-  const fadeInterval=setInterval(()=>{
-    const elapsed=Date.now()-_ny._createdAt;
-    if(elapsed>3000){clearInterval(fadeInterval);}
-    else draw();
-  },50);
   // Ei gruppe: stykket brukaren teikna står der det vart teikna, resten vert
   // fordelte utover veggen derifrå. Får dei ikkje plass rundt det, fell gruppa
   // tilbake til jamn fordeling — og er ho breiare enn veggen, seier vi frå med
   // ein gong, for tala går rett inn i energimerket.
   if(n>1){
-    // Oppdater _newWindows når antal aukar
-    _ny._newWindows=new Set(Array.from({length:n},(_,i)=>i));
     const g=winGeom(_z,_ny);
     _ny.posT=winPosFraKlikk((_ny.t0+_ny.t1)/2,n,g.width,g.segLen);
     if(_ny.posT)winSyncAnchor(_ny,g.width,g.segLen);
