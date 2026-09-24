@@ -3744,21 +3744,21 @@ function draw(){
         if(isHov||isDrag||isNew){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
           if(isDrag)ctx.strokeStyle='rgba(29,79,79,.15)';
-          else if(isNew)ctx.strokeStyle='rgba(34,197,94,.15)';
+          else if(isNew)ctx.strokeStyle=`rgba(34,197,94,${0.25+0.15*newFade})`;
           else ctx.strokeStyle=isDoor?'rgba(245,158,11,.12)':'rgba(6,182,212,.12)';
           ctx.lineWidth=18;ctx.stroke();
           // Inner glow — brighter
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
           if(isDrag)ctx.strokeStyle='rgba(29,79,79,.6)';
-          else if(isNew)ctx.strokeStyle=`rgba(34,197,94,${0.4+0.2*newFade})`;
+          else if(isNew)ctx.strokeStyle=`rgba(34,197,94,${0.7+0.3*newFade})`;
           else ctx.strokeStyle=isDoor?'rgba(245,158,11,.55)':'rgba(6,182,212,.55)';
           ctx.lineWidth=13;ctx.stroke();
         }
         ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
         if(isHov||isDrag)ctx.strokeStyle='#fff';
-        else if(isNew)ctx.strokeStyle=`rgba(34,197,94,${0.6+0.4*newFade})`;
+        else if(isNew)ctx.strokeStyle=`rgba(34,197,94,${0.8+0.2*newFade})`;
         else ctx.strokeStyle=baseColor;
-        ctx.lineWidth=(isHov||isDrag)?5:isNew?4:3.5;ctx.stroke();
+        ctx.lineWidth=(isHov||isDrag)?5:isNew?4.5:3.5;ctx.stroke();
         if(isHov||isDrag){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
           ctx.strokeStyle=isDrag?'#1d4f4f':baseColor;ctx.lineWidth=2.5;ctx.stroke();
@@ -5865,7 +5865,7 @@ document.getElementById('winOk').onclick=()=>{
   const _brystCb=document.getElementById('winBrystCb');
   const _brystVal=parseInt(document.getElementById('winBryst').value);
   const _brystMm=(type!=='dor'&&_brystCb.checked&&!isNaN(_brystVal))?Math.max(0,_brystVal):null;
-  const _ny={segIdx:pendingWin.segIdx,dir:pendingWin.dir,t0:pendingWin.t0,t1:pendingWin.t1,breddeMm:w,hoyMm:h,antal:n,type,name:_wname,brystningMm:_brystMm,_createdAt:Date.now(),posT:null};
+  const _ny={segIdx:pendingWin.segIdx,dir:pendingWin.dir,t0:pendingWin.t0,t1:pendingWin.t1,breddeMm:w,hoyMm:h,antal:n,type,name:_wname,brystningMm:_brystMm,_createdAt:Date.now(),posT:null,_newWindows:new Set([0])};
   _existW.push(_ny);
   const _z=zones[pendingWin.zi];
   pendingWin=null;winPts=[];
@@ -5874,6 +5874,8 @@ document.getElementById('winOk').onclick=()=>{
   // Ei gruppe vert fordelt jamnt utover veggen. Får ho ikkje plass, seier vi
   // frå med ein gong — tala går rett inn i energimerket.
   if(n>1){
+    // Oppdater _newWindows når antal aukar
+    _ny._newWindows=new Set(Array.from({length:n},(_,i)=>i));
     const g=winGeom(_z,_ny);
     hintText.textContent=(g.mpp&&winForTrongt(_ny,g.width,g.segLen))
       ?`⚠ ${n} × ${w} mm er breiare enn veggen (${(g.segLen*(g.mpp||0)/1000).toFixed(2)} m) — stykka overlappar. Sjekk breidda eller antalet.`
