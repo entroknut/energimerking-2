@@ -3734,18 +3734,18 @@ function draw(){
         const isHov=isSameW&&hoveredWin.inst===k;
         const isDrag=dragWin&&dragWin.w===w&&dragWin.inst===k;
         const isNew=w._newWindows&&(w._newWindows instanceof Set?w._newWindows.has(k):w._newWindows.includes(k));
-        const newFadeTime=3000;
+        const newFadeTime=1500;
         const timeSinceNew=isNew?Date.now()-w._createdAt:Infinity;
         const newFade=isNew?Math.max(0,1-timeSinceNew/newFadeTime):0;
         const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
         gx+=mx;gy+=my;
-        // Grøn gløw for nye vindauge (fade ut på 3 sekunder)
+        // Oransje gløw for nye vindauge (fade ut på 1.5 sekunder)
         if(isNew&&newFade>0){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-          ctx.strokeStyle=`rgba(34,197,94,${0.15*newFade})`;
+          ctx.strokeStyle=`rgba(249,115,22,${0.15*newFade})`;
           ctx.lineWidth=18;ctx.stroke();
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-          ctx.strokeStyle=`rgba(34,197,94,${0.55*newFade})`;
+          ctx.strokeStyle=`rgba(249,115,22,${0.55*newFade})`;
           ctx.lineWidth=13;ctx.stroke();
         }
         // Highlight glow — outer ring
