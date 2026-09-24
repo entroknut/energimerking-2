@@ -764,7 +764,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.0.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.0.1</span>
   </div>
   <div id="cwrap">
     <canvas id="cv"></canvas>
@@ -956,7 +956,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
         <div class="irow"><label>Namn</label><input type="text" class="big-input" id="winName" placeholder="Vindauge 1" style="font-size:15px;text-align:left"></div>
         <div class="irow"><label>Bredde (mål)</label><input type="number" class="big-input" id="winW" placeholder="1200" min="1"><span class="unit">mm</span></div>
         <div class="irow"><label>Høgde</label><input type="number" class="big-input" id="winH" value="1200" min="1"><span class="unit">mm</span></div>
-        <div class="irow"><label>Tal stk</label><input type="number" class="big-input" id="winN" value="1" min="1" step="1"><span class="unit">stk</span></div>
+        <div class="irow" id="winNRow"><label>Tal stk</label><input type="number" class="big-input" id="winN" value="1" min="1" step="1"><span class="unit">stk</span></div>
         <div class="irow"><label>Type</label>
           <select class="big-input" id="winType" style="font-size:14px;padding:8px">
             <option value="vindauge">Vindauge</option>
@@ -8687,7 +8687,11 @@ cv.addEventListener('click',e=>{
       _brystUnit.style.display=_brystCb.checked?'':'none';
       if(_brystCb.checked) setTimeout(()=>_brystI.focus(),10);
     };
-    document.getElementById('winType').onchange=setAutoName;
+    document.getElementById('winType').onchange=()=>{
+      setAutoName();
+      const isDor=document.getElementById('winType').value==='dor';
+      document.getElementById('winNRow').style.display=isDor?'none':'';
+    };
     winOverlay.classList.add('show');
     winPts=[];draw();
     setTimeout(()=>{const el=document.getElementById('winName');el.select();el.focus();},50);
