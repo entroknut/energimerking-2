@@ -807,7 +807,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.1.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.2.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -5389,6 +5389,153 @@ function _autoRetningForTakflate(roofPts,zone,segs){
   return Math.round(bestSeg.normalAz/45)*45%360;
 }
 
+// ── Tilpass takflater til kvarandre ─────────────────────────────────────────
+// Kvar takflate er eitt plan: vinkel + fallretning, med lågaste hjørne på
+// raftet. Fallretninga vart vald i 45°-steg, så på ei sone som ikkje står
+// heilt i vinkel treffer ikkje plana kvarandre i mønet og gradene.
+//
+// Referanseflata held vinkelen sin, men fallretninga vert sett nøyaktig
+// vinkelrett på raftet hennar. Då er høgda i kvart av hjørna hennar kjend, og
+// alle dei andre skrå takflatene vert løyste som plan (h = a·x + b·y + c) med
+// minste kvadrat: kvart hjørne har éi felles høgd for alle flatene som rører
+// det, sonehjørna ligg på raftet (h = 0). Vinkel og fallretning kjem ut av
+// planet. Planteikninga vert ikkje flytta.
+//
+// Går ikkje linjene i planen opp som eitt tak (t.d. mønet ikkje parallelt med
+// raftet), finst det inga eksakt løysing — då vert det største spranget i eit
+// hjørne rekna ut frå det som faktisk vart lagra, og meldt.
+function _tpRetningFraNed(dx,dy,north){
+  // Inversen av 3D-/gavl-formelen: oppover = (-sin R, cos R), R = retning+nord
+  const R=Math.atan2(dx,-dy)*180/Math.PI;
+  return ((R-north)%360+360)%360;
+}
+function _tpPlan(tf,north,mpp){
+  // Planet slik 3D-modellen og gavlflatene teiknar det, i meter
+  const tanV=Math.tan(Math.max(0,tf.vinkel||0)*Math.PI/180);
+  const r=((tf.retning||0)+north)*Math.PI/180;
+  const ux=-Math.sin(r),uy=Math.cos(r);
+  const k=mpp/1000;
+  let minP=Infinity;
+  tf.pts.forEach(p=>{const pr=p.x*k*ux+p.y*k*uy;if(pr<minP)minP=pr;});
+  return p=>Math.max(0,(p.x*k*ux+p.y*k*uy-minP))*tanV;
+}
+function tilpassTakflater(z,refIdx){
+  const mpp=mppForZone(z);
+  if(!mpp)return {ok:false,msg:'Kalibrer teikninga fyrst — tilpassinga reknar i meter.'};
+  const alle=flateListe(z,'tak');
+  const ref=alle[refIdx];
+  if(!ref||flateType(z,'tak',ref)!=='Tak'||!((ref.vinkel||0)>0))
+    return {ok:false,msg:'Referanseflata må vere tak mot det fri med ein vinkel over 0°.'};
+  const andre=alle.filter((tf,i)=>i!==refIdx&&flateType(z,'tak',tf)==='Tak'&&(tf.pts||[]).length>=3);
+  if(!andre.length)return {ok:false,msg:'Det finst ingen andre skrå takflater å tilpasse.'};
+  const north=parseFloat(northI.value)||0;
+  const k=mpp/1000;
+  const tolPx=0.05/k;                          // 5 cm
+  const avst=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  const paaKant=(p,pts)=>{
+    for(let i=0;i<pts.length;i++){
+      const a=pts[i],b=pts[(i+1)%pts.length];
+      const dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;
+      const t=l2>0?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2)):0;
+      if(Math.hypot(p.x-(a.x+dx*t),p.y-(a.y+dy*t))<=tolPx)return true;
+    }
+    return false;
+  };
+  // Sonehjørne der sona faktisk svingar — innsette punkt på ei rett linje
+  // (t.d. frå automatisk skiljekonstruksjon) kan liggje på ein gavlvegg.
+  const n0=z.pts.length;
+  const raftHj=z.pts.filter((p,i)=>{
+    const a=z.pts[(i-1+n0)%n0],b=z.pts[(i+1)%n0];
+    const v1x=p.x-a.x,v1y=p.y-a.y,v2x=b.x-p.x,v2y=b.y-p.y;
+    const l=Math.hypot(v1x,v1y)*Math.hypot(v2x,v2y);
+    return l>0&&Math.abs(v1x*v2y-v1y*v2x)/l>Math.sin(10*Math.PI/180);
+  });
+  const erRaft=p=>raftHj.some(q=>avst(p,q)<=tolPx);
+
+  // 1. Referanseflata: fallretning vinkelrett på raftet hennar
+  const refRetning0=ref.retning;
+  const refRaft=ref.pts.filter(erRaft);
+  if(refRaft.length>=2){
+    let pa=refRaft[0],pb=refRaft[1],best=-1;
+    refRaft.forEach((p,i)=>refRaft.forEach((q,j)=>{if(j>i&&avst(p,q)>best){best=avst(p,q);pa=p;pb=q;}}));
+    const ex=pb.x-pa.x,ey=pb.y-pa.y,el=Math.hypot(ex,ey);
+    let nx=-ey/el,ny=ex/el;
+    const cx=ref.pts.reduce((s,p)=>s+p.x,0)/ref.pts.length,cy=ref.pts.reduce((s,p)=>s+p.y,0)/ref.pts.length;
+    if(((pa.x+pb.x)/2-cx)*nx+((pa.y+pb.y)/2-cy)*ny<0){nx=-nx;ny=-ny;}  // ned = mot raftet
+    ref.retning=Math.round(_tpRetningFraNed(nx,ny,north)*10)/10;
+  }
+  const hRef=_tpPlan(ref,north,mpp);
+
+  // 2. Unike hjørne over alle skrå flater
+  const V=[];
+  const finnV=p=>{let v=V.find(q=>avst(q,p)<=tolPx);if(!v){v={x:p.x,y:p.y};V.push(v);}return v;};
+  [ref,...andre].forEach(tf=>tf.pts.forEach(finnV));
+  const ox=V.reduce((s,v)=>s+v.x,0)/V.length,oy=V.reduce((s,v)=>s+v.y,0)/V.length;
+  V.forEach(v=>{
+    v.X=(v.x-ox)*k;v.Y=(v.y-oy)*k;
+    if(paaKant(v,ref.pts))v.H=hRef(v);
+    else if(erRaft(v))v.H=0;
+    else v.fri=true;
+  });
+  const fri=V.filter(v=>v.fri);
+  fri.forEach((v,i)=>v.ui=3*andre.length+i);
+  const N=3*andre.length+fri.length;
+  // Normallikningar AᵀA·x = Aᵀb
+  const M=Array.from({length:N},()=>new Float64Array(N)),rhs=new Float64Array(N);
+  const leggTil=(koef,b,w)=>{            // koef: [[indeks,verdi],…]
+    koef.forEach(([i,ai])=>{rhs[i]+=w*w*ai*b;koef.forEach(([j,aj])=>{M[i][j]+=w*w*ai*aj;});});
+  };
+  let span=0;V.forEach(v=>{span=Math.max(span,Math.hypot(v.X,v.Y));});span=Math.max(span,1);
+  andre.forEach((tf,ki)=>{
+    const ia=3*ki,ib=ia+1,ic=ia+2;
+    V.forEach(v=>{
+      if(!paaKant(v,tf.pts))return;       // hjørne ELLER på ein kant (T-kryss)
+      if(v.fri)leggTil([[ia,v.X],[ib,v.Y],[ic,1],[v.ui,-1]],0,1);
+      else leggTil([[ia,v.X],[ib,v.Y],[ic,1]],v.H,1);
+    });
+    // Svak drag mot dagens plan, så ei flate med få faste hjørne ikkje gjer
+    // systemet singulært
+    const h0=_tpPlan(tf,north,mpp),t0=tf.pts[0],h00=h0(t0);
+    const tanV=Math.tan(Math.max(0,tf.vinkel||0)*Math.PI/180),r=((tf.retning||0)+north)*Math.PI/180;
+    const a0=-Math.sin(r)*tanV,b0=Math.cos(r)*tanV;
+    const c0=h00-a0*(t0.x-ox)*k-b0*(t0.y-oy)*k;
+    const eps=1e-3;
+    leggTil([[ia,1]],a0,eps*span);leggTil([[ib,1]],b0,eps*span);leggTil([[ic,1]],c0,eps);
+  });
+  fri.forEach(v=>leggTil([[v.ui,1]],hRef(v),1e-3));
+  // Gauss med delvis pivotering
+  for(let c=0;c<N;c++){
+    let p=c;for(let r=c+1;r<N;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;
+    if(Math.abs(M[p][c])<1e-12){ref.retning=refRetning0;return {ok:false,msg:'Klarte ikkje å løyse takplana — sjekk at takflatene heng saman.'};}
+    [M[c],M[p]]=[M[p],M[c]];[rhs[c],rhs[p]]=[rhs[p],rhs[c]];
+    for(let r=c+1;r<N;r++){const f=M[r][c]/M[c][c];if(!f)continue;for(let j=c;j<N;j++)M[r][j]-=f*M[c][j];rhs[r]-=f*rhs[c];}
+  }
+  const x=new Float64Array(N);
+  for(let c=N-1;c>=0;c--){let s=rhs[c];for(let j=c+1;j<N;j++)s-=M[c][j]*x[j];x[c]=s/M[c][c];}
+
+  // 3. Planet → vinkel og fallretning
+  const endra=[];
+  andre.forEach((tf,ki)=>{
+    const a=x[3*ki],b=x[3*ki+1],g=Math.hypot(a,b);
+    const v=Math.atan(g)*180/Math.PI;
+    if(v<0.05){tf.vinkel=0;}
+    else{
+      tf.vinkel=Math.round(Math.min(v,89)*10)/10;
+      tf.retning=Math.round(_tpRetningFraNed(-a,-b,north)*10)/10;
+    }
+    endra.push(tf);
+  });
+
+  // 4. Kontroll på det som faktisk vart lagra: høgda i kvart delte hjørne
+  const plan=[ref,...andre].map(tf=>({tf,h:_tpPlan(tf,north,mpp)}));
+  let maks=0;
+  V.forEach(v=>{
+    const hs=plan.filter(p=>paaKant(v,p.tf.pts)).map(p=>p.h(v));
+    if(hs.length>1)maks=Math.max(maks,Math.max(...hs)-Math.min(...hs));
+  });
+  return {ok:true,ref,endra,maksAvvikM:maks};
+}
+
 // Startar oppdelinga: éi flate som dekkjer heile sona, med sona sin eigen type.
 // Vinkelen vert arva frå `z.takvinkel` — eit flatt tak skal ikkje plutseleg bli
 // skrått av at brukaren deler det opp.
@@ -5642,7 +5789,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
 
     if(kind==='tak'&&ftype==='Tak'){
       const r3=document.createElement('div');r3.style.cssText='display:flex;align-items:center;gap:4px';
-      const vInp=document.createElement('input');vInp.type='number';vInp.min='0';vInp.max='89';vInp.value=fl.vinkel||'';
+      const vInp=document.createElement('input');vInp.type='number';vInp.min='0';vInp.max='89';vInp.step='0.1';vInp.value=fl.vinkel||'';
       vInp.placeholder='0';
       vInp.title='Takvinkel i grader. Tomt eller 0 = flatt.';
       vInp.style.cssText="width:38px;flex-shrink:0;font-size:10.5px;border:1px solid var(--border2);border-radius:4px;padding:2px 3px;text-align:right;font-family:'DM Mono',monospace;background:#fff";
@@ -5657,12 +5804,39 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
       rSel.title='Fallretning — dit vatnet renn';
       rSel.style.cssText='font-size:10.5px;border:1px solid var(--border2);border-radius:4px;padding:2px 3px;flex:1;min-width:0;background:#fff';
       const valgt=fl.retning??180;
+      // «Tilpass» gir ei nøyaktig retning (t.d. 187,4°) — ho må stå i lista
+      // som seg sjølv, elles ville nedtrekket vist ein annan verdi enn den lagra
+      const eksakt=!RETNING_ALLE.some(o=>o.v===valgt);
+      if(eksakt){
+        const op=document.createElement('option');op.value=valgt;op.selected=true;
+        const naer=RETNING_ALLE[Math.round(((valgt%360)+360)%360/45)%8];
+        op.textContent=naer.l+' '+(Math.round(valgt*10)/10).toString().replace('.',',')+'°';
+        rSel.appendChild(op);
+      }
       RETNING_ALLE.filter(o=>_fasadeAz.has(o.v)||o.v===valgt).forEach(o=>{
         const op=document.createElement('option');op.value=o.v;op.textContent=o.l;
-        if(o.v===valgt)op.selected=true;rSel.appendChild(op);
+        if(!eksakt&&o.v===valgt)op.selected=true;rSel.appendChild(op);
       });
-      rSel.onchange=()=>{fl.retning=parseInt(rSel.value);markDirty();_syncGavlflater(z);updateResults();renderTable();draw();};
+      rSel.onchange=()=>{fl.retning=parseFloat(rSel.value);markDirty();_syncGavlflater(z);updateResults();renderTable();draw();};
       r3.appendChild(vInp);r3.appendChild(gr);r3.appendChild(rSel);
+      const fleireSkraa=list.filter(t=>flateType(z,kind,t)==='Tak').length>1;
+      if(fleireSkraa&&fl.vinkel>0){
+        const tp=ikon('⇄','Tilpass dei andre takflatene til denne: vinkelen her står, fallretninga vert sett '
+          +'vinkelrett på raftet, og vinkel og fallretning på dei andre vert rekna ut slik at hjørna møtest.','#6366f1');
+        tp.onclick=()=>{
+          snapshot();
+          const res=tilpassTakflater(z,fli);
+          if(!res.ok){hintText.textContent=res.msg;return;}
+          markDirty();_syncGavlflater(z);updateResults();renderTable();draw();
+          const cm=res.maksAvvikM*100;
+          const liste=res.endra.map(t=>(t.name||'Tak')+' '+String(t.vinkel).replace('.',',')+'°').join(', ');
+          hintText.textContent='Tilpassa til «'+(res.ref.name||'Tak')+'» ('+String(res.ref.vinkel).replace('.',',')+'°): '+liste
+            +(cm<3?' · hjørna møtest (avvik under '+Math.max(0.1,Math.ceil(cm*10)/10).toString().replace('.',',')+' cm).'
+                 :' · ⚠ Største sprang i eit hjørne er '+cm.toFixed(0)+' cm — linjene i planen går ikkje opp som eitt tak '
+                  +'(t.d. mønet ikkje parallelt med raftet). Sjekk at mønet og gradene er teikna inn til hjørna.');
+        };
+        r3.appendChild(tp);
+      }
       if(fl.vinkel>0){
         const sk=document.createElement('span');
         sk.style.cssText="font-size:9.5px;color:var(--text3);font-family:'DM Mono',monospace;white-space:nowrap";

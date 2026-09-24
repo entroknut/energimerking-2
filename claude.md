@@ -822,6 +822,19 @@ Invariantar:
 - Del sone og kopiering mellom etasjar nullstiller begge listene — dei peikar på
   den gamle soneforma.
 
+**Tilpass takflater (⇄ på kortet til ei skrå flate)** — `tilpassTakflater(z,refIdx)`.
+Referanseflata held vinkelen, fallretninga vert sett nøyaktig vinkelrett på
+raftet hennar, og dei andre skrå flatene vert løyste som plan med minste
+kvadrat (felles høgd i kvart delte hjørne, sonehjørna på raftet h=0). Vinkel
+og fallretning kjem ut av planet; planteikninga vert ikkje flytta.
+
+- `retning` er difor **ikkje lenger berre 45°-steg** — ho kan vere t.d. 187,4.
+  Nedtrekket legg inn ein eigen option for ein eksakt verdi, og alt som les
+  feltet må bruke `parseFloat`, ikkje `parseInt`.
+- Går linjene i planen ikkje opp som eitt tak (mønet ikkje parallelt med
+  raftet), finst det inga eksakt løysing. Største sprang i eit hjørne vert
+  rekna frå dei **lagra** (avrunda) verdiane og meldt i hintlinja — aldri stille.
+
 **Sona skal alltid vere heilt dekt av tak og golv.** Difor forsvinn ei flate
 aldri berre: `slettFlate` gir arealet tilbake til den naboflata ho deler lengst
 kant med (`_felleskantLen`), og den siste flata tek med seg heile oppdelinga
