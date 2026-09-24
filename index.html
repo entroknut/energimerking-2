@@ -3725,7 +3725,9 @@ function draw(){
       const nStk=winCount(w);
       // Bruk breddeMm for visuell breidde (uavhengig av segmentlengd)
       const spans=winSpansPx(w,segLen,mmPerImgPx);
-      const isSameW=hoveredWin&&hoveredWin.wi===wi&&hoveredWin.zi===ci&&hoveredWin.fli===activeFloor;
+      // Samanlikn soneindeksen (zi), ikkje fargeindeksen (ci) — dei er berre
+      // like på første etasje utan kopla soner
+      const isSameW=hoveredWin&&hoveredWin.wi===wi&&hoveredWin.zi===zi&&hoveredWin.fli===activeFloor;
       let gx=0,gy=0,merkt=false;
       spans.forEach((sp,k)=>{
         const s0i={x:seg.p1.x+ux*sp.t0*segLen,y:seg.p1.y+uy*sp.t0*segLen};
