@@ -5871,6 +5871,12 @@ document.getElementById('winOk').onclick=()=>{
   pendingWin=null;winPts=[];
   winOverlay.classList.remove('show');
   updateResults();renderTable();draw();
+  // Tegn på nytt mange gonger medan highlight fade-ar, slik at animasjonen er synleg
+  const fadeInterval=setInterval(()=>{
+    const elapsed=Date.now()-_ny._createdAt;
+    if(elapsed>3000){clearInterval(fadeInterval);}
+    else draw();
+  },50);
   // Ei gruppe vert fordelt jamnt utover veggen. Får ho ikkje plass, seier vi
   // frå med ein gong — tala går rett inn i energimerket.
   if(n>1){
