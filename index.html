@@ -3695,11 +3695,15 @@ function draw(){
         const isDrag=dragWin&&dragWin.w===w&&dragWin.inst===k;
         const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
         gx+=mx;gy+=my;
-        // Highlight glow
+        // Highlight glow — outer ring
         if(isHov||isDrag){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-          ctx.strokeStyle=isDrag?'rgba(29,79,79,.45)':w.type==='dor'?'rgba(245,158,11,.35)':'rgba(6,182,212,.35)';
-          ctx.lineWidth=11;ctx.stroke();
+          ctx.strokeStyle=isDrag?'rgba(29,79,79,.15)':w.type==='dor'?'rgba(245,158,11,.12)':'rgba(6,182,212,.12)';
+          ctx.lineWidth=18;ctx.stroke();
+          // Inner glow — brighter
+          ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
+          ctx.strokeStyle=isDrag?'rgba(29,79,79,.6)':w.type==='dor'?'rgba(245,158,11,.55)':'rgba(6,182,212,.55)';
+          ctx.lineWidth=13;ctx.stroke();
         }
         ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
         ctx.strokeStyle=(isHov||isDrag)?'#fff':baseColor;
