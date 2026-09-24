@@ -3733,7 +3733,7 @@ function draw(){
         const s0=i2s(s0i.x,s0i.y),s1=i2s(s1i.x,s1i.y);
         const isHov=isSameW&&hoveredWin.inst===k;
         const isDrag=dragWin&&dragWin.w===w&&dragWin.inst===k;
-        const isNew=w._newWindows&&w._newWindows.has(k);
+        const isNew=w._newWindows&&(w._newWindows instanceof Set?w._newWindows.has(k):w._newWindows.includes(k));
         const newFadeTime=3000; // 3 sekunder fade-ut
         const timeSinceNew=isNew?Date.now()-w._createdAt:Infinity;
         const newFade=isNew?Math.max(0,1-timeSinceNew/newFadeTime):0;
@@ -3754,12 +3754,17 @@ function draw(){
           ctx.lineWidth=13;ctx.stroke();
         }
         ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-        ctx.strokeStyle=(isHov||isDrag)?'#fff':isNew?`rgba(34,197,94,${0.65*newFade})`:baseColor;
-        ctx.lineWidth=(isHov||isDrag)?5:isNew?4:3.5;ctx.stroke();
-        if(isHov||isDrag){
-          ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-          ctx.strokeStyle=isDrag?'#1d4f4f':baseColor;ctx.lineWidth=2.5;ctx.stroke();
+        if(isNew){
+          ctx.strokeStyle=`rgba(34,197,94,${0.65*newFade})`;
+          ctx.lineWidth=4;
+        }else if(isHov||isDrag){
+          ctx.strokeStyle='#fff';
+          ctx.lineWidth=5;
+        }else{
+          ctx.strokeStyle=baseColor;
+          ctx.lineWidth=3.5;
         }
+        ctx.stroke();
         if(!(isHov||isDrag))return;
         // Merkelapp på den stk musa er på — gruppelappen står under
         merkt=true;
