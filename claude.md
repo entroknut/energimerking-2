@@ -226,13 +226,20 @@ liste med senterposisjonar (0–1 langs segmentet), ei per stk.
 `posT` er **valfri**. Manglar ho, vert stykka fordelte jamnt utover **heile**
 veggen: kvar stk får si eiga rute på `segLen/n` og står midt i ruta. Då er
 avstanden mellom stykka lik overalt, med halve avstanden ned til kvar ende —
-slik ein fasade med like vindauge faktisk ser ut. Feltet dukkar først opp når
-brukaren flyttar ei enkelt stk.
+slik ein fasade med like vindauge faktisk ser ut.
 
-Klikkpunktet (`t0`/`t1`) styrer berre eit **einsleg** vindauge. For ei gruppe er
-det veggen som avgjer. Ei tidlegare utgåve klumpa stykka saman rundt
-gruppesenteret med ein liten luftavstand; det gav ein 3D-modell som ikkje likna
-på bygget, og på ein kort vegg hamna stykka oppå kvarandre.
+**Ei ny gruppe får `posT` med ein gong** (`winPosFraKlikk`, frå vindaugsdialogen
+og når `winSetAntal` aukar frå 1): stykket brukaren teikna står der det vart
+teikna, og dei n-1 andre vert spreidde utover veggen derifrå — lik luft mellom
+stykka, halv luft ned mot hjørnet, og sidefordelinga som gir mest luft på den
+trongaste sida. Klikk midt i ei rute i den jamne rekkja gir eksakt den jamne
+rekkja. Er det ikkje plass rundt det teikna stykket, vert `posT` null og gruppa
+jamnt fordelt (hintlinja seier frå).
+
+Ei tidlegare utgåve klumpa stykka saman rundt klikkpunktet med ein liten
+luftavstand; det gav ein 3D-modell som ikkje likna på bygget, og på ein kort
+vegg hamna stykka oppå kvarandre. Difor vert resten **spreidde over heile
+veggen**, ikkje lagde tett inntil det teikna.
 
 Ruteinndelinga er dessutan den **tettaste** fordelinga som finst for n stk, så
 er det plass i det heile (`n*breidde <= segLen`), ligg dei aldri oppå kvarandre.
@@ -250,6 +257,7 @@ winSpansPx(w, segLenPx, mpp)      // {t0,t1} per stk, i biletpikslar
 winGeom(z, w)                     // {seg, segLen, width, mpp} i biletpikslar
 winFreezePos(w, width, segLen)    // frys den jamne rekkja til faktiske posisjonar
 winSetAntal(w, n, width, segLen)  // endra antal og ta vare på plasseringa
+winPosFraKlikk(c, n, width, segLen) // ny gruppe: teikna stk står, resten spreidd — eller null
 winSyncAnchor(w, width, segLen)   // t0/t1 = snittet av posT
 ```
 
@@ -1013,8 +1021,9 @@ Viktig bughistorikk:
   har si plassering i w.posT; bruk winCentres/winSpansPx, og endra antal berre
   gjennom winSetAntal. posT skal ALDRI følgje med ein kopi (kopi/limeinn/del sone
   set posT:null) — sjå «antal er eitt SIMIEN-element og mange stk på veggen»
-- Ei gruppe vert fordelt jamnt utover HEILE veggen (rute på segLen/n, stk midt i
-  ruta), ikkje klumpa rundt klikkpunktet. Det er den tettaste fordelinga som
+- Ei ny gruppe: det teikna stykket står der det vart teikna, resten vert spreidde
+  utover HEILE veggen derifrå (winPosFraKlikk). Utan posT: jamn rekkje (rute på
+  segLen/n, stk midt i ruta), aldri klumpa rundt klikkpunktet. Det er den tettaste fordelinga som
   finst, så stykka overlappar aldri når dei får plass — og når dei ikkje får
   plass, seier winForTrongt frå tre stader i staden for å teikne ein stabel
 - Omkalibrering må skalere w.breddeMm og rekne gavlflater på nytt — elles slutta
