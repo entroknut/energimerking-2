@@ -3734,37 +3734,37 @@ function draw(){
         const isHov=isSameW&&hoveredWin.inst===k;
         const isDrag=dragWin&&dragWin.w===w&&dragWin.inst===k;
         const isNew=w._newWindows&&(w._newWindows instanceof Set?w._newWindows.has(k):w._newWindows.includes(k));
-        const newFadeTime=3000; // 3 sekunder fade-ut
+        const newFadeTime=3000;
         const timeSinceNew=isNew?Date.now()-w._createdAt:Infinity;
         const newFade=isNew?Math.max(0,1-timeSinceNew/newFadeTime):0;
         const mx=(s0.x+s1.x)/2,my=(s0.y+s1.y)/2;
         gx+=mx;gy+=my;
-        // Highlight glow — outer ring
-        if(isHov||isDrag||isNew){
+        // Grøn gløw for nye vindauge (fade ut på 3 sekunder)
+        if(isNew&&newFade>0){
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-          if(isDrag)ctx.strokeStyle='rgba(29,79,79,.15)';
-          else if(isNew)ctx.strokeStyle=`rgba(34,197,94,${0.15*newFade})`;
-          else ctx.strokeStyle=w.type==='dor'?'rgba(245,158,11,.12)':'rgba(6,182,212,.12)';
+          ctx.strokeStyle=`rgba(34,197,94,${0.15*newFade})`;
+          ctx.lineWidth=18;ctx.stroke();
+          ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
+          ctx.strokeStyle=`rgba(34,197,94,${0.55*newFade})`;
+          ctx.lineWidth=13;ctx.stroke();
+        }
+        // Highlight glow — outer ring
+        if(isHov||isDrag){
+          ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
+          ctx.strokeStyle=isDrag?'rgba(29,79,79,.15)':w.type==='dor'?'rgba(245,158,11,.12)':'rgba(6,182,212,.12)';
           ctx.lineWidth=18;ctx.stroke();
           // Inner glow — brighter
           ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-          if(isDrag)ctx.strokeStyle='rgba(29,79,79,.6)';
-          else if(isNew)ctx.strokeStyle=`rgba(34,197,94,${0.55*newFade})`;
-          else ctx.strokeStyle=w.type==='dor'?'rgba(245,158,11,.55)':'rgba(6,182,212,.55)';
+          ctx.strokeStyle=isDrag?'rgba(29,79,79,.6)':w.type==='dor'?'rgba(245,158,11,.55)':'rgba(6,182,212,.55)';
           ctx.lineWidth=13;ctx.stroke();
         }
         ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
-        if(isNew){
-          ctx.strokeStyle=`rgba(34,197,94,${0.65*newFade})`;
-          ctx.lineWidth=4;
-        }else if(isHov||isDrag){
-          ctx.strokeStyle='#fff';
-          ctx.lineWidth=5;
-        }else{
-          ctx.strokeStyle=baseColor;
-          ctx.lineWidth=3.5;
+        ctx.strokeStyle=(isHov||isDrag)?'#fff':baseColor;
+        ctx.lineWidth=(isHov||isDrag)?5:3.5;ctx.stroke();
+        if(isHov||isDrag){
+          ctx.beginPath();ctx.moveTo(s0.x,s0.y);ctx.lineTo(s1.x,s1.y);
+          ctx.strokeStyle=isDrag?'#1d4f4f':baseColor;ctx.lineWidth=2.5;ctx.stroke();
         }
-        ctx.stroke();
         if(!(isHov||isDrag))return;
         // Merkelapp på den stk musa er på — gruppelappen står under
         merkt=true;
