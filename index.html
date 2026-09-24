@@ -8691,6 +8691,7 @@ cv.addEventListener('click',e=>{
       setAutoName();
       const isDor=document.getElementById('winType').value==='dor';
       document.getElementById('winNRow').style.display=isDor?'none':'';
+      if(isDor)document.getElementById('winN').value=1;
     };
     winOverlay.classList.add('show');
     winPts=[];draw();
