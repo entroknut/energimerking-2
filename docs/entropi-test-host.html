@@ -81,6 +81,7 @@ window.addEventListener('message',async ev=>{
     }
     send({type:'sxi:init',
       bygg:BYGG,
+      brukar:{namn:'Test Testesen'},   // den innlogga → «Ansvarleg person»
       project:lagraTekst||null,      // strengen frå førre lagring
       wantsSxi:true,
       // Utelaten ⇒ verktøyet brukar standardintervallet (2 min).

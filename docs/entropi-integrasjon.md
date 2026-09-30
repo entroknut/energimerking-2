@@ -59,7 +59,7 @@ nok til å vise «3 etasjar · 12 soner · 2 480 m²» på byggkortet utan å op
 
 | type | felt | verknad |
 |---|---|---|
-| `sxi:init` | `bygg`, `project`, `wantsSxi`, `autosaveMs`, `saveLabel` | slår på innbygd modus. Send han som svar på `sxi:ready`. |
+| `sxi:init` | `bygg`, `brukar`, `project`, `wantsSxi`, `autosaveMs`, `saveLabel` | slår på innbygd modus. Send han som svar på `sxi:ready`. |
 | `sxi:load` | `project` | byt til eit anna prosjekt medan verktøyet står ope (t.d. ein tidlegare versjon). |
 | `sxi:request-save` | `requestId`, `auto` | ber verktøyet lagre no. Kvar førespurnad endar i ein `sxi:save` med same `requestId` — kjem han medan ei lagring alt går (t.d. ei autolagring), vert han lagd i kø og send så snart den fyrste er ferdig. |
 | `sxi:save-result` | `requestId`, `ok`, `message` | resultatet av lagringa. Utan svar innan 45 s gir verktøyet opp og ber brukaren prøve igjen. |
@@ -74,6 +74,11 @@ Felta i `sxi:init`:
   er **framlegg** som vert fylte inn i verktøyet (sjå under). `byggeaar` må
   vere eit årstal mellom 1800 og 2100; alt anna vert ignorert, sidan eit
   vrøvltal ville gitt feil standard-U-verdiar utan at nokon såg det.
+- `brukar: {namn}` — den som er logga inn i EntroPi. Namnet vert fylt inn som
+  «Ansvarleg person» i SXI-dialogen (`person` i SIMIEN-fila) kvar gong
+  dialogen vert opna. Det er den som eksporterer no som er ansvarleg, så
+  namnet vert ikkje lagra i prosjektet. Brukaren kan skrive over det i
+  dialogen. Utelate ⇒ feltet står tomt og må fyllast ut før eksport.
 - `project` — `.entro`-innhaldet, som **Blob, streng eller ferdig parsa
   objekt**. `null` for eit bygg utan prosjekt.
 - `wantsSxi: true` — send også SXI-fila til EntroPi ved eksport.
@@ -467,7 +472,9 @@ const TOOL_URL = `${TOOL_ORIGIN}/energimerking-2/index.html?embed=1`;
 
 type Bygg = { id: string; namn: string; adresse?: string; byggeaar?: number };
 
-export function Energimerking({ bygg, onClose }: { bygg: Bygg; onClose: () => void }) {
+type Brukar = { namn: string };   // den som er logga inn
+
+export function Energimerking({ bygg, brukar, onClose }: { bygg: Bygg; brukar: Brukar; onClose: () => void }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -490,6 +497,7 @@ export function Energimerking({ bygg, onClose }: { bygg: Bygg; onClose: () => vo
           send({
             type: 'sxi:init',
             bygg: { id: bygg.id, namn: bygg.namn, adresse: bygg.adresse, byggeaar: bygg.byggeaar },
+            brukar: { namn: brukar.namn },     // den innlogga — «Ansvarleg person» i SXI-en
             project: lagra.current,          // Blob, streng eller null
             wantsSxi: true,
             saveLabel: 'Lagre på bygget',

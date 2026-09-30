@@ -807,7 +807,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.3.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.4.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -1226,6 +1226,10 @@ function adresseTilFilnamn(a){
 // Brua er einaste skrivar. Utanfor EntroPi står objektet tomt, og då gjer
 // _fyllFraPi() ingenting.
 let piBygg={adresse:'',byggeaar:null};
+// Den som er logga inn i EntroPi (sxi:init → brukar.namn). Går til «Ansvarlig
+// person» i SXI-dialogen. Ikkje serialisert: det er den som eksporterer no som
+// er ansvarleg, ikkje den som lagra prosjektet sist. Brua er einaste skrivar.
+let piBrukar={namn:''};
 
 // Fyller inn dei tomme felta frå bygget i EntroPi. Trygg å kalle fleire gonger.
 // Returnerer true om noko vart endra, så kallaren veit om han må teikne på nytt.
@@ -10709,6 +10713,7 @@ async function showFloorContextMenu(clientX,clientY,f){
       piBygg={adresse:(bygg&&bygg.adresse)?String(bygg.adresse):'',
               // eit vrøvltal ville gitt feil standard-U-verdiar utan at nokon såg det
               byggeaar:(_by>=1800&&_by<=2100)?_by:null};
+      piBrukar={namn:(d.brukar&&d.brukar.namn)?String(d.brukar.namn).trim():''};
       // Utan prosjekt teiknar vi sjølve; med prosjekt gjer lastProsjekt() det.
       if(_fyllFraPi()&&!d.project){updateResults();renderTable();}
       // Eit tilbod som kom opp før init må vekk uansett: det var reist utan å
@@ -12547,6 +12552,7 @@ function toggleZoneConnection(zone, segIdx, opposingZoneId){
 
 function buildSXI(proj){
   const {prosjektnamn,adresse,klimasted,byggeaar,kommunenr} = proj;
+  const ansvarleg = String(proj.ansvarleg||'').trim();
   const tiltakValgte = Array.isArray(proj.tiltak)?proj.tiltak:[];
   const k=KLIMA[klimasted];
   const today=new Date().toISOString().slice(0,10);
@@ -12956,7 +12962,7 @@ ${kjellerXml}${facXml}${takXml}${gulvXml}    <ventilation id="${nextId('cav')}" 
       .concat(tiltakIds.map(id=>
         `    <included_measures_ids tiltak_id="${id}"></included_measures_ids>`))
       .join('\n');
-    return `  <energymark26 id="${emId}" name="${emName}" comment="" language="nb" units="1" project_type="old_building" building_code="${tek}" built="${byggeaar}" company="Entro AS" company_id="" person="Knut Nedkvitne" personal_id="7b009268-c247-4c34-beb2-d587272fb229" energy_measured="no" infiltration_measured="no" measure_date_n50="${today}" unheated_floor_area="0" tech_check="yes" section_description="" matrikkelenhet_ident="" bygg_ident="" bruksenhet_ident="" adresse_ident="" vegadresse_ident="" lighting_system="normal" ventilation_system="cav" ventilation_input="real" lowered_temperature="no" distr_system_space_heating_detailed="no" distr_system_heating_coil_detailed="no" distr_system_space_cooling_detailed="no" distr_system_cooling_coil_detailed="no" distr_system_tap_water_detailed="no" spp_space_heating_detailed="no" spp_heating_coil_detailed="no" spp_space_cooling_detailed="no" spp_cooling_coil_detailed="no" spp_tap_water_detailed="no" json_file="no" red_factor_lighting="0.70" description_no_measures="" include_measures="${tiltakXml?'yes':'no'}" total_floor_area="${emBra.toFixed(2)}">
+    return `  <energymark26 id="${emId}" name="${emName}" comment="" language="nb" units="1" project_type="old_building" building_code="${tek}" built="${byggeaar}" company="Entro AS" company_id="" person="${xesc(ansvarleg)}" personal_id="" energy_measured="no" infiltration_measured="no" measure_date_n50="${today}" unheated_floor_area="0" tech_check="yes" section_description="" matrikkelenhet_ident="" bygg_ident="" bruksenhet_ident="" adresse_ident="" vegadresse_ident="" lighting_system="normal" ventilation_system="cav" ventilation_input="real" lowered_temperature="no" distr_system_space_heating_detailed="no" distr_system_heating_coil_detailed="no" distr_system_space_cooling_detailed="no" distr_system_cooling_coil_detailed="no" distr_system_tap_water_detailed="no" spp_space_heating_detailed="no" spp_heating_coil_detailed="no" spp_space_cooling_detailed="no" spp_cooling_coil_detailed="no" spp_tap_water_detailed="no" json_file="no" red_factor_lighting="0.70" description_no_measures="" include_measures="${tiltakXml?'yes':'no'}" total_floor_area="${emBra.toFixed(2)}">
     <measured_energy single_year="no" energy_measure_year1="2023" energy_measure_year2="2024" energy_measure_year3="2025"></measured_energy>
     <building_id id_type="matrikkel" municipality="${klimasted}" municipality_no="${kommunenr}" zip_address="" zip_number="0"></building_id>
 ${incl}
@@ -12968,7 +12974,7 @@ ${incl}
   const profitXml=tiltakIds.length?'\n'+buildProfitsimXml(nextId):'';
 
   const sxi=`<?xml version="1.0" encoding="utf-8"?>
-<simien_project id="project#1" name="${xesc(prosjektnamn)}" comment="${xesc(adresse)}" person="Knut H. Nedkvitne" user="Knut Nedkvitne" company="Entro AS" version="8.1.0.15">
+<simien_project id="project#1" name="${xesc(prosjektnamn)}" comment="${xesc(adresse)}" person="${xesc(ansvarleg)}" user="${xesc(ansvarleg)}" company="Entro AS" version="8.1.0.15">
 ${klimaBlock(k,klimasted)}
   <input_documentation25></input_documentation25>
   <global_vars conv_share_lighting_gain="0.30" conv_share_equipment_gain="0.50" conv_share_person_gain="0.50" conv_share_solar_gain="0.50" heat_gain_pr_person="95" conv_thermal_transfer_coeff_wall="2.50" conv_thermal_transfer_coeff_ceiling="2.00" conv_thermal_transfer_coeff_floor="3.00" thermal_cond_acc_layer="20.00" bypass_cooling_coil="0.25" int_res_window_pane="0.13" air_velocity="0.15" distance_from_window="0.60" turbulence_intensity="25.00" el_energy_cost="1.50" export_energy_cost="1.00" el_co2_emission="130.00" min_cold_water_temp="6.00" max_cold_water_temp="13.00" transmissivity_jan="0.88" transmissivity_jul="0.71" co2_consentration="400.00" el_price="constant" primary_energy_factor_el="1.00" primary_energy_factor_bio_gas="0.45" primary_energy_factor_bio_solid="0.45" primary_energy_factor_district_heating="0.45" primary_energy_factor_district_cooling="0.45" primary_energy_factor_other="1.00" power_tariff="no" primary_energy_factor_fossil_oil="1.00" primary_energy_factor_fossil_gas="1.00" primary_energy_factor_fossil_solid="1.00" primary_energy_factor_bio_oil="0.45" weight_factor_el="1.00" weight_factor_fossil_oil="1.00" weight_factor_fossil_gas="1.00" weight_factor_fossil_solid="1.00" weight_factor_bio_oil="0.45" weight_factor_bio_gas="0.45" weight_factor_bio_solid="0.45" weight_factor_district_heating="0.45" weight_factor_district_cooling="0.45" weight_factor_other="1.00" weight_factor_el_export="0.00" el_export_co2_emission="65.00" primary_energy_factor_el_export="0.00">
@@ -12986,6 +12992,7 @@ ${zonesXml}${tiltakXml}${emXml}${profitXml}
 }
 
 // ── SXI Dialog ────────────────────────────────────────────────
+const ANSVARLEG_KEY='sxiAnsvarleg';
 (function(){
   // Create dialog HTML
   const dlg=document.createElement('div');
@@ -13006,6 +13013,10 @@ ${zonesXml}${tiltakXml}${emXml}${profitXml}
       <div style="display:flex;align-items:center;gap:10px">
         <label style="font-size:12px;color:var(--text3);width:120px;font-weight:500;flex-shrink:0">Adresse</label>
         <input id="sxi_adresse" type="text" placeholder="Storgata 10, 5000 Bergen" style="flex:1;padding:8px 11px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:inherit;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <label style="font-size:12px;color:var(--text3);width:120px;font-weight:500;flex-shrink:0">Ansvarleg person</label>
+        <input id="sxi_ansvarleg" type="text" placeholder="Fornamn Etternamn" autocomplete="name" style="flex:1;padding:8px 11px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:inherit;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <label style="font-size:12px;color:var(--text3);width:120px;font-weight:500;flex-shrink:0">Byggeår</label>
@@ -13095,6 +13106,11 @@ ${zonesXml}${tiltakXml}${emXml}${profitXml}
     const kl=document.getElementById('sxi_klima').value;
     document.getElementById('sxi_kommunenr').value=KOMMUNE_NR[kl]||'';
     _syncAdresseFelt();   // fyll inn adressa frå kartsøket om ho finst
+    // Ansvarleg person: i EntroPi den som er logga inn; elles det brukaren
+    // skreiv sist i denne nettlesaren (per-brukar-bekvemmelegheit, ikkje prosjektdata).
+    const ansInp=document.getElementById('sxi_ansvarleg');
+    if(inPi()&&piBrukar.namn)ansInp.value=piBrukar.namn;
+    else if(!ansInp.value){try{ansInp.value=localStorage.getItem(ANSVARLEG_KEY)||'';}catch(e){}}
     document.getElementById('sxi_err').style.display='none';
     dlg.style.display='flex';
     setTimeout(()=>document.getElementById('sxi_namn').focus(),50);
@@ -13110,22 +13126,25 @@ ${zonesXml}${tiltakXml}${emXml}${profitXml}
     const byggeaar=document.getElementById('sxi_byggeaar').value.trim();
     const klimasted=document.getElementById('sxi_klima').value;
     const kommunenr=document.getElementById('sxi_kommunenr').value.trim();
+    const ansvarleg=document.getElementById('sxi_ansvarleg').value.trim();
     const errs=[];
     if(!namn)errs.push('Prosjektnamn manglar.');
     if(!byggeaar||isNaN(parseInt(byggeaar)))errs.push('Byggeår manglar eller er ugyldig.');
     if(!kommunenr)errs.push('Kommunenr. manglar.');
+    if(!ansvarleg)errs.push('Ansvarleg person manglar.');
     // Eksport utan kalibrering gir feil dimensjonar i SIMIEN — stopp her
     const uncalFloors=floors.filter(f=>f.zones.length>0&&!(f.ownCal?f.mmPerImgPx:(globalMmPerImgPx||f.mmPerImgPx)));
     if(uncalFloors.length)errs.push('Skalaen er ikkje kalibrert ('+uncalFloors.map(f=>f.name).join(', ')+') — kalibrer før eksport.');
     if(errs.length){errEl.textContent=errs.join(' ');errEl.style.display='block';return;}
     errEl.style.display='none';
+    try{localStorage.setItem(ANSVARLEG_KEY,ansvarleg);}catch(e){}
     const tiltak=[...document.querySelectorAll('#sxi_tiltak input[data-tiltak]:checked')]
       .map(i=>i.dataset.tiltak);
     const tiltakInfo={tomme:[]};
     let sxi;
     try{
       sxi=buildSXI({prosjektnamn:namn,adresse,klimasted,byggeaar:parseInt(byggeaar),kommunenr,
-        tiltak,tiltakInfo});
+        ansvarleg,tiltak,tiltakInfo});
     }catch(e){
       errEl.textContent='Feil ved generering: '+e.message;errEl.style.display='block';return;
     }
