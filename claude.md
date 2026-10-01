@@ -956,12 +956,15 @@ Invariantar:
   arket, klikk 2 berre mot systerarka (`_snapKjelde`), og arket følgjer musa
   imellom. Berre flytting, ingen rotasjon. `setMode`, `switchFloor` og
   `applyHistoryState` avbryt og legg arket attende (`_avbrytPlassering`).
-- **Systerarka vert teikna to gonger**: dempa under det aktive arket, og med
-  `multiply` oppå så strekane syner gjennom det kvite papiret. Sonene deira er
-  stipla og kan ikkje redigerast — berre snappast mot (hjørne, kant og
-  `imgLineSnap` i systerbiletet). Ei sone kan difor teiknast tvers over
-  skøyten; punkta ligg i koordinatane til det aktive arket, også utanfor biletet.
-- **Auto-skiljekonstruksjon verkar på tvers av ark**, men set berre
+- **Systerarka er berre synlege under «Plasser»** (`synlegeSysterark()` sjekkar
+  `mode==='plasser-ark'`). Elles ser ein berre den teikninga ein arbeider i —
+  ein brukar bad om det; to teikningar oppå kvarandre heile tida var forvirrande.
+  Under plasseringa vert dei teikna to gonger: dempa under det aktive arket, og
+  med `multiply` oppå så strekane syner gjennom det kvite papiret. Sonene deira
+  er stipla og kan ikkje redigerast — berre snappast mot (hjørne, kant og
+  `imgLineSnap` i systerbiletet).
+- **Auto-skiljekonstruksjon verkar på tvers av ark** (uavhengig av visinga —
+  `_systerProxyar` les alle arka i etasjen), men set berre
   `skillevegg` — aldri `zoneConnections`, som peikar på ein indeks i same
   arket si soneliste. Kutta kan gå rett inn i den ekte sona fordi omrekninga
   er likeforma (t langs eit segment er den same).
@@ -973,7 +976,6 @@ Invariantar:
   forskyvinga står, så arket ligg der det låg.
 - Import/klippbord: `delAv` og `plassAnker.til` vert omrekna til nye id-ar;
   kjem ikkje hovudetasjen med, vert arket ei eiga etasje.
-- `visDelplanar` er eit visingsval og vert ikkje lagra.
 
 ## Skjulte soner
 

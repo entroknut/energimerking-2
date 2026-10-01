@@ -807,10 +807,6 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v11M1 6.5h5.5" stroke="currentColor" stroke-width="1.2" opacity=".5"/><circle cx="6.5" cy="6.5" r="2.5" fill="currentColor" opacity=".25"/></svg>
         Ghost
       </button>
-      <button id="delplanVisBtn" title="Vis dei andre teikningane i same etasje under denne — du kan teikne og snappe på tvers" style="font-size:11px;padding:4px 10px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;white-space:nowrap;display:none;align-items:center;gap:5px;border-right:1px solid var(--border2)">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><rect x="1" y="1.5" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="5" y="4.5" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 1.4"/></svg>
-        Delplanar
-      </button>
       <button id="plasserBtn" title="Plasser denne teikninga mot dei andre i etasjen: klikk eit punkt her, så same punktet på den andre teikninga" style="font-size:11px;padding:4px 10px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;white-space:nowrap;display:none;align-items:center;gap:5px;border-right:1px solid var(--border2)">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><circle cx="6.5" cy="6.5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 0.5v3M6.5 9.5v3M0.5 6.5h3M9.5 6.5h3" stroke="currentColor" stroke-width="1.2"/></svg>
         Plasser
@@ -1426,10 +1422,12 @@ function aktivTilArk(p,f){
   const A=curFloor(),k=_arkK(f);
   return{x:(p.x+(A.floorDxImg||0))/k-(f.floorDxImg||0),y:(p.y+(A.floorDyImg||0))/k-(f.floorDyImg||0)};
 }
-let visDelplanar=true;   // vis systerarka under det aktive — berre visning, vert ikkje lagra
-// Systerarka som skal visast og snappast mot no
+// Systerarka som skal visast og snappast mot no. Berre medan «Plasser» er
+// på: elles skal ein sjå den eine teikninga ein arbeider i, og ingenting anna.
+// (Auto-skiljekonstruksjonen på tvers av ark brukar _systerProxyar og verkar
+// uansett.)
 function synlegeSysterark(){
-  if(iFasade()||!visDelplanar)return[];
+  if(iFasade()||mode!=='plasser-ark')return[];
   const A=curFloor();
   return etasjeArk(A).filter(f=>f!==A);
 }
@@ -2152,12 +2150,7 @@ function updateGhostUI(){
   const ghostBtn=document.getElementById('ghostBtn');
   if(widget)widget.style.display=(hasMulti||harDel)?'flex':'none';
   if(offsetBar)offsetBar.style.display=((hasMulti&&ghostMode)||harDel)?'flex':'none';
-  const vb=document.getElementById('delplanVisBtn'),pb=document.getElementById('plasserBtn');
-  if(vb){
-    vb.style.display=harDel?'flex':'none';
-    vb.style.background=visDelplanar?'var(--accent-dim)':'transparent';
-    vb.style.color=visDelplanar?'var(--accent)':'var(--text3)';
-  }
+  const pb=document.getElementById('plasserBtn');
   if(pb){
     const paa=mode==='plasser-ark';
     pb.style.display=harDel?'flex':'none';
@@ -2240,7 +2233,6 @@ function startPlasserArk(){
   if(!syster.some(f=>f.bgImg||f.zones.length)){
     hintText.textContent='Dei andre arka i etasjen er tomme — last opp teikninga der fyrst.';return;
   }
-  if(!visDelplanar){visDelplanar=true;updateGhostUI();}
   setMode('plasser-ark');
   plass=null;
   const u=mppForFloor(A)&&syster.every(f=>mppForFloor(f))?'':
@@ -2342,13 +2334,6 @@ function _teiknPlassering(){
 document.getElementById('plasserBtn').onclick=()=>{
   if(mode==='plasser-ark'){setMode('navigate');updateGhostUI();draw();return;}
   startPlasserArk();
-};
-document.getElementById('delplanVisBtn').onclick=()=>{
-  visDelplanar=!visDelplanar;
-  if(!visDelplanar&&mode==='plasser-ark')setMode('navigate');
-  updateGhostUI();draw();
-  hintText.textContent=visDelplanar?'Dei andre teikningane i etasjen er synlege — du kan snappe mot dei.'
-                                   :'Berre denne teikninga er synleg. Sonene på dei andre arka er der framleis.';
 };
 
 // ── Ny delplan ──
@@ -4275,7 +4260,7 @@ function slettAlleMaal(){
 }
 
 // ── Draw ──────────────────────────────────────────────────────
-// ── Delplanar på lerretet ──
+// ── Delplanar på lerretet (berre under «Plasser») ──
 // Systerarka vert teikna to gonger: fyrst dempa under det aktive arket (der
 // dei stikk ut), så med multiply oppå, så strekane deira syner gjennom det
 // kvite papiret på det aktive arket. Kvitt papir gjer ingenting i multiply,
