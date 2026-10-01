@@ -64,6 +64,13 @@ Brukaren seier eksplisitt frå når noko skal publiserast. Då: bump versjonsnum
 
 **Verifiser alltid live-adressa etterpå** — ikkje meld «publisert» berre fordi pushen gjekk gjennom. GitHub Pages-bygget kan feile (det skjedde 6. august: deploy-steget timeout-a etter 10 min, to gonger på rad, og trong eit tredje forsøk).
 
+**Publiseringa går gjennom `.github/workflows/pages.yml`** (Pages-kjelda står på
+«GitHub Actions»). Før dette stod kjelda på «Deploy from a branch», og den
+innebygde utløysinga starta ofte ikkje noko bygg etter ein push — i oktober
+2026 kom det ingen bygg på over 20 minutt, og løysinga var å slå kjelda av og
+på. Ikkje lag «Retrigger»-commitar lenger: startar ikkje workflowen, køyr han
+for hand med «Run workflow» i Actions-fana.
+
 Grep-mønsteret må **ankrast på `</span>`**. To feller, begge observerte:
 
 - Ein hardkoda `v2\.`-prefiks gir tom output etter ein major-bump — det ser ut som

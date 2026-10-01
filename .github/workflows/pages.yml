@@ -1,0 +1,47 @@
+# Publiserer main til GitHub Pages ved kvar push.
+#
+# Erstattar den innebygde «Deploy from a branch», som ikkje alltid starta
+# eit bygg etter ein push (sjå «Publisering» i claude.md). Krev at
+# Settings → Pages → Source står på «GitHub Actions».
+#
+# Byggesteget er det same Jekyll-bygget som branch-publiseringa brukte, så
+# sida vert lik. «Run workflow» i Actions-fana køyrer han på nytt for hand.
+name: Publiser til GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Éi publisering om gongen; ei ny push avbryt ikkje ei som er i gang
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./
+          destination: ./_site
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
