@@ -624,6 +624,13 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .floor-tab:hover .floor-tab-del{opacity:.5}
 .floor-tab-del:hover{color:var(--red) !important;opacity:1 !important}
 .floor-tab.drag-over{border-color:var(--accent);background:var(--accent-dim);transform:scale(1.03);}
+/* Ei etasje med fleire teikningar (delplanar) — éi ramme rundt fanene */
+.floor-group{display:flex;align-items:center;gap:1px;padding:1px;border:1px solid var(--border2);border-radius:8px;background:var(--surface2);flex-shrink:0}
+.floor-group .floor-tab{padding:3px 9px}
+.floor-tab.delplan{font-size:11px;font-weight:500}
+.floor-tab.delplan::before{content:'';width:7px;height:7px;border:1.2px dashed currentColor;border-radius:2px;opacity:.7;flex-shrink:0}
+.floor-grp-add{background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;line-height:1;padding:2px 7px;border-radius:5px;font-family:inherit}
+.floor-grp-add:hover{background:var(--accent-dim);color:var(--accent)}
 .add-floor-btn{
   flex-shrink:0;display:flex;align-items:center;gap:4px;
   padding:4px 11px;font-size:11.5px;font-weight:500;
@@ -800,6 +807,14 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 1v11M1 6.5h5.5" stroke="currentColor" stroke-width="1.2" opacity=".5"/><circle cx="6.5" cy="6.5" r="2.5" fill="currentColor" opacity=".25"/></svg>
         Ghost
       </button>
+      <button id="delplanVisBtn" title="Vis dei andre teikningane i same etasje under denne — du kan teikne og snappe på tvers" style="font-size:11px;padding:4px 10px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;white-space:nowrap;display:none;align-items:center;gap:5px;border-right:1px solid var(--border2)">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><rect x="1" y="1.5" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="5" y="4.5" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 1.4"/></svg>
+        Delplanar
+      </button>
+      <button id="plasserBtn" title="Plasser denne teikninga mot dei andre i etasjen: klikk eit punkt her, så same punktet på den andre teikninga" style="font-size:11px;padding:4px 10px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;white-space:nowrap;display:none;align-items:center;gap:5px;border-right:1px solid var(--border2)">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><circle cx="6.5" cy="6.5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M6.5 0.5v3M6.5 9.5v3M0.5 6.5h3M9.5 6.5h3" stroke="currentColor" stroke-width="1.2"/></svg>
+        Plasser
+      </button>
       <div id="floorOffsetBar" style="display:none;align-items:center;gap:5px;padding:0 8px">
         <span id="floorOffsetVal" style="font-size:10px;font-family:'DM Mono',monospace;color:var(--accent);white-space:nowrap">0, 0 px</span>
         <button id="floorOffsetReset" title="Nullstill forskyving" style="font-size:10.5px;padding:1px 5px;border:1px solid var(--border2);border-radius:3px;background:var(--surface);color:var(--text3);cursor:pointer;font-family:inherit;line-height:1.4">↺</button>
@@ -807,7 +822,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.4.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.5.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -1338,6 +1353,135 @@ function setGlobalNorth(nd){
 }
 
 function curFloor(){return floors[activeFloor];}
+
+// ── Delplanar: fleire planteikningar for same etasje ─────────
+// Store bygg har ofte éi teikning per fløy. Kvar teikning er framleis eit
+// eige element i `floors` — med sitt eige bilete, si eiga kalibrering, sine
+// eigne soner og si eiga forskyving — men ei delplan ber `delAv` = id-en til
+// hovudetasjen. Då deler ho etasjehøgda og står på same nivå i 3D og kart,
+// og systerarka vert viste under det aktive arket, så ein kan plassere
+// teikningane mot kvarandre og teikne og snappe på tvers.
+//
+// Alt som reknar per sone (areal, SXI, BRA) er urørt: ei sone høyrer framleis
+// til nøyaktig eitt ark, og mppForZone/mppForFloor finn skalaen hennar.
+// Invariantar (held av _ordneDelplanar):
+//  - ei hovudetasje er aldri sjølv ei delplan, og delAv peikar alltid på ein
+//    hovudetasje som finst — elles vert arket ei eiga etasje att
+//  - delplanane står rett etter hovudetasjen sin i `floors`
+//  - alle arka i ei etasje har same defaultHoyde
+function hovudEtasje(f){
+  if(!f||f.delAv==null)return f;
+  const h=floors.find(x=>x.id===f.delAv);
+  return(h&&h!==f&&h.delAv==null)?h:f;
+}
+function erDelplan(f){return !!f&&hovudEtasje(f)!==f;}
+// Alle arka i etasjen til f, hovudetasjen fyrst
+function etasjeArk(f){
+  const h=hovudEtasje(f);
+  return floors.filter(x=>x===h||hovudEtasje(x)===h);
+}
+// Namnet på arket der det står åleine (sonekort, eksport-suffiks)
+function arkNamn(f){return erDelplan(f)?hovudEtasje(f).name+' · '+f.name:f.name;}
+function _ordneDelplanar(){
+  floors.forEach(f=>{if(f.delAv!=null&&hovudEtasje(f)===f)f.delAv=null;});
+  // Eit anker gjeld berre innanfor same etasje
+  floors.forEach(f=>{
+    if(!f.plassAnker)return;
+    const a=_anker(f);
+    if(!a||hovudEtasje(a.t)!==hovudEtasje(f))f.plassAnker=null;
+  });
+  const akt=floors[activeFloor];
+  const ut=[];
+  floors.filter(f=>f.delAv==null).forEach(h=>{
+    ut.push(h);
+    floors.forEach(f=>{if(f.delAv===h.id)ut.push(f);});
+  });
+  floors.splice(0,floors.length,...ut);
+  floors.forEach(f=>{if(f.delAv!=null)f.defaultHoyde=hovudEtasje(f).defaultHoyde;});
+  const ai=floors.indexOf(akt);
+  if(ai>=0)activeFloor=ai;
+}
+// Grunnhøgda (m over planteikninga til nedste etasje) for kvar etasje i
+// `floors`. Ei delplan står på same nivå som hovudetasjen sin og legg ikkje
+// til noko høgd i stabelen. Brukt av 3D, kartet og kjellersenkinga — dei
+// MÅ rekne likt, elles hamnar terrenget på feil nivå.
+function etasjeGrunnhoyder(){
+  let cum=0;const base=new Map();
+  floors.forEach(f=>{if(erDelplan(f))return;base.set(f,cum);cum+=_etasjeStakkHoyde(f);});
+  return floors.map(f=>base.get(hovudEtasje(f))??0);
+}
+// Arkskala relativt til det aktive arket: k = mpp(ark)/mpp(aktivt). Verda er
+// i meter, (ix+floorDxImg)*mpp — same formel som 3D-modellen brukar. Manglar
+// ein av skalaene, reknar vi pikslane som like store (som ghost-laget før).
+function _arkK(f){
+  const a=mppForFloor(curFloor()),b=mppForFloor(f);
+  return(a&&b)?b/a:1;
+}
+// Biletpunkt på arket f → biletpunkt på det aktive arket, og attende
+function arkTilAktiv(p,f){
+  const A=curFloor(),k=_arkK(f);
+  return{x:(p.x+(f.floorDxImg||0))*k-(A.floorDxImg||0),y:(p.y+(f.floorDyImg||0))*k-(A.floorDyImg||0)};
+}
+function aktivTilArk(p,f){
+  const A=curFloor(),k=_arkK(f);
+  return{x:(p.x+(A.floorDxImg||0))/k-(f.floorDxImg||0),y:(p.y+(A.floorDyImg||0))/k-(f.floorDyImg||0)};
+}
+let visDelplanar=true;   // vis systerarka under det aktive — berre visning, vert ikkje lagra
+// Systerarka som skal visast og snappast mot no
+function synlegeSysterark(){
+  if(iFasade()||!visDelplanar)return[];
+  const A=curFloor();
+  return etasjeArk(A).filter(f=>f!==A);
+}
+// Sonene på systerarka, med punkta omrekna til det aktive arket. `z` er
+// originalen; `pts` er ein kopi — skriv aldri til han.
+function systerSoner(){
+  const ut=[];
+  synlegeSysterark().forEach(f=>f.zones.forEach(z=>{
+    if(z.skjult||(z.pts||[]).length<2)return;
+    ut.push({z,f,ark:f,pts:z.pts.map(p=>arkTilAktiv(p,f))});
+  }));
+  return ut;
+}
+// ── Plassering av delplanar ──
+// `f.plassAnker = {a:{x,y}, til:id, b:{x,y}}`: biletpunktet a på dette arket
+// ligg oppå biletpunktet b på arket `til`. Ankeret er i BILETPIKSLAR på begge
+// ark, så det er uavhengig av kalibreringa. Når ein skala endrar seg, vert
+// floorDxImg rekna på nytt frå ankeret — elles ville arket gli ut av
+// plasseringa si (forskyvinga er i biletpikslar, og verda er pikslar × mpp).
+// Manglar ein av skalaene, står arket der det står til begge er kalibrerte.
+function _anker(f){
+  const a=f&&f.plassAnker;if(!a||!a.a||!a.b)return null;
+  const t=floors.find(x=>x.id===a.til);
+  return(t&&t!==f)?{a:a.a,b:a.b,t}:null;
+}
+function _kopiAnker(a){
+  return(a&&a.a&&a.b)?{a:{x:+a.a.x,y:+a.a.y},til:a.til,b:{x:+a.b.x,y:+a.b.y}}:null;
+}
+function _brukAnker(f){
+  const a=_anker(f);if(!a)return false;
+  const mf=mppForFloor(f),mt=mppForFloor(a.t);if(!mf||!mt)return false;
+  f.floorDxImg=(a.b.x+(a.t.floorDxImg||0))*mt/mf-a.a.x;
+  f.floorDyImg=(a.b.y+(a.t.floorDyImg||0))*mt/mf-a.a.y;
+  return true;
+}
+// To rundar, så eit ark som er plassert mot ei anna delplan følgjer med når
+// den andre flyttar seg.
+function _brukAlleAnker(){
+  for(let r=0;r<2;r++)floors.forEach(f=>{if(f.plassAnker)_brukAnker(f);});
+}
+// Arket vart flytta for hand (piltastar, Plasser). Ankeret til arket sjølv
+// skal følgje den nye staden; ark som er plasserte MOT det skal følgje med.
+function _arkFlytta(f){
+  const a=_anker(f);
+  if(a){
+    const mf=mppForFloor(f),mt=mppForFloor(a.t);
+    const k=(mf&&mt)?mf/mt:1;
+    f.plassAnker.b={x:(a.a.x+(f.floorDxImg||0))*k-(a.t.floorDxImg||0),
+                    y:(a.a.y+(f.floorDyImg||0))*k-(a.t.floorDyImg||0)};
+  }
+  _brukAlleAnker();
+}
 // Redirect zones to active floor
 function syncFloorState(){
   const f=curFloor();
@@ -1373,6 +1517,7 @@ function saveFloorState(){
   const f=curFloor();
   f.bgImg=bgImg;f.sc=sc;f.offX=offX;f.offY=offY;
   f.defaultHoyde=parseFloat(fhI.value)||3.0;
+  etasjeArk(f).forEach(x=>{x.defaultHoyde=f.defaultHoyde;});   // delplanar deler høgda
   // Lagre berre tilbake til etasjen om den har eigen kalibrering
   if(f.ownCal)f.mmPerImgPx=mmPerImgPx;
   f.zones=zones;
@@ -1387,10 +1532,33 @@ function renderFloorTabs(){
   let dragSrcIdx=null;
 
   if(typeof updateGhostUI==='function')updateGhostUI();
+  // Ei etasje med delplanar står som éin gruppe: hovudteikninga fyrst, så
+  // delplanane, og ein liten «+» til ei ny teikning for same etasje.
+  let grp=null;
+  const lukkGruppe=()=>{
+    if(!grp)return;
+    const h=grp._hov;
+    const add=document.createElement('button');
+    add.className='floor-grp-add';add.textContent='+';
+    add.title='Ny delplan i «'+h.name+'» — ei teikning til for same etasje';
+    add.onclick=e=>{e.stopPropagation();leggTilDelplan(h);};
+    grp.appendChild(add);
+    grp=null;
+  };
   floors.forEach((f,fi)=>{
     const tab=document.createElement('button');
-    tab.className='floor-tab'+(fi===activeFloor?' active':'');
-    tab.title='Høgreklikk: kopier etasjen, eller hent ein inn frå eit anna prosjekt';
+    const _del=erDelplan(f);
+    if(!_del){
+      lukkGruppe();
+      if(etasjeArk(f).length>1){
+        grp=document.createElement('div');grp.className='floor-group';grp._hov=f;
+        grp.title='Éi etasje, fleire teikningar — same høgd og same nivå i 3D';
+        bar.appendChild(grp);
+      }
+    }
+    tab.className='floor-tab'+(fi===activeFloor?' active':'')+(_del?' delplan':'');
+    tab.title=_del?'Delplan i «'+hovudEtasje(f).name+'» — høgreklikk for fleire val'
+                  :'Høgreklikk: delplanar, kopier etasjen, eller hent ein inn frå eit anna prosjekt';
     tab.draggable=true;
     tab.style.cssText+='cursor:grab;';
 
@@ -1420,6 +1588,7 @@ function renderFloorTabs(){
       floors.splice(newIdx,0,moved);
       // Keep activeFloor pointing at same floor object
       activeFloor=floors.indexOf(moved);
+      _ordneDelplanar();   // delplanane følgjer hovudetasjen sin
       dragSrcIdx=null;
       syncFloorState();renderFloorTabs();updateResults();renderTable();draw();
     });
@@ -1442,7 +1611,12 @@ function renderFloorTabs(){
 
     const badge=document.createElement('span');
     badge.className='floor-tab-badge';
-    badge.textContent=f.zones.length+' soner';
+    badge.textContent=f.zones.length+(_del?'':' soner');
+    if(!_del&&etasjeArk(f).length>1){
+      const tot=etasjeArk(f).reduce((s,x)=>s+x.zones.length,0);
+      badge.textContent=f.zones.length+' / '+tot+' soner';
+      badge.title=f.zones.length+' soner på denne teikninga, '+tot+' i heile etasjen';
+    }
 
     tab.appendChild(nameEl);
     tab.appendChild(badge);
@@ -1451,11 +1625,21 @@ function renderFloorTabs(){
       const del=document.createElement('button');
       del.className='floor-tab-del';
       del.textContent='×';
-      del.title='Slett etasje';
+      del.title=_del?'Slett delplanen':'Slett etasje';
       del.onclick=e=>{
         e.stopPropagation();
-        if(!confirm('Slett "'+f.name+'" og alle sonene i denne etasjen?\n\nKan angrast med Ctrl+Z.')){return;}
+        const _ark=etasjeArk(f);
+        const _arv=!_del&&_ark.length>1?_ark[1]:null;   // delplanen som tek over etasjen
+        const _sp=_del?'Slett delplanen "'+f.name+'" og sonene på ho?\n\nResten av "'+hovudEtasje(f).name+'" står att.'
+                 :_arv?'Slett teikninga "'+f.name+'" og sonene på ho?\n\n"'+_arv.name+'" vert hovudteikning for etasjen og tek over namnet "'+f.name+'".'
+                 :'Slett "'+f.name+'" og alle sonene i denne etasjen?';
+        if(!confirm(_sp+'\n\nKan angrast med Ctrl+Z.')){return;}
         snapshot();
+        if(_arv){
+          _arv.delAv=null;_arv.plassAnker=null;
+          _ark.slice(2).forEach(x=>{x.delAv=_arv.id;});
+          _arv.name=f.name;
+        }
         floors.splice(fi,1);
         // Slettar vi ei etasje FØR den aktive, forskyvast indeksen — juster
         if(fi<activeFloor)activeFloor--;
@@ -1464,15 +1648,18 @@ function renderFloorTabs(){
         const _gidCount={};
         floors.forEach(fl=>fl.zones.forEach(z=>{if(z.groupId)_gidCount[z.groupId]=(_gidCount[z.groupId]||0)+1;}));
         floors.forEach(fl=>fl.zones.forEach(z=>{if(z.groupId&&_gidCount[z.groupId]<2)delete z.groupId;}));
+        _ordneDelplanar();
         syncFloorState();renderFloorTabs();updateResults();renderTable();draw();
       };
       tab.appendChild(del);
     }
-    bar.appendChild(tab);
+    (_del&&grp?grp:(grp&&grp._hov===f?grp:bar)).appendChild(tab);
   });
+  lukkGruppe();
 }
 
 function switchFloor(fi){
+  if(mode==='plasser-ark')setMode('navigate');   // plasseringa gjeld arket vi går frå
   saveFloorState();
   activeFloor=fi;
   syncFloorState();
@@ -1489,11 +1676,12 @@ document.getElementById('addFloorBtn').onclick=async()=>{
   // importerEtasjar() eig heile innsetjinga (og angre-steget).
   if(choice==='clip'){await limInnEtasjeFraKlippbord();return;}
   if(choice==='from-file'){await hentEtasjeFraFil();return;}
+  if(choice==='delplan'){await leggTilDelplan(curFloor());return;}
   saveFloorState();
   // Inherit calibration from current floor
   const newFloor={
     id:_nextFloorId++,
-    name:'Etasje '+(floors.length+1),
+    name:'Etasje '+(floors.filter(f=>!erDelplan(f)).length+1),
     bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,
     paperWMm:null,paperHMm:null,paperSource:null,
     mmPerImgPx:null,ownCal:false,defaultHoyde:parseFloat(fhI.value)||3.0,floorDxImg:0,floorDyImg:0,
@@ -1956,13 +2144,28 @@ if(window.ResizeObserver)new ResizeObserver(()=>{if(sideBySide)drawSide();}).obs
 
 // ── Ghost-overlay og etasje-offset ─────────────────────────
 function updateGhostUI(){
-  const hasMulti=floors.length>1;
+  // Ghost gjeld naboetasjar; delplan-knappane gjeld arka i same etasje
+  const hasMulti=floors.filter(f=>!erDelplan(f)).length>1;
+  const harDel=etasjeArk(curFloor()).length>1;
   const widget=document.getElementById('ghostWidget');
   const offsetBar=document.getElementById('floorOffsetBar');
   const ghostBtn=document.getElementById('ghostBtn');
-  if(widget)widget.style.display=hasMulti?'flex':'none';
-  if(offsetBar)offsetBar.style.display=(hasMulti&&ghostMode)?'flex':'none';
+  if(widget)widget.style.display=(hasMulti||harDel)?'flex':'none';
+  if(offsetBar)offsetBar.style.display=((hasMulti&&ghostMode)||harDel)?'flex':'none';
+  const vb=document.getElementById('delplanVisBtn'),pb=document.getElementById('plasserBtn');
+  if(vb){
+    vb.style.display=harDel?'flex':'none';
+    vb.style.background=visDelplanar?'var(--accent-dim)':'transparent';
+    vb.style.color=visDelplanar?'var(--accent)':'var(--text3)';
+  }
+  if(pb){
+    const paa=mode==='plasser-ark';
+    pb.style.display=harDel?'flex':'none';
+    pb.style.background=paa?'rgba(234,88,12,.12)':'transparent';
+    pb.style.color=paa?'rgb(194,65,12)':'var(--text3)';
+  }
   if(ghostBtn){
+    ghostBtn.style.display=hasMulti?'flex':'none';
     ghostBtn.style.background=ghostMode?'var(--accent-dim)':'transparent';
     ghostBtn.style.color=ghostMode?'var(--accent)':'var(--text3)';
   }
@@ -1993,14 +2196,16 @@ if(ghostBtn){
   };
 }
 document.getElementById('floorOffsetReset').onclick=()=>{
-  const f=curFloor();f.floorDxImg=0;f.floorDyImg=0;
+  const f=curFloor();snapshot();f.floorDxImg=0;f.floorDyImg=0;
+  f.plassAnker=null;_arkFlytta(f);   // ark plasserte mot dette følgjer med
   updateOffsetDisplay();draw();
   if(document.getElementById('model3dOverlay').style.display==='flex')window._rebuild3D&&window._rebuild3D();
 };
 
 // Etasje-offset med piltastar (når ghost er aktivt)
 document.addEventListener('keydown',e=>{
-  if(!ghostMode)return;
+  if(!ghostMode&&!(mode==='plasser-ark'&&!plass))return;
+  if(iFasade())return;
   const KEYS=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'];
   if(!KEYS.includes(e.key))return;
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.isContentEditable)return;
@@ -2014,10 +2219,212 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight')f.floorDxImg+=step;
   if(e.key==='ArrowUp')f.floorDyImg-=step;
   if(e.key==='ArrowDown')f.floorDyImg+=step;
+  _arkFlytta(f);markDirty();
   updateOffsetDisplay();draw();
   if(document.getElementById('model3dOverlay').style.display==='flex')window._rebuild3D&&window._rebuild3D();
 },{capture:false});
 
+
+// ── Plasser delplan: to klikk ─────────────────────────────────
+// Klikk 1: eit kjent punkt på det aktive arket (snappar berre mot dette arket).
+// Klikk 2: same punktet på eit systerark (snappar berre mot systerarka). Medan
+// ein leitar etter punkt 2, følgjer heile det aktive arket musa, så ein ser
+// teikningane leggje seg oppå kvarandre før ein slepp.
+// Berre flytting — ikkje rotasjon. Delteikningar frå same prosjekt står i
+// same retning; ei rotering ville dessutan måtte flytte alle punkta i sonene.
+let plass=null;   // {p1, dx0, dy0, t, sp, ark} medan punkt 2 vert leita etter
+function startPlasserArk(){
+  if(iFasade())return;
+  const A=curFloor(),syster=etasjeArk(A).filter(f=>f!==A);
+  if(!syster.length){hintText.textContent='Arket har ingen delplanar å plassere seg mot.';return;}
+  if(!syster.some(f=>f.bgImg||f.zones.length)){
+    hintText.textContent='Dei andre arka i etasjen er tomme — last opp teikninga der fyrst.';return;
+  }
+  if(!visDelplanar){visDelplanar=true;updateGhostUI();}
+  setMode('plasser-ark');
+  plass=null;
+  const u=mppForFloor(A)&&syster.every(f=>mppForFloor(f))?'':
+    ' · NB: kalibrer arka — plasseringa vert halden når skalaen kjem på plass';
+  hintText.textContent=HINTS['plasser-ark']+u;
+  updateGhostUI();draw();
+}
+function _avbrytPlassering(){
+  if(!plass)return;
+  const A=curFloor();
+  A.floorDxImg=plass.dx0;A.floorDyImg=plass.dy0;
+  plass=null;
+}
+// Klikk 2: arket følgjer musa. Snappinga vert rekna med arket på den GAMLE
+// staden, sidan det er der p1 er definert.
+function _plasserForhand(){
+  if(!plass){
+    _snapKjelde='aktiv';
+    drawSnap=unifiedSnap(mouse.x,mouse.y,null);
+    _snapKjelde=null;
+    return;
+  }
+  const A=curFloor();
+  A.floorDxImg=plass.dx0;A.floorDyImg=plass.dy0;
+  _snapKjelde='syster';
+  const sn=unifiedSnap(mouse.x,mouse.y,null);
+  _snapKjelde=null;
+  let t=sn?{x:sn.x,y:sn.y}:s2i(mouse.x,mouse.y);
+  if(!sn&&shiftHeld){   // lås til vassrett eller loddrett flytting
+    if(Math.abs(t.x-plass.p1.x)>Math.abs(t.y-plass.p1.y))t={x:t.x,y:plass.p1.y};
+    else t={x:plass.p1.x,y:t.y};
+  }
+  plass.t=t;plass.ark=sn?sn.ark:null;
+  plass.sp=i2s(t.x,t.y);
+  plass.snapType=sn?sn.type:null;
+  A.floorDxImg=plass.dx0+(t.x-plass.p1.x);
+  A.floorDyImg=plass.dy0+(t.y-plass.p1.y);
+}
+function _plasserKlikk(sx,sy){
+  const A=curFloor();
+  if(!plass){
+    _snapKjelde='aktiv';
+    const sn=unifiedSnap(sx,sy,null);
+    _snapKjelde=null;
+    const p1=sn?{x:sn.x,y:sn.y}:s2i(sx,sy);
+    plass={p1,dx0:A.floorDxImg||0,dy0:A.floorDyImg||0,t:p1,sp:i2s(p1.x,p1.y),ark:null,snapType:null};
+    drawSnap=null;
+    const namn=etasjeArk(A).filter(f=>f!==A).map(f=>'«'+f.name+'»').join(' / ');
+    hintText.textContent='Klikk same punktet på '+namn+' — arket følgjer musa · Shift låser til vassrett/loddrett · Esc for å avbryte';
+    if(mouse)_plasserForhand();
+    draw();return;
+  }
+  _plasserForhand();
+  const fin={x:A.floorDxImg,y:A.floorDyImg};
+  // Kva ark punkt 2 ligg på: det snappinga fann, elles det øvste arket som
+  // dekkjer punktet, elles hovudetasjen.
+  A.floorDxImg=plass.dx0;A.floorDyImg=plass.dy0;
+  const syster=etasjeArk(A).filter(f=>f!==A);
+  let til=plass.ark&&syster.includes(plass.ark)?plass.ark:null;
+  if(!til)til=syster.slice().reverse().find(f=>{
+    if(!f.bgImg)return false;
+    const q=aktivTilArk(plass.t,f);
+    return q.x>=0&&q.y>=0&&q.x<=f.bgImg.width&&q.y<=f.bgImg.height;
+  })||(syster.includes(hovudEtasje(A))?hovudEtasje(A):syster[0]);
+  const b=aktivTilArk(plass.t,til);
+  const flytt=Math.hypot(fin.x-plass.dx0,fin.y-plass.dy0);
+  snapshot();
+  A.floorDxImg=fin.x;A.floorDyImg=fin.y;
+  A.plassAnker={a:{x:plass.p1.x,y:plass.p1.y},til:til.id,b};
+  plass=null;
+  _brukAlleAnker();   // ark som er plasserte mot dette følgjer med
+  setMode('navigate');
+  updateOffsetDisplay();updateResults();renderTable();draw();
+  if(document.getElementById('model3dOverlay').style.display==='flex')window._rebuild3D&&window._rebuild3D();
+  hintText.textContent='✓ «'+A.name+'» er plassert mot «'+til.name+'»'+(flytt<0.5?' (stod alt der)':'')+
+    '. Plasseringa vert halden om du kalibrerer på nytt · Ctrl+Z angrar.';
+}
+function _teiknPlassering(){
+  ctx.save();
+  if(!plass){
+    if(drawSnap)drawSnapMarker(i2s(drawSnap.x,drawSnap.y),drawSnap.type,'rgb(234,88,12)');
+  } else {
+    // Omrisset av det aktive arket der det vil hamne
+    if(bgImg){
+      const d=_arkOffset();
+      ctx.strokeStyle='rgba(234,88,12,0.9)';ctx.lineWidth=2;ctx.setLineDash([8,4]);
+      ctx.strokeRect(offX+d.x*sc,offY+d.y*sc,bgImg.width*sc,bgImg.height*sc);
+      ctx.setLineDash([]);
+    }
+    const sp=plass.sp;
+    if(sp){
+      if(plass.snapType)drawSnapMarker(sp,plass.snapType,'rgb(234,88,12)');
+      ctx.strokeStyle='rgb(234,88,12)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(sp.x-14,sp.y);ctx.lineTo(sp.x+14,sp.y);ctx.moveTo(sp.x,sp.y-14);ctx.lineTo(sp.x,sp.y+14);ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+document.getElementById('plasserBtn').onclick=()=>{
+  if(mode==='plasser-ark'){setMode('navigate');updateGhostUI();draw();return;}
+  startPlasserArk();
+};
+document.getElementById('delplanVisBtn').onclick=()=>{
+  visDelplanar=!visDelplanar;
+  if(!visDelplanar&&mode==='plasser-ark')setMode('navigate');
+  updateGhostUI();draw();
+  hintText.textContent=visDelplanar?'Dei andre teikningane i etasjen er synlege — du kan snappe mot dei.'
+                                   :'Berre denne teikninga er synleg. Sonene på dei andre arka er der framleis.';
+};
+
+// ── Ny delplan ──
+// Målestokken til eit ark, utleidd frå skalaen og papirformatet. Berre når
+// han ligg nær ein vanleg målestokk — elles gjettar vi ikkje.
+function _arkMaalestokk(f){
+  const mpp=mppForFloor(f);
+  if(!mpp||!f.bgImg||!f.paperWMm)return null;
+  const m=mpp*f.bgImg.width/f.paperWMm;
+  const std=[20,50,100,200,250,500,1000].find(v=>Math.abs(m-v)/v<0.02);
+  return std||null;
+}
+async function leggTilDelplan(hf){
+  if(iFasade())return;
+  const h=hovudEtasje(hf||curFloor());
+  const img=await pickFile();
+  if(!img||!img.bgImg)return;
+  saveFloorState();
+  snapshot();
+  const ark=etasjeArk(h);
+  const tatt=new Set(floors.map(f=>f.name));
+  let n=ark.length+1,namn='Del '+n;
+  while(tatt.has(namn))namn='Del '+(++n);
+  // Ei anna teikning har sjeldan same pikseltettleik — PDF-ane vert rendra
+  // til om lag same tal pikslar uansett papirformat. Difor eiga kalibrering.
+  // Har hovudteikninga ein vanleg målestokk og den nye sida eit kjent
+  // papirformat, føreslår vi same målestokk — og seier det.
+  const ny={
+    id:_nextFloorId++,name:namn,delAv:h.id,plassAnker:null,
+    bgImg:img.bgImg,pdfDoc:img.pdfDoc,pdfPage:img.pdfPage,totalPages:img.totalPages,
+    paperWMm:img.paperWMm,paperHMm:img.paperHMm,paperSource:img.paperSource,
+    mmPerImgPx:null,ownCal:true,defaultHoyde:h.defaultHoyde??3.0,floorDxImg:0,floorDyImg:0,
+    sc:1,offX:0,offY:0,zones:[],measurements:[]
+  };
+  const ms=_arkMaalestokk(h);
+  if(ms&&ny.paperWMm)ny.mmPerImgPx=ny.paperWMm/ny.bgImg.width*ms;
+  // Start med øvre venstre hjørne oppå øvre venstre hjørne av hovudteikninga
+  const mh=mppForFloor(h);
+  const k=(ny.mmPerImgPx&&mh)?mh/ny.mmPerImgPx:1;
+  ny.floorDxImg=(h.floorDxImg||0)*k;ny.floorDyImg=(h.floorDyImg||0)*k;
+  floors.splice(floors.indexOf(ark[ark.length-1])+1,0,ny);
+  activeFloor=floors.indexOf(ny);
+  syncFloorState();
+  editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
+  renderFloorTabs();updateResults();renderTable();
+  fitImage();
+  if(h.bgImg||h.zones.length)startPlasserArk();
+  hintText.textContent='«'+namn+'» er lagd til i «'+h.name+'». '+
+    (ny.mmPerImgPx?'Skalaen er sett til 1:'+ms+' som hovudteikninga — kontroller med eit kontrollmål. '
+                  :'Kalibrer teikninga (eiga skala). ')+
+    (mode==='plasser-ark'?'Plasser ho no: klikk eit kjent punkt her, så same punktet på «'+h.name+'».':'');
+}
+// Gjer eit eksisterande ark (og delplanane hans) til delplan(ar) av h.
+// Dette er vegen frå den gamle omvegen med etasjehøgd 0 og ghost-forskyving:
+// forskyvinga står, så arket ligg der det låg.
+function gjerTilDelplan(f,h){
+  if(!f||!h||f===h||erDelplan(h))return;
+  saveFloorState();
+  snapshot();
+  etasjeArk(f).forEach(x=>{x.delAv=h.id;});
+  _ordneDelplanar();
+  syncFloorState();renderFloorTabs();updateResults();renderTable();draw();
+  if(document.getElementById('model3dOverlay').style.display==='flex')window._rebuild3D&&window._rebuild3D();
+  hintText.textContent='«'+f.name+'» er no ei delplan i «'+h.name+'» — same etasjehøgd ('+(h.defaultHoyde??3)+' m) og same nivå i 3D. '+
+    'Bruk «⌖ Plasser» om teikningane ikkje ligg rett mot kvarandre.';
+}
+function gjerTilEigaEtasje(f){
+  if(!erDelplan(f))return;
+  saveFloorState();
+  snapshot();
+  f.delAv=null;f.plassAnker=null;
+  _ordneDelplanar();
+  syncFloorState();renderFloorTabs();updateResults();renderTable();draw();
+  if(document.getElementById('model3dOverlay').style.display==='flex')window._rebuild3D&&window._rebuild3D();
+  hintText.textContent='«'+f.name+'» er no ei eiga etasje.';
+}
 
 function showAddFloorMenu(klipp){
   return new Promise(resolve=>{
@@ -2032,6 +2439,7 @@ function showAddFloorMenu(klipp){
       {key:'blank',icon:'⬡',label:'Tom etasje','desc':'Last opp teikning seinare'},
       {key:'file',icon:'↑',label:'Last opp fil','desc':'PDF eller bilete for ny etasje'},
       {key:'pdf-page',icon:'⊕',label:'Neste side i same PDF','desc':pdfDoc?`Side ${curPage+1} av ${totalPages}`:'Ingen PDF lasta'},
+      {key:'delplan',icon:'▣',label:'Ny delplan i «'+hovudEtasje(curFloor()).name+'»','desc':'Ei teikning til for same etasje — t.d. ein annan fløy'},
       {key:'clip',icon:'⧈',label:'Lim inn kopiert etasje',
         'desc':klipp?('«'+klipp.namn+'» · '+klipp.soner+' soner'
                       +(klipp.kjelde?' · '+klipp.kjelde:'')+(klipp.alder?' · '+klipp.alder:''))
@@ -2225,8 +2633,24 @@ function i2s(ix,iy){
   return{x:(ix+d.x)*sc+offX,y:(iy+d.y)*sc+offY};
 }
 // Konverter biletkord for ei spesifikk etasje (for ghost-overlay)
+// Med ulik skala på arka vert det andre arket skalert med k = mpp(f)/mpp(aktivt),
+// så det står likt med 3D-modellen. Same skala ⇒ k=1, som før.
 function i2sFloor(ix,iy,f){
-  return{x:(ix+(f.floorDxImg||0))*sc+offX,y:(iy+(f.floorDyImg||0))*sc+offY};
+  const k=_arkK(f);
+  return{x:(ix+(f.floorDxImg||0))*k*sc+offX,y:(iy+(f.floorDyImg||0))*k*sc+offY};
+}
+// Teikn bakgrunnsbiletet til eit anna ark (ghost/delplan) der det står no
+function _teiknArkBilete(f){
+  if(!f||!f.bgImg)return;
+  const k=_arkK(f);
+  ctx.drawImage(f.bgImg,offX+(f.floorDxImg||0)*k*sc,offY+(f.floorDyImg||0)*k*sc,f.bgImg.width*k*sc,f.bgImg.height*k*sc);
+}
+// Hovudetasjen ghost-laget viser: etasjen under, eller over om vi står nedst.
+// Ei delplan er ikkje ein nabo — ho er ein del av same etasje.
+function ghostEtasje(){
+  const hov=floors.filter(f=>!erDelplan(f));
+  const hi=hov.indexOf(hovudEtasje(curFloor()));
+  return hov[hi>0?hi-1:hi+1]||null;
 }
 
 // ── Scale helpers ─────────────────────────────────────────────
@@ -2283,6 +2707,7 @@ function _snapshotMpp(){return floors.map(fl=>mppForFloor(fl));}
 function _reskalerAlleEtasjar(oldMppList){
   let n=0;
   floors.forEach((fl,i)=>{n+=reskalerVedNyKalibrering(fl,oldMppList[i],mppForFloor(fl));});
+  _brukAlleAnker();   // delplanar held plasseringa si når skalaen endrar seg
   return n;
 }
 
@@ -2773,11 +3198,13 @@ function ensureKjellerveggar(z,segs){
 // Stakkingsformelen må vere identisk med floorBaseY i 3D-bygginga, elles
 // hamnar terrenget på feil nivå.
 function _etasjeStakkHoyde(f){
-  return f.defaultHoyde??Math.max(...f.zones.map(z=>getHoyde(z)),3);
+  return f.defaultHoyde??Math.max(...etasjeArk(f).flatMap(a=>a.zones.map(z=>getHoyde(z))),3);
 }
 function kjellerSenking(){
-  let cum=0,terreng=0,funne=false;
-  for(const f of floors){
+  let terreng=0,funne=false;
+  const grunn=etasjeGrunnhoyder();
+  for(let fi=0;fi<floors.length;fi++){
+    const f=floors[fi],cum=grunn[fi];
     const kjSoner=f.zones.filter(z=>isKjeller(z));
     if(kjSoner.length){
       // Fleire kjellersoner i same etasje: den djupaste oppfyllinga styrer
@@ -2787,7 +3214,6 @@ function kjellerSenking(){
       terreng=Math.max(terreng,cum+d);
       funne=true;
     }
-    cum+=_etasjeStakkHoyde(f);
   }
   return funne?terreng:0;
 }
@@ -3035,10 +3461,12 @@ const HINTS={
   'tegn-takflate':'Klikk hjørner for å teikne takflate-polygon. Klikk på startpunktet for å lukke. Esc for å avbryte.',
   'klipp-takflate':'Klikk for å legge til punkt på klippelinja · Shift for 90°/45° · Enter eller dobbelklikk for å klippe · Esc for å avbryte',
   'del-sone':'Teikn ei linje tvers gjennom sona · Shift for 90°/45° · Enter eller dobbelklikk for å dele · Esc for å avbryte',
+  'plasser-ark':'Klikk eit kjent punkt på DETTE arket (t.d. eit hjørne) · piltastar flyttar arket litt · Esc for å avbryte',
 };
-const MODELABELS={navigate:'Naviger',draw:'Tegn sone',edit:'Rediger',calibrate:'Kalibrer',window:'Vindauge/dør',measure:'Kontrollmål','tegn-takflate':'Teikn takflate','klipp-takflate':'Klipp flate','del-sone':'Del sone'};
+const MODELABELS={navigate:'Naviger',draw:'Tegn sone',edit:'Rediger',calibrate:'Kalibrer',window:'Vindauge/dør',measure:'Kontrollmål','tegn-takflate':'Teikn takflate','klipp-takflate':'Klipp flate','del-sone':'Del sone','plasser-ark':'Plasser delplan'};
 
 function setMode(m){
+  if(m!=='plasser-ark')_avbrytPlassering();
   mode=m;drawSnap=null;calSnap=null;measureSnap=null;measureGeoSnap=null;
   if(m!=='del-sone'){delSonePts=[];delSoneTarget=null;delSoneSnap=null;}
   navBtn.classList.toggle('on',m==='navigate');
@@ -3047,10 +3475,11 @@ function setMode(m){
   winBtn.classList.toggle('on',m==='window');
   calBtn.classList.toggle('on',m==='calibrate');
   measureBtn.classList.toggle('on',m==='measure');
-  cv.style.cursor=m==='navigate'?'grab':m==='draw'||m==='calibrate'||m==='window'||m==='measure'||m==='tegn-takflate'||m==='klipp-takflate'||m==='del-sone'?'crosshair':'default';
+  cv.style.cursor=m==='navigate'?'grab':m==='draw'||m==='calibrate'||m==='window'||m==='measure'||m==='tegn-takflate'||m==='klipp-takflate'||m==='del-sone'||m==='plasser-ark'?'crosshair':'default';
   modeLabel.textContent=MODELABELS[m]||m;
   hintText.textContent=HINTS[m]||'';
   if(m!=='measure')measurePts=[];
+  if(typeof updateGhostUI==='function')updateGhostUI();
 }
 
 navBtn.onclick=()=>{setMode('navigate');editZoneIdx=null;curPts=[];calPts=[];draw();};
@@ -3278,7 +3707,7 @@ function snapshot(){
     pdfPage:f.pdfPage||1,totalPages:f.totalPages||1,
     paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
     mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-    sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
+    sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,delAv:f.delAv??null,plassAnker:_kopiAnker(f.plassAnker),
     measurements:normMaal(f.measurements),
     zones:JSON.parse(JSON.stringify(f.zones.map(z=>{
       const obj={...z,skillevegg:Array.from(z.skillevegg||[])};
@@ -3304,6 +3733,7 @@ function snapshot(){
 }
 
 function applyHistoryState(prev){
+  if(mode==='plasser-ark')setMode('navigate');
   floors=prev.floors.map((pf,fi)=>{
     const cur=floors[fi]||{};
     return{
@@ -3316,7 +3746,7 @@ function applyHistoryState(prev){
       paperWMm:pf.paperWMm??cur.paperWMm??null,paperHMm:pf.paperHMm??cur.paperHMm??null,
       paperSource:pf.paperSource??cur.paperSource??null,
       mmPerImgPx:pf.mmPerImgPx,ownCal:pf.ownCal||false,defaultHoyde:pf.defaultHoyde??3.0,
-      sc:pf.sc,offX:pf.offX,offY:pf.offY,floorDxImg:pf.floorDxImg||0,floorDyImg:pf.floorDyImg||0,
+      sc:pf.sc,offX:pf.offX,offY:pf.offY,floorDxImg:pf.floorDxImg||0,floorDyImg:pf.floorDyImg||0,delAv:pf.delAv??null,plassAnker:_kopiAnker(pf.plassAnker),
       measurements:normMaal(pf.measurements!==undefined?pf.measurements:cur.measurements),
       zones:pf.zones.map(z=>{
         const nz={...z,skillevegg:new Set(z.skillevegg||[])};
@@ -3345,6 +3775,7 @@ function applyHistoryState(prev){
     if(prev._nextFasadeId!==undefined)_nextFasadeId=prev._nextFasadeId;
   }
   activeFloor=Math.min(prev.activeFloor,floors.length-1);
+  _ordneDelplanar();
   _nextGroupId=prev._nextGroupId;
   if(prev._nextZoneId!==undefined)_nextZoneId=prev._nextZoneId;
   if(prev.globalMmPerImgPx!==undefined)globalMmPerImgPx=prev.globalMmPerImgPx;
@@ -3364,7 +3795,7 @@ function getCurrentState(){
       pdfPage:f.pdfPage||1,totalPages:f.totalPages||1,
       paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
       mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-      sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
+      sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,delAv:f.delAv??null,plassAnker:_kopiAnker(f.plassAnker),
       measurements:normMaal(f.measurements),
       zones:JSON.parse(JSON.stringify(f.zones.map(z=>{
         const obj={...z,skillevegg:Array.from(z.skillevegg||[])};
@@ -3844,6 +4275,46 @@ function slettAlleMaal(){
 }
 
 // ── Draw ──────────────────────────────────────────────────────
+// ── Delplanar på lerretet ──
+// Systerarka vert teikna to gonger: fyrst dempa under det aktive arket (der
+// dei stikk ut), så med multiply oppå, så strekane deira syner gjennom det
+// kvite papiret på det aktive arket. Kvitt papir gjer ingenting i multiply,
+// så det aktive arket står like klart. drawImage er GPU-akselerert, så to
+// teikningar per ark kostar under eit millisekund.
+function _teiknSysterBilete(alpha,op){
+  const ark=synlegeSysterark().filter(f=>f.bgImg);
+  if(!ark.length)return;
+  ctx.save();ctx.globalAlpha=alpha;
+  if(op)ctx.globalCompositeOperation=op;
+  ark.forEach(_teiknArkBilete);
+  ctx.restore();
+}
+// Sonene på systerarka: stipla og utan fyllfarge-identitet — dei kan ikkje
+// redigerast herifrå, berre snappast mot. Namnet står så ein ser kva det er.
+function _teiknSysterSoner(){
+  const ss=systerSoner();
+  if(!ss.length)return;
+  ctx.save();
+  ss.forEach(o=>{
+    if(o.pts.length<3)return;
+    ctx.beginPath();
+    o.pts.forEach((p,i)=>{const sp=i2s(p.x,p.y);if(i)ctx.lineTo(sp.x,sp.y);else ctx.moveTo(sp.x,sp.y);});
+    ctx.closePath();
+    ctx.fillStyle='rgba(29,79,79,0.07)';ctx.fill();
+    ctx.strokeStyle='rgba(29,79,79,0.55)';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);ctx.stroke();ctx.setLineDash([]);
+  });
+  ctx.font='600 10.5px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ss.forEach(o=>{
+    if(o.pts.length<3)return;
+    const mp=typeof flateMerkepunkt==='function'?flateMerkepunkt(o.pts):o.pts[0];
+    if(!mp)return;
+    const sp=i2s(mp.x,mp.y);
+    ctx.fillStyle='rgba(29,79,79,0.7)';
+    ctx.fillText(o.z.name+' · '+o.f.name,sp.x,sp.y);
+  });
+  ctx.restore();
+}
+
 function draw(){
   if(sideBySide)drawSideSnart();
   ctx.clearRect(0,0,cv.width,cv.height);
@@ -3871,16 +4342,13 @@ function draw(){
     // floorDxImg i biletpikslar → skjermoffset = floorDxImg * sc
     const _ao=_arkOffset();
     const afdx=_ao.x*sc,afdy=_ao.y*sc;
-    if(ghostMode&&floors.length>1&&!iFasade()){
-      // Steg 1: Teikn ghost-etasjen (naboetasjen) fullt synleg
-      const ghostFloorIdx=activeFloor>0?activeFloor-1:activeFloor+1;
-      const gf=floors[ghostFloorIdx];
-      if(gf&&gf.bgImg){
-        const gdx=(gf.floorDxImg||0)*sc,gdy=(gf.floorDyImg||0)*sc;
-        ctx.drawImage(gf.bgImg,offX+gdx,offY+gdy,gf.bgImg.width*sc,gf.bgImg.height*sc);
-      }
+    const _ge=(ghostMode&&!iFasade())?ghostEtasje():null;
+    if(_ge){
+      // Steg 1: Teikn ghost-etasjen (naboetasjen) fullt synleg — alle arka hennar
+      const _gArk=etasjeArk(_ge);
+      _gArk.forEach(_teiknArkBilete);
       // Teikn ghost-soner med fyllt farge og stipla kontur
-      if(gf){
+      _gArk.forEach(gf=>{
         gf.zones.forEach(gz=>{
           if(gz.pts.length<3||gz.skjult)return;
           ctx.beginPath();
@@ -3890,20 +4358,26 @@ function draw(){
           ctx.fillStyle='rgba(124,58,237,0.08)';ctx.fill();
           ctx.strokeStyle='rgba(124,58,237,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.stroke();ctx.setLineDash([]);
         });
-      }
+      });
       // Steg 2: Aktiv etasje sitt bilete med 65% opacity over ghost
+      _teiknSysterBilete(0.55);
       ctx.save();ctx.globalAlpha=0.65;
       ctx.drawImage(bgImg,offX+afdx,offY+afdy,bgImg.width*sc,bgImg.height*sc);
       ctx.restore();
+      _teiknSysterBilete(0.35,'multiply');
     } else {
       // Normalt — full opacity
+      _teiknSysterBilete(0.55);
       ctx.drawImage(bgImg,offX+afdx,offY+afdy,bgImg.width*sc,bgImg.height*sc);
+      _teiknSysterBilete(0.35,'multiply');
     }
   } else {
     const theme=document.documentElement.getAttribute('data-theme');
     ctx.fillStyle=theme==='lumon'?'#000810':'#d0d6de';
     ctx.fillRect(0,0,cv.width,cv.height);
+    _teiknSysterBilete(0.55);   // ei blank delplan viser framleis resten av etasjen
   }
+  _teiknSysterSoner();
 
   // Completed zones — fasadearket er eit reint oppmålingslag og har ingen
   zones.forEach((z,zi)=>{
@@ -4633,6 +5107,8 @@ function draw(){
     }
   }
 
+  if(mode==='plasser-ark')_teiknPlassering();
+
   drawCompass();
 
   ctx.restore(); // end nordCheck rotation transform
@@ -4935,9 +5411,21 @@ function _kuttSegment(z,cuts){
 }
 
 // Returnerer talet på veggar som vart skiljekonstruksjon.
+// Delplanar: sonene på dei andre arka i same etasje, med punkta omrekna til
+// det aktive arket. Omrekninga er ein likeforma avbildning (skala + flytting),
+// så ein t langs eit omrekna segment er same t langs originalen — kutta kan
+// difor gå rett inn i den ekte sona. Skjulte soner er med, som på eige ark.
+function _systerProxyar(){
+  if(iFasade())return[];
+  const A=curFloor();
+  return etasjeArk(A).filter(f=>f!==A).flatMap(f=>f.zones
+    .filter(z=>(z.pts||[]).length>=3)
+    .map(z=>({z,f,pts:z.pts.map(p=>arkTilAktiv(p,f))})));
+}
 function autoSkilleveggForNySone(nz){
   const andre=zones.filter(z=>z!==nz&&(z.pts||[]).length>=3);
-  if(!andre.length)return 0;
+  let syster=_systerProxyar();
+  if(!andre.length&&!syster.length)return 0;
   const tol=_naboTolPx(),minLen=_naboMinOverlapPx();
 
   // 1. Finn alle overlapp på opphavleg geometri og samle kutta per sone
@@ -4959,6 +5447,15 @@ function autoSkilleveggForNySone(nz){
         if(!o)continue;
         leggTil(nz,i,o.ta0);leggTil(nz,i,o.ta1);
         leggTil(z,j,o.tb0);leggTil(z,j,o.tb1);
+      }
+    });
+    syster.forEach(o=>{
+      const m=o.pts.length;
+      for(let j=0;j<m;j++){
+        const ov=_veggOverlapp(a1,a2,o.pts[j],o.pts[(j+1)%m],tol,minLen);
+        if(!ov)continue;
+        leggTil(nz,i,ov.ta0);leggTil(nz,i,ov.ta1);
+        leggTil(o.z,j,ov.tb0);leggTil(o.z,j,ov.tb1);
       }
     });
   }
@@ -4986,6 +5483,25 @@ function autoSkilleveggForNySone(nz){
       for(let j=0;j<m;j++){
         if(!_sammeVegg(a1,a2,z.pts[j],z.pts[(j+1)%m],tol))continue;
         const nyA=merk(nz,i,z),nyB=merk(z,j,nz);
+        if(nyA||nyB)tal++;
+      }
+    });
+  }
+  // Mot soner på eit anna ark berre skiljekonstruksjon, ingen sonekobling:
+  // zoneConnections peikar på ein indeks i SAME arket si soneliste.
+  syster=_systerProxyar();   // punkta etter kutta
+  const sk=(z,si)=>{
+    if(!z.skillevegg)z.skillevegg=new Set();
+    if(z.skillevegg.has(si))return false;
+    z.skillevegg.add(si);return true;
+  };
+  for(let i=0;i<nn;i++){
+    const a1=nz.pts[i],a2=nz.pts[(i+1)%nn];
+    syster.forEach(o=>{
+      const m=o.pts.length;
+      for(let j=0;j<m;j++){
+        if(!_sammeVegg(a1,a2,o.pts[j],o.pts[(j+1)%m],tol))continue;
+        const nyA=sk(nz,i),nyB=sk(o.z,j);
         if(nyA||nyB)tal++;
       }
     });
@@ -6257,14 +6773,37 @@ const SNAP_R={point:15,corner:15,imgcorner:13,edge:9};
 // men dei går tvers gjennom vindauget — medan tekst, møblar og målelinjer gir
 // korte strekar. Difor treffer dette veggane og overser resten, der ein rein
 // hjørnedetektor lett låser seg til næraste bokstav.
+// Kven snappinga skal sjå på: null = alt, 'aktiv' = berre det aktive arket,
+// 'syster' = berre systerarka (delplanar). Brukt av «Plasser delplan».
+let _snapKjelde=null;
 function imgLineSnap(sx,sy){
-  if(!snapEnabled||!bgImg||_snapBlocked)return null;
-  const iw=bgImg.width||bgImg.naturalWidth,ih=bgImg.height||bgImg.naturalHeight;
+  if(!snapEnabled||_snapBlocked)return null;
+  if(bgImg&&_snapKjelde!=='syster'){
+    const r=_linjeKryss(bgImg,s2i(sx,sy),Math.max(10,Math.round(SNAP_R.imgcorner/sc)));
+    if(r){const sp=i2s(r.x,r.y);return{x:r.x,y:r.y,type:'imgcorner',sx:sp.x,sy:sp.y};}
+  }
+  // Delplanar: veggkryss i systerteikningane, der det aktive arket er blankt
+  // eller sluttar. Søket går i biletpikslane til systerarket, og treffet vert
+  // rekna attende til det aktive arket.
+  if(_snapKjelde==='aktiv')return null;
+  for(const f of synlegeSysterark()){
+    if(!f.bgImg)continue;
+    const k=_arkK(f);
+    const r=_linjeKryss(f.bgImg,aktivTilArk(s2i(sx,sy),f),Math.max(10,Math.round(SNAP_R.imgcorner/(sc*k))));
+    if(_snapBlocked)return null;
+    if(!r)continue;
+    const a=arkTilAktiv(r,f),sp=i2s(a.x,a.y);
+    return{x:a.x,y:a.y,type:'imgcorner',sx:sp.x,sy:sp.y,ark:f};
+  }
+  return null;
+}
+// Linjekrysset nærast ip (biletpikslar på img), eller null. Rimg er
+// søkeradien i biletpikslar.
+function _linjeKryss(img,ip,Rimg){
+  const iw=img.width||img.naturalWidth,ih=img.height||img.naturalHeight;
   if(!iw||!ih)return null;
-  const Rimg=Math.max(10,Math.round(SNAP_R.imgcorner/sc));
   const src=Rimg*2+1;
   const W=Math.max(21,Math.min(81,src)|1);
-  const ip=s2i(sx,sy);
   const x0=Math.round(ip.x)-Rimg,y0=Math.round(ip.y)-Rimg;
   if(x0<0||y0<0||x0+src>=iw||y0+src>=ih)return null;
   if(!_lineCv){
@@ -6274,7 +6813,7 @@ function imgLineSnap(sx,sy){
   let d;
   try{
     _lineCtx.fillStyle='#fff';_lineCtx.fillRect(0,0,W,W);
-    _lineCtx.drawImage(bgImg,x0,y0,src,src,0,0,W,W);
+    _lineCtx.drawImage(img,x0,y0,src,src,0,0,W,W);
     d=_lineCtx.getImageData(0,0,W,W).data;
   }catch(e){_snapBlocked=true;return null;}
   const n=W*W,g=new Float32Array(n);
@@ -6329,9 +6868,7 @@ function imgLineSnap(sx,sy){
   const hy=finnLinje(rowC),vx=finnLinje(colC);
   if(hy<0||vx<0)return null;                   // treng både vassrett og loddrett
   const f=src/W;
-  const gx=x0+vx*f+f/2,gy=y0+hy*f+f/2;
-  const sp=i2s(gx,gy);
-  return{x:gx,y:gy,type:'imgcorner',sx:sp.x,sy:sp.y};
+  return{x:x0+vx*f+f/2,y:y0+hy*f+f/2};
 }
 
 
@@ -6341,7 +6878,9 @@ function unifiedSnap(sx,sy,ownPts){
   // På eit fasadeark finst ingen soner å snappe til — berre eigne punkt og
   // veggkryss i sjølve teikninga. Sonene ville dessutan lege på heilt andre
   // koordinatar, sidan arket er ei anna teikning.
-  const _sz=iFasade()?[]:zones;
+  const _sz=(iFasade()||_snapKjelde==='syster')?[]:zones;
+  // Sonene på systerarka (delplanar), omrekna til det aktive arket
+  const _ss=_snapKjelde==='aktiv'?[]:systerSoner();
   let bd,b;
   if(ownPts&&ownPts.length){
     bd=SNAP_R.point;b=null;
@@ -6356,11 +6895,15 @@ function unifiedSnap(sx,sy,ownPts){
     const sp=i2s(p.x,p.y),dd=Math.hypot(sx-sp.x,sy-sp.y);
     if(dd<bd){bd=dd;b={x:p.x,y:p.y,type:'corner',sx:sp.x,sy:sp.y};}
   });});
+  _ss.forEach(o=>o.pts.forEach(p=>{
+    const sp=i2s(p.x,p.y),dd=Math.hypot(sx-sp.x,sy-sp.y);
+    if(dd<bd){bd=dd;b={x:p.x,y:p.y,type:'corner',sx:sp.x,sy:sp.y,ark:o.ark};}
+  }));
   if(b)return b;
   const il=imgLineSnap(sx,sy);
   if(il&&Math.hypot(sx-il.sx,sy-il.sy)<=SNAP_R.imgcorner)return il;
   bd=SNAP_R.edge;b=null;
-  _sz.forEach(z=>{
+  [..._sz,..._ss].forEach(z=>{
     if(z.skjult)return;
     for(let i=0;i<z.pts.length;i++){
       const p1=z.pts[i],p2=z.pts[(i+1)%z.pts.length];
@@ -6370,7 +6913,7 @@ function unifiedSnap(sx,sy,ownPts){
       const t=((sx-s1.x)*dx+(sy-s1.y)*dy)/(len*len);
       if(t<=0||t>=1)continue;
       const px=s1.x+t*dx,py=s1.y+t*dy,dd=Math.hypot(sx-px,sy-py);
-      if(dd<bd){bd=dd;const ipp=s2i(px,py);b={x:ipp.x,y:ipp.y,type:'edge',sx:px,sy:py};}
+      if(dd<bd){bd=dd;const ipp=s2i(px,py);b={x:ipp.x,y:ipp.y,type:'edge',sx:px,sy:py,ark:z.ark};}
     }
   });
   return b;
@@ -6561,7 +7104,7 @@ function updateResults(){
       if(floors.length>1){
         const ftag=document.createElement('span');
         ftag.style.cssText='font-size:10px;color:var(--text3);white-space:nowrap;flex-shrink:0';
-        ftag.textContent=f.name;
+        ftag.textContent=arkNamn(f);
         cardHeader.appendChild(ftag);
       }
       const areaPreview=document.createElement('span');
@@ -7720,7 +8263,7 @@ function renderTable(){
     const fh=getHoyde(z);
     const areaVal=z.areaOverride!=null?z.areaOverride:(area?area.toFixed(2):'');
     const perimVal=z.perimOverride!=null?z.perimOverride:(perim?perim.toFixed(2):'');
-    const _flLabel=floors.length>1?` <span style="font-size:10px;color:var(--text3);font-weight:400">${fl.name}</span>`:'';  
+    const _flLabel=floors.length>1?` <span style="font-size:10px;color:var(--text3);font-weight:400">${arkNamn(fl)}</span>`:'';  
     html+=`<tr>
       <td><div style="display:flex;align-items:center;gap:4px"><input class="tbl-input" data-zname="${fli},${zi}" value="${z.name.replace(/"/g,'&quot;')}">${_flLabel}</div></td>
       <td><select class="tbl-input" data-zbygkat="${fli},${zi}" style="width:100%">${mkOpts(BYGG_KAT2,z.bygkat||'Kontorbygg')}</select></td>
@@ -7740,7 +8283,7 @@ function renderTable(){
   html+='<table class="dtbl"><thead><tr><th>Sone</th><th>Type</th><th>Konstruksjon</th><th>Flatareal m²</th><th>Takvinkel °</th><th title="Skrått areal etter vinkelkorrigering">Skrå m²</th><th>Utv. perimeter m</th></tr></thead><tbody>';
   floors.forEach((fl,fli)=>{fl.zones.forEach((z,zi)=>{
     const utvOmk=getUtvOmkrets(z);
-    const _fltag=floors.length>1?` (${fl.name})`:'';
+    const _fltag=floors.length>1?` (${arkNamn(fl)})`:'';
     const _sk=z.skillevegg||new Set();
     // Éi rad per flate. Udelt lag gir nøyaktig éi rad med redigerbar type, som før.
     const flateRader=(kind,dattr)=>{
@@ -7802,7 +8345,7 @@ function renderTable(){
   const _sharedBy=_allBy.length>0&&_allBy.every(y=>y===_allBy[0]);
   floors.forEach((fl,fli)=>{fl.zones.forEach((z,zi)=>{
     const std=entroStandard(z.byggeaar);
-    const _fltag=floors.length>1?` (${fl.name})`:''
+    const _fltag=floors.length>1?` (${arkNamn(fl)})`:''
 ;    // Check if this zone's byggeår is inherited (same as first zone that set it)
     const _isInherited=_sharedBy&&floors[0].zones[0]!==z&&z.byggeaar===_allBy[0];
     const mkUCell=(field,stdVal,ovVal)=>{
@@ -7839,7 +8382,7 @@ function renderTable(){
     let skMergedTbl=false;
     const zColor=COLORS[zi%COLORS.length];
     if(!z.segOverrides)z.segOverrides={};
-    const _flsuf=floors.length>1?` <span style="font-size:10px;font-weight:400;color:var(--text3)">${fl.name}</span>`:'';
+    const _flsuf=floors.length>1?` <span style="font-size:10px;font-weight:400;color:var(--text3)">${arkNamn(fl)}</span>`:'';
     html+=`<div style="margin-bottom:2px;padding:4px 0 2px;font-size:11px;font-weight:700;color:${zColor};border-bottom:2px solid ${zColor}22">${z.name}${_flsuf}</div>`;
     html+='<table class="dtbl" style="margin-bottom:10px"><thead><tr><th>Fasade</th><th>Type</th><th>Lengde m</th><th>Veggfl. m²</th><th>Vindauge m²</th><th>Netto m²</th><th>U-verdi W/m²K</th></tr></thead><tbody>';
     const stdZ=entroStandard(z.byggeaar);
@@ -7926,7 +8469,7 @@ function renderTable(){
     const segs=calcSegments(z.pts,null,mppForFloor(fl))||[];
     (z.windows||[]).forEach((w,wi)=>{
       const dir=segs[w.segIdx]?.dir||w.dir;
-      const _wfn=floors.length>1?` (${fl.name})`:'';allWins.push({...w,zoneName:z.name+_wfn,zi,wi,dir,fl,fli});
+      const _wfn=floors.length>1?` (${arkNamn(fl)})`:'';allWins.push({...w,zoneName:z.name+_wfn,zi,wi,dir,fl,fli});
     });
   });});
   if(allWins.length){
@@ -7964,7 +8507,7 @@ function renderTable(){
     f.zones.forEach(z=>{
       if(!z.groupId)return;
       if(!allGroups[z.groupId])allGroups[z.groupId]=[];
-      allGroups[z.groupId].push({z,fi,fname:f.name});
+      allGroups[z.groupId].push({z,fi,fname:arkNamn(f)});
     });
   });
   const groupKeys=Object.keys(allGroups).filter(k=>allGroups[k].length>1);
@@ -8226,6 +8769,7 @@ function orthoSnapAngle(sx, sy, prevScreenPt){
 // annan stad på teikninga etterpå — markøren lyg og klikket hamnar feil.
 function oppdaterSnap(){
   if(!mouse)return;
+  if(mode==='plasser-ark'){_plasserForhand();return;}
   // Live snap preview for window mode
   if(mode==='window'){
     winSnapPreview=snapScreenToSegment(mouse.x,mouse.y);
@@ -9046,6 +9590,8 @@ cv.addEventListener('click',e=>{
   const r=cv.getBoundingClientRect();
   const sx=e.clientX-r.left,sy=e.clientY-r.top;
 
+  if(mode==='plasser-ark'){_plasserKlikk(sx,sy);return;}
+
   // ── Måleverktøy ──
   if(mode==='measure'){
     let ip=s2i(sx,sy);
@@ -9439,6 +9985,7 @@ document.addEventListener('keydown',e=>{
     else if(mode==='tegn-takflate'){takflatePts=[];activeTakflateZone=null;setMode('navigate');draw();}
     else if(mode==='klipp-takflate'){klippTakflatePts=[];klippTakflateTarget=null;setMode('navigate');draw();}
     else if(mode==='del-sone'){delSonePts=[];delSoneTarget=null;delSoneSnap=null;setMode('navigate');draw();}
+    else if(mode==='plasser-ark'){setMode('navigate');hintText.textContent='Plasseringa vart avbroten — arket står der det stod.';draw();}
   }
   if(e.key==='Backspace'||e.key==='Delete'){
     // Slett hovered vindauge/dør
@@ -9480,6 +10027,11 @@ function tungOppdateringSnart(){
 [northI,fhI].forEach(el=>el.addEventListener('input',()=>{
   if(el===northI){
     setGlobalNorth(parseFloat(northI.value)||0);
+  }
+  // Etasjehøgda gjeld alle arka i etasjen, ikkje berre det aktive
+  if(el===fhI&&!iFasade()){
+    const v=parseFloat(fhI.value);
+    if(v>0)etasjeArk(curFloor()).forEach(x=>{x.defaultHoyde=v;});
   }
   draw();
   tungOppdateringSnart();
@@ -9655,7 +10207,7 @@ function serialiserEtasje(f,opts){
   const obj={
     id:f.id,name:f.name,
     mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-    sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
+    sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,delAv:f.delAv??null,plassAnker:_kopiAnker(f.plassAnker),
     pdfPage:f.pdfPage,totalPages:f.totalPages,
     paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
     measurements:normMaal(f.measurements),
@@ -9818,6 +10370,8 @@ async function deserialiserEtasje(f){
     // floorDxImg er biletpikslar. Gamle filer har floorDx i skjermpikslar — migrer via sc.
     floorDxImg:f.floorDxImg!=null?f.floorDxImg:(f.floorDx||0)/(f.sc||1),
     floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
+    delAv:f.delAv??null,      // delplan: id-en til hovudetasjen
+    plassAnker:_kopiAnker(f.plassAnker),
     sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
     pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
     paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
@@ -9865,6 +10419,7 @@ async function lastProsjekt(proj,opts){
   // Sikra at alle soner har korrekt zoneConnections-format (kan vere object, array, eller Map)
   ensureAllZoneConnectionsMaps();
   activeFloor=Math.min(proj.activeFloor??0,floors.length-1);
+  _ordneDelplanar();
   // Vis den oppdelinga prosjektet faktisk har. Berre eitt lag om gongen, og
   // taket vinn — utan oppdelt tak ville golvlaget elles ligge usynleg.
   flateLag=floors.some(fl=>fl.zones.some(z=>(z.takflater||[]).length))?'tak'
@@ -10161,9 +10716,13 @@ async function importerEtasjar(serFloors,meta){
 
   let utanSystem=0,egenKal=0;
   const nye=[];
+  // Delplanar: id-ane vert nye, så delAv må følgje med. Kjem ikkje
+  // hovudetasjen med i importen, vert delplanen ei eiga etasje.
+  const idNy=new Map();
   for(const sf of serFloors){
     const fl=await deserialiserEtasje(sf);
     fl.id=_nextFloorId++;
+    if(sf.id!=null)idNy.set(sf.id,fl.id);
     fl.name=_unikNamn(sf.name,tatteEtg);tatteEtg.add(fl.name);
     // Kalibreringa som GJALDT for etasjen i kjeldeprosjektet er den einaste som
     // gir rette mål. Er ho ulik den globale her, må etasjen ha eiga
@@ -10190,9 +10749,14 @@ async function importerEtasjar(serFloors,meta){
     nye.push(fl);
   }
 
+  nye.forEach(fl=>{
+    fl.delAv=(fl.delAv!=null&&idNy.has(fl.delAv))?idNy.get(fl.delAv):null;
+    if(fl.plassAnker)fl.plassAnker=idNy.has(fl.plassAnker.til)?{...fl.plassAnker,til:idNy.get(fl.plassAnker.til)}:null;
+  });
   nye.forEach(fl=>floors.push(fl));
   activeFloor=floors.length-nye.length;
   if(tomStart){floors.splice(0,1);activeFloor--;}
+  _ordneDelplanar();
   syncFloorState();
   editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
   renderFloorTabs();updateResults();renderTable();
@@ -10390,10 +10954,26 @@ async function showFloorContextMenu(clientX,clientY,f){
   };
   const hdr=document.createElement('div');
   hdr.className='ctx-menu-header';
-  hdr.textContent=f.name+' · '+f.zones.length+' soner';
+  hdr.textContent=arkNamn(f)+' · '+f.zones.length+' soner';
   menu.appendChild(hdr);
   const sep=document.createElement('div');sep.className='ctx-menu-sep';menu.appendChild(sep);
 
+  // Delplanar — fleire teikningar for same etasje
+  if(!iFasade()){
+    const h=hovudEtasje(f);
+    menu.appendChild(mkItem('▣','Ny delplan i «'+h.name+'»…','Ei teikning til for same etasje — t.d. ein annan fløy',()=>leggTilDelplan(h)));
+    if(erDelplan(f)){
+      menu.appendChild(mkItem('⇱','Gjer til eiga etasje','Får eiga høgd og vert stabla i 3D som før',()=>gjerTilEigaEtasje(f)));
+    } else {
+      floors.filter(x=>!erDelplan(x)&&x!==f).forEach(x=>{
+        const n=etasjeArk(f).length;
+        menu.appendChild(mkItem('⇲','Legg under «'+x.name+'» som delplan',
+          (n>1?'Alle '+n+' teikningane i «'+f.name+'» vert med · ':'')+'Høgda og nivået vert «'+x.name+'» sitt; plasseringa står',
+          ()=>gjerTilDelplan(f,x)));
+      });
+    }
+    const sep2=document.createElement('div');sep2.className='ctx-menu-sep';menu.appendChild(sep2);
+  }
   menu.appendChild(mkItem('⧉','Kopier etasje','Til klippbordet — kan hentast inn i eit anna prosjekt',async()=>{
     hintText.textContent='Kopierer «'+f.name+'»…';
     try{
@@ -12569,7 +13149,7 @@ function buildSXI(proj){
   const seenGroups=new Set();
   // Build a map: zone object -> floor name
   const zoneFloorName=new Map();
-  floors.forEach((fl,fli)=>{fl.zones.forEach(z=>zoneFloorName.set(z,fl.name));});
+  floors.forEach((fl,fli)=>{fl.zones.forEach(z=>zoneFloorName.set(z,arkNamn(fl)));});
 
   floors.forEach((fl,fli)=>{
     fl.zones.forEach((z,zi)=>{
@@ -13489,12 +14069,8 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     // Stack floors — bruk etasjens defaultHoyde som stakkingshøgde.
     // Med kjeller startar stabelen under null, slik at oppfyllingskanten til
     // den nedste kjelleretasjen fell saman med terrenget (planteikninga, y=0).
-    let cumY=-kjSink;
-    const floorBaseY=floors.map(f=>{
-      const by=cumY;
-      cumY+=_etasjeStakkHoyde(f);
-      return by;
-    });
+    // Delplanar står på same nivå som hovudetasjen sin (etasjeGrunnhoyder).
+    const floorBaseY=etasjeGrunnhoyder().map(b=>b-kjSink);
 
     const legendEl=document.getElementById('model3dLegend');
     legendEl.innerHTML='';
@@ -13798,7 +14374,7 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     const totalA=floors.flatMap(f=>f.zones).reduce((s,z)=>{const a=getAreaM2(z);return s+(a||0);},0);
     const nZ=floors.flatMap(f=>f.zones).length;
     document.getElementById('model3dInfo').innerHTML=
-      `${floors.length} etasje${floors.length>1?'r':''}&nbsp;·&nbsp;${nZ} sone${nZ>1?'r':''}&nbsp;·&nbsp;<strong>${totalA.toFixed(0)} m² BRA</strong>`;
+      `${(n=>n+' etasje'+(n>1?'r':''))(floors.filter(f=>!erDelplan(f)).length)}${floors.some(erDelplan)?' ('+floors.length+' teikningar)':''}&nbsp;·&nbsp;${nZ} sone${nZ>1?'r':''}&nbsp;·&nbsp;<strong>${totalA.toFixed(0)} m² BRA</strong>`;
 
     recenter();
     _applySun();
@@ -14514,11 +15090,11 @@ function printFasadeView(){
     }
 
     const features=[];
-    let cumH=0;
+    // Delplanar står på same nivå som hovudetasjen sin
+    const grunnH=etasjeGrunnhoyder();
     floors.forEach((f,fi)=>{
-      const baseH=cumH+elevM;
+      const baseH=grunnH[fi]+elevM;
       const flH=f.defaultHoyde??3;
-      cumH+=flH;
       // floorDxImg/floorDyImg er offset i BILETpikslar — same eining som z.pts.
       // Her stod det floorDx/floorDy, som er feltnamn frå før omlegginga og
       // ikkje finst lenger, så kartet ignorerte ghost-forskyvinga heilt.

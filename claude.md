@@ -103,6 +103,8 @@ floors = [{
   paperWMm,       // papirformat, for målestokk-kalibrering
   paperHMm,
   paperSource,    // 'pdf' | 'dpi' | null
+  delAv,          // id til hovudetasjen om arket er ei delplan, elles null
+  plassAnker,     // {a:{x,y}, til:id, b:{x,y}} — punktet a her ligg oppå b på arket til
   measurements,   // [{p1:{x,y}, p2:{x,y}}] — kontrollmål i biletkoordinatar.
                   // measureResults er eit ALIAS til denne (som zones) — aldri
                   // tildel measureResults=[], det bryt aliaset. Lengda reknast
@@ -907,6 +909,64 @@ Sidepanelet — plassen er knapp, så seksjonen veks med behovet:
   forhandsvisninga ståande att på lerretet til noko anna utløyser ei ny
   teikning. Bomskot (linja treffer ikkje flata) held derimot på målet, så
   brukaren kan prøve igjen utan å starte på nytt.
+
+## Delplanar (fleire planteikningar for same etasje)
+
+Store bygg har ofte éi teikning per fløy. Ei **delplan** er framleis eit
+vanleg element i `floors` — eige bilete, eiga kalibrering, eigne soner, eiga
+forskyving — men ber `delAv` = id-en til hovudetasjen. Alt som reknar per
+sone (areal, SXI, BRA) er difor urørt: ei sone høyrer til nøyaktig eitt ark.
+
+```javascript
+hovudEtasje(f) / erDelplan(f) / etasjeArk(f)   // gruppa, hovudetasjen fyrst
+arkNamn(f)              // «Etasje 1 · Del 2» — sonekort, tabell, eksport-suffiks
+_ordneDelplanar()       // held invariantane — kall etter kvar endring av rekkjefølgje/delAv
+etasjeGrunnhoyder()     // grunnhøgd per ark — 3D, kart og kjellerSenking MÅ bruke denne
+arkTilAktiv(p,f) / aktivTilArk(p,f)   // biletpunkt mellom ark, via verda i meter
+systerSoner()           // sonene på systerarka, punkta omrekna — berre til lesing
+```
+
+Invariantar:
+
+- **Ei hovudetasje er aldri sjølv delplan, og delplanane står rett etter ho i
+  `floors`.** `_ordneDelplanar()` reparerer begge (og foreldrelause `delAv`)
+  ved lasting, angring, import, sletting og dra-og-slepp.
+- **Same `defaultHoyde` i heile gruppa.** Etasjehøgd-feltet skriv til alle arka.
+  Ei delplan legg ikkje til høgd i stabelen — ho står på nivået til hovudetasjen.
+- **Verda er `(ix+floorDxImg)*mpp`**, same formel som 3D. Systerark og ghost-lag
+  vert difor teikna skalerte med `k = mpp(ark)/mpp(aktivt)` (`_arkK`). Manglar
+  ein skala, er k=1 — som ghost-laget før.
+- **Ny delplan får `ownCal=true`.** PDF-ane vert rendra til om lag same tal
+  pikslar uansett papir, så den globale skalaen er nesten alltid feil for ei
+  anna teikning. Målestokken til hovudteikninga vert føreslått berre når han
+  ligg innanfor 2 % av ein vanleg målestokk, og hintlinja seier frå.
+- **Plasseringa er eit anker i biletpikslar** (`plassAnker`), ikkje berre
+  forskyvinga. Forskyvinga er i biletpikslar, så ei omkalibrering ville elles
+  late arket gli ut av plass. `_reskalerAlleEtasjar` kallar `_brukAlleAnker()`,
+  og flyttar ein eit ark for hand (piltastar, ↺) går det gjennom `_arkFlytta(f)`
+  — ankeret til arket følgjer, og ark som er plasserte MOT det flyttar seg med.
+- **Plasser (⌖)** er modusen `plasser-ark`: klikk 1 snappar berre mot det aktive
+  arket, klikk 2 berre mot systerarka (`_snapKjelde`), og arket følgjer musa
+  imellom. Berre flytting, ingen rotasjon. `setMode`, `switchFloor` og
+  `applyHistoryState` avbryt og legg arket attende (`_avbrytPlassering`).
+- **Systerarka vert teikna to gonger**: dempa under det aktive arket, og med
+  `multiply` oppå så strekane syner gjennom det kvite papiret. Sonene deira er
+  stipla og kan ikkje redigerast — berre snappast mot (hjørne, kant og
+  `imgLineSnap` i systerbiletet). Ei sone kan difor teiknast tvers over
+  skøyten; punkta ligg i koordinatane til det aktive arket, også utanfor biletet.
+- **Auto-skiljekonstruksjon verkar på tvers av ark**, men set berre
+  `skillevegg` — aldri `zoneConnections`, som peikar på ein indeks i same
+  arket si soneliste. Kutta kan gå rett inn i den ekte sona fordi omrekninga
+  er likeforma (t langs eit segment er den same).
+- Ghost-laget viser **nabo-etasjen** (`ghostEtasje()`, alle arka hennar), aldri
+  ei delplan i same etasje.
+- Sletting av hovudteikninga: den fyrste delplanen tek over og arvar
+  etasjenamnet. «Gjer til eiga etasje» / «Legg under … som delplan» i
+  høgreklikkmenyen er vegen frå den gamle omvegen (etasjehøgd 0 + ghost):
+  forskyvinga står, så arket ligg der det låg.
+- Import/klippbord: `delAv` og `plassAnker.til` vert omrekna til nye id-ar;
+  kjem ikkje hovudetasjen med, vert arket ei eiga etasje.
+- `visDelplanar` er eit visingsval og vert ikkje lagra.
 
 ## Skjulte soner
 
