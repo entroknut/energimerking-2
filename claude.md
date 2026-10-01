@@ -68,8 +68,9 @@ Brukaren seier eksplisitt frå når noko skal publiserast. Då: bump versjonsnum
 «GitHub Actions»). Før dette stod kjelda på «Deploy from a branch», og den
 innebygde utløysinga starta ofte ikkje noko bygg etter ein push — i oktober
 2026 kom det ingen bygg på over 20 minutt, og løysinga var å slå kjelda av og
-på. Ikkje lag «Retrigger»-commitar lenger: startar ikkje workflowen, køyr han
-for hand med «Run workflow» i Actions-fana.
+på. Etter bytet startar pushen workflowen innan få sekund (verifisert med
+v5.5.2, 1. oktober 2026). Ikkje lag «Retrigger»-commitar lenger: startar ikkje
+workflowen, køyr han med `gh workflow run pages.yml --ref main`.
 
 Grep-mønsteret må **ankrast på `</span>`**. To feller, begge observerte:
 
@@ -86,9 +87,9 @@ kommandoen påliteleg:
 curl -s "https://entroknut.github.io/energimerking-2/index.html?cb=$(date +%s)" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+</span>' | head -1 | sed 's|</span>||'
 ```
 
-Byggestatus (anonymt API, `gh` er ikkje innlogga):
+Byggestatus (`gh` er innlogga som `entroknut`):
 ```bash
-curl -s "https://api.github.com/repos/entroknut/energimerking-2/actions/runs?per_page=3"
+gh run list --workflow pages.yml --limit 3
 ```
 
 ---
