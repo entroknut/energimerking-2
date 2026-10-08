@@ -818,7 +818,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.5.2</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.5.3</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -4529,11 +4529,15 @@ function draw(){
         const p1=z.pts[i],p2=z.pts[(i+1)%z.pts.length];
         const mx=(p1.x+p2.x)/2,my=(p1.y+p2.y)/2;
         const mp=i2s(mx,my);
-        ctx.beginPath();ctx.arc(mp.x,mp.y,5,0,Math.PI*2);
-        ctx.fillStyle='rgba(15,17,23,.8)';ctx.fill();
-        ctx.strokeStyle=COLORS[ci]+'88';ctx.lineWidth=1.5;ctx.setLineDash([2,2]);ctx.stroke();ctx.setLineDash([]);
-        ctx.font='bold 8px sans-serif';ctx.fillStyle=COLORS[ci];ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.fillText('+',mp.x,mp.y);
+        // Lys knapp med strekt pluss — skil seg frå dei mørke hjørna,
+        // så det er tydeleg at klikk her legg til eit punkt
+        ctx.beginPath();ctx.arc(mp.x,mp.y,7,0,Math.PI*2);
+        ctx.fillStyle='#ffffff';ctx.fill();
+        ctx.strokeStyle=COLORS[ci];ctx.lineWidth=1.5;ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(mp.x-3.5,mp.y);ctx.lineTo(mp.x+3.5,mp.y);
+        ctx.moveTo(mp.x,mp.y-3.5);ctx.lineTo(mp.x,mp.y+3.5);
+        ctx.strokeStyle=COLORS[ci];ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();ctx.lineCap='butt';
       }
       z.pts.forEach((p,pi)=>{
         const pp=i2s(p.x,p.y);
