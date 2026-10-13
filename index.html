@@ -640,7 +640,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.6.1</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.6.2</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -6923,36 +6923,76 @@ document.getElementById('winOk').onclick=()=>{
 document.getElementById('winCancel').onclick=()=>{winOverlay.classList.remove('show');winPts=[];pendingWin=null;draw();};
 
 // ── Results / sidebar ─────────────────────────────────────────
-// Ankeret for scroll-posisjonen i sonelista: kortet brukaren arbeider i (fokus
-// eller sist klikka) om det er synleg, elles det øvste synlege kortet.
-let _zlistSistKort=null;
+// Ankeret for scroll-posisjonen i sonelista: ELEMENTET brukaren arbeider med
+// (fokus, eller det som sist vart klikka) om det er synleg, elles det øvste
+// synlege kortet. Elementet — ikkje toppen av kortet — fordi ei endring ofte
+// gjer rader over i same kort høgare (SK-rader får «Slå saman»-knappar).
+// Elementet vert funne att i det nybygde kortet via stien av barneindeksar.
+let _zlistSist=null;   // {key, path}
+function _zlistSti(card,el){
+  const p=[];
+  while(el&&el!==card){const par=el.parentElement;if(!par)return null;p.unshift([...par.children].indexOf(el));el=par;}
+  return el===card?p:null;
+}
+function _zlistFrSti(card,p){
+  let el=card;
+  for(const i of p||[]){const n=el.children[i];if(!n)return el;el=n;}
+  return el;
+}
 document.addEventListener('pointerdown',e=>{
   const c=e.target.closest&&e.target.closest('.zcard');
-  if(c)_zlistSistKort=c.dataset.zkey;
+  if(c)_zlistSist={key:c.dataset.zkey,path:_zlistSti(c,e.target)};
 },true);
+// Billeg innhaldssignatur for eit sonekort — berre DOM, ingen layout.
+// Endrar ho seg, kan høgda ha endra seg, og den lagra høgda er ikkje til å stole på.
+function _zcardSig(c){return c.getElementsByTagName('*').length+':'+c.textContent.length;}
 function _zlistAnker(sp){
   const pr=sp.getBoundingClientRect();
-  const synleg=c=>{const r=c.getBoundingClientRect();return r.bottom>pr.top&&r.top<pr.bottom;};
+  const synleg=el=>{const r=el.getBoundingClientRect();return r.bottom>pr.top&&r.top<pr.bottom;};
   const kort=[...zlist.querySelectorAll('.zcard')];
-  let c=document.activeElement&&document.activeElement.closest?document.activeElement.closest('.zcard'):null;
-  if(!(c&&synleg(c)))c=_zlistSistKort?kort.find(k=>k.dataset.zkey===_zlistSistKort&&synleg(k)):null;
-  if(!c)c=kort.find(k=>k.getBoundingClientRect().bottom>pr.top);
-  return c?{key:c.dataset.zkey,dy:c.getBoundingClientRect().top-pr.top}:null;
+  const mk=(c,el)=>({key:c.dataset.zkey,path:el?_zlistSti(c,el):[],dy:(el||c).getBoundingClientRect().top-pr.top});
+  const ae=document.activeElement;
+  const ac=ae&&ae.closest?ae.closest('.zcard'):null;
+  if(ac&&synleg(ae))return mk(ac,ae);
+  if(_zlistSist){
+    const c=kort.find(k=>k.dataset.zkey===_zlistSist.key);
+    const el=c&&_zlistFrSti(c,_zlistSist.path);
+    if(el&&synleg(el))return mk(c,el);
+    if(c&&synleg(c))return mk(c,null);
+  }
+  const c=kort.find(k=>k.getBoundingClientRect().bottom>pr.top);
+  return c?mk(c,null):null;
 }
-// Set scrollTop slik at ankerkortet står der det stod. Korta utanfor
-// synsfeltet får fyrst storleiken sin i neste frame, så vi rettar ein gong til
-// då — men berre om brukaren ikkje har rulla sjølv i mellomtida.
+// Set scrollTop slik at ankeret står der det stod — no, og så kvar gong eit
+// kort endrar storleik dei neste 400 ms. Nybygde kort får fyrst ekte storleik
+// når nettlesaren teiknar dei (content-visibility), og ResizeObserver fyrer
+// etter layout men FØR skjermen vert oppdatert, så rettinga syner aldri som
+// eit hopp. Rullar brukaren sjølv, sluttar vi straks.
+let _zlistRO=null;
 function _zlistTilAnker(sp,a){
+  if(_zlistRO){_zlistRO.stopp();_zlistRO=null;}
   if(!a)return;
   const juster=()=>{
     const c=zlist.querySelector('.zcard[data-zkey="'+a.key+'"]');
     if(!c)return;
-    const d=c.getBoundingClientRect().top-sp.getBoundingClientRect().top-a.dy;
+    const el=_zlistFrSti(c,a.path);
+    const d=el.getBoundingClientRect().top-sp.getBoundingClientRect().top-a.dy;
     if(Math.abs(d)>=0.5)sp.scrollTop+=d;
   };
   juster();
-  const st=sp.scrollTop;
-  requestAnimationFrame(()=>{if(Math.abs(sp.scrollTop-st)<1)juster();});
+  if(typeof ResizeObserver==='undefined')return;
+  const ro=new ResizeObserver(()=>juster());
+  zlist.querySelectorAll('.zcard').forEach(c=>ro.observe(c));
+  const brukar=()=>stopp();
+  const hend=['wheel','touchstart','keydown','mousedown'];
+  const stopp=()=>{
+    ro.disconnect();clearTimeout(t);
+    hend.forEach(h=>sp.removeEventListener(h,brukar,true));
+    if(_zlistRO&&_zlistRO.stopp===stopp)_zlistRO=null;
+  };
+  hend.forEach(h=>sp.addEventListener(h,brukar,true));
+  const t=setTimeout(stopp,400);
+  _zlistRO={stopp};
 }
 function updateResults(){
   const allZones=floors.flatMap((f,fi)=>f.zones.map((z,zi)=>({z,zi,fi,f})));
@@ -6972,6 +7012,7 @@ function updateResults(){
   // same talet som sist — verdien held seg sjølv ved like.
   if(!window._zcardH)window._zcardH={};
   if(!window._zcardEkte)window._zcardEkte=new Set();
+  if(!window._zcardSig)window._zcardSig={};
   zlist.querySelectorAll('.zcard').forEach(c=>{
     const k=c.dataset.zkey;
     // Brøkdelen må med: avrunda høgder hopar seg opp over alle korta over.
@@ -6985,7 +7026,7 @@ function updateResults(){
     // (då er kortet teikna, eller nettlesaren hugsar ein teikna storleik).
     if(!k||!h)return;
     const ph=parseFloat((c.style.getPropertyValue('contain-intrinsic-size')||'').replace('auto',''))||320;
-    if(Math.abs(h-ph)>0.5){window._zcardH[k]=h;window._zcardEkte.add(k);}
+    if(Math.abs(h-ph)>0.5){window._zcardH[k]=h;window._zcardEkte.add(k);window._zcardSig[k]=_zcardSig(c);}
   });
   zlist.innerHTML='';
   // Sonekorta vert bygde utanfor dokumentet og sette inn i éin operasjon.
@@ -7895,15 +7936,19 @@ function updateResults(){
     });
   });
   zlist.appendChild(_zfrag);
-  // Kort over ankeret som aldri har vore synlege har berre ei gjetta høgd
-  // (200–500 px feil for opne kort). Når dei rullar inn, veks dei og lista
-  // hoppar. Mål dei éin gong med ekte layout; etterpå står høgda i _zcardH.
-  // Berre korta OVER ankeret: veks eit kort under, skyv det ingenting du ser.
+  // Eit nybygd kort får høgda frå førre runde som plasshaldar, og vert
+  // fyrst teikna i neste frame. Har det aldri vore målt (200–500 px feil),
+  // eller har innhaldet endra seg sidan (t.d. nabosona når ein vegg vert SK),
+  // veks eller krympar det då — og alt under hoppar. Mål slike kort med ekte
+  // layout no. Berre korta OVER ankeret: endrar eit kort under seg, flyttar
+  // det ingenting av det brukaren ser på.
   if(_anker){
     const ukjende=[];
     for(const c of zlist.children){
       if(c.dataset.zkey===_anker.key)break;
-      if(c.classList.contains('zcard')&&!window._zcardEkte.has(c.dataset.zkey))ukjende.push(c);
+      if(!c.classList.contains('zcard'))continue;
+      const k=c.dataset.zkey;
+      if(!window._zcardEkte.has(k)||window._zcardSig[k]!==_zcardSig(c))ukjende.push(c);
     }
     if(ukjende.length){
       ukjende.forEach(c=>c.style.contentVisibility='visible');
@@ -7911,6 +7956,7 @@ function updateResults(){
       ukjende.forEach((c,i)=>{
         window._zcardH[c.dataset.zkey]=hs[i];
         window._zcardEkte.add(c.dataset.zkey);
+        window._zcardSig[c.dataset.zkey]=_zcardSig(c);
         c.style.setProperty('contain-intrinsic-size','auto '+hs[i]+'px');
         c.style.contentVisibility='';
       });

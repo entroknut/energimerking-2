@@ -433,11 +433,19 @@ Fallgruver som er retta, og som ikkje må innførast på nytt:
   eit hoppa-over kort gir tom streng (bruk `textContent`), og
   `getBoundingClientRect()` gir plasshaldarstorleiken til kortet har vore
   synleg i eit frame.
-- **Rulleposisjonen er forankra på eit kort, ikkje på `scrollTop`.**
-  `_zlistAnker()` hugsar kortet brukaren arbeider i (fokus eller sist klikka,
-  om det er synleg — elles det øvste synlege) og kor det stod;
-  `_zlistTilAnker()` set det attende etter ombygginga og rettar ein gong til i
-  neste frame (berre om brukaren ikkje har rulla).
+- **Rulleposisjonen er forankra på elementet brukaren arbeider med**, ikkje på
+  `scrollTop` og ikkje på toppen av kortet. `_zlistAnker()` hugsar fokus eller
+  det sist klikka elementet (`_zlistSist`, som sti av barneindeksar frå kortet
+  — `_zlistSti`/`_zlistFrSti` finn det att i det nybygde kortet), elles det
+  øvste synlege kortet. Toppen av kortet var ikkje nok: å gjere ein vegg om til
+  SK gjer rader over høgare («Slå saman»-knappar), og nabokortet endrar seg òg.
+  `_zlistTilAnker()` set ankeret attende med ein gong, og så **kvar gong eit
+  kort endrar storleik i 400 ms** (ResizeObserver). Nybygde kort får fyrst ekte
+  storleik når nettlesaren teiknar dei, og ResizeObserver fyrer etter layout
+  men før skjermen vert oppdatert — så rettinga syner aldri. `wheel`,
+  `touchstart`, `keydown` og `mousedown` i panelet stoppar rettinga straks.
+  Å føreseie høgdene var ikkje nok: målingar i JS og det som faktisk vart
+  teikna stemde ikkje alltid overeins.
   **`overflow-anchor` må stå på** (standard). Kort som aldri har vore synlege
   har ei gjetta høgd som kan vere 200–500 px feil, og det er nettlesaren si
   forankring som held lista i ro når dei rullar inn. v5.6.0 slo ho av, og då
@@ -447,7 +455,8 @@ Fallgruver som er retta, og som ikkje må innførast på nytt:
   vart aldri retta — difor `_zcardEkte`: ei høgd tel berre når ho skil seg frå
   plasshaldaren kortet hadde, eller er tvangsmålt. Ikkje bruk
   `checkVisibility()` til dette; han svarar «synleg» før nettlesaren har teikna.
-- **Kort over ankeret som aldri er målte, vert målte éin gong** i
+- **Kort over ankeret som aldri er målte, eller som har fått anna innhald**
+  (`_zcardSig`: tal på element + tekstlengd), vert målte på nytt i
   `updateResults()` (`content-visibility:visible` → les høgda → tilbake). Det
   er dei som får lista til å hoppe når ein rullar oppover. Kostar ~50 ms
   første gongen ved 20 opne kort, deretter ingenting.
