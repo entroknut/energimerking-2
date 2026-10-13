@@ -437,8 +437,20 @@ Fallgruver som er retta, og som ikkje må innførast på nytt:
   `_zlistAnker()` hugsar kortet brukaren arbeider i (fokus eller sist klikka,
   om det er synleg — elles det øvste synlege) og kor det stod;
   `_zlistTilAnker()` set det attende etter ombygginga og rettar ein gong til i
-  neste frame (berre om brukaren ikkje har rulla). `#spanel` har
-  `overflow-anchor:none`, så nettlesaren ikkje rettar i tillegg.
+  neste frame (berre om brukaren ikkje har rulla).
+  **`overflow-anchor` må stå på** (standard). Kort som aldri har vore synlege
+  har ei gjetta høgd som kan vere 200–500 px feil, og det er nettlesaren si
+  forankring som held lista i ro når dei rullar inn. v5.6.0 slo ho av, og då
+  hoppa lista med heile avviket kvar gong eit slikt kort kom til syne.
+- **Berre ekte høgder i `_zcardH`.** Eit kort som er hoppa over rapporterer
+  plasshaldaren, ikkje si eiga høgd. Lagra vi den, såg kortet «kjent» ut og
+  vart aldri retta — difor `_zcardEkte`: ei høgd tel berre når ho skil seg frå
+  plasshaldaren kortet hadde, eller er tvangsmålt. Ikkje bruk
+  `checkVisibility()` til dette; han svarar «synleg» før nettlesaren har teikna.
+- **Kort over ankeret som aldri er målte, vert målte éin gong** i
+  `updateResults()` (`content-visibility:visible` → les høgda → tilbake). Det
+  er dei som får lista til å hoppe når ein rullar oppover. Kostar ~50 ms
+  første gongen ved 20 opne kort, deretter ingenting.
   To feller som gav hopp på 5–25 px ved kvar lita endring:
   `_zcardH` må vere **brøk** (`getBoundingClientRect`, ikkje `offsetHeight` —
   avrundinga hopa seg opp over alle korta over), og **utan kantlinja**

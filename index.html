@@ -249,7 +249,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
    bygd på nytt ved kvar oppdatering; difor set updateResults() høgda frå
    førre runde eksplisitt (sjå _zcardH). */
 .zcard{content-visibility:auto;contain-intrinsic-size:auto 320px}
-#spanel{overflow-anchor:none}   /* updateResults() forankrar sjølv (_zlistAnker) */
+/* overflow-anchor MÅ stå på (standard). Kort som enno ikkje har vore synlege
+   har ei gjetta høgd som kan vere 200–500 px feil; når dei rullar inn, er det
+   nettlesaren si forankring som held resten av lista i ro. Med
+   overflow-anchor:none hoppa lista med heile avviket. */
 .zcard-body{padding:0 12px 12px 12px}
 .zcard.collapsed .zcard-body{display:none}
 .zcard-chevron{margin-left:auto;flex-shrink:0;width:16px;height:16px;color:var(--text3);transition:transform .18s;display:flex;align-items:center;justify-content:center}
@@ -637,7 +640,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.6.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.6.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -6968,6 +6971,7 @@ function updateResults(){
   // Eit kort som var hoppa over rapporterer den reserverte høgda, altså det
   // same talet som sist — verdien held seg sjølv ved like.
   if(!window._zcardH)window._zcardH={};
+  if(!window._zcardEkte)window._zcardEkte=new Set();
   zlist.querySelectorAll('.zcard').forEach(c=>{
     const k=c.dataset.zkey;
     // Brøkdelen må med: avrunda høgder hopar seg opp over alle korta over.
@@ -6975,7 +6979,13 @@ function updateResults(){
     // botn) — med kantlinja vart kvart nybygd kort 2 px for høgt til det
     // vart teikna, og lista glei etter eit par frames.
     const h=c.getBoundingClientRect().height-2*c.clientTop;
-    if(k&&h)window._zcardH[k]=h;
+    // Eit kort som er hoppa over rapporterer berre plasshaldaren. Lagra vi
+    // den som fasit, såg kortet «kjent» ut og vart aldri målt. Difor tel
+    // høgda som ekte berre når ho skil seg frå plasshaldaren kortet hadde
+    // (då er kortet teikna, eller nettlesaren hugsar ein teikna storleik).
+    if(!k||!h)return;
+    const ph=parseFloat((c.style.getPropertyValue('contain-intrinsic-size')||'').replace('auto',''))||320;
+    if(Math.abs(h-ph)>0.5){window._zcardH[k]=h;window._zcardEkte.add(k);}
   });
   zlist.innerHTML='';
   // Sonekorta vert bygde utanfor dokumentet og sette inn i éin operasjon.
@@ -7028,7 +7038,9 @@ function updateResults(){
       card.className='zcard'+(mode==='edit'&&fi===activeFloor&&editZoneIdx===zi?' editing':'')+(isCollapsed?' collapsed':'')+(z.skjult?' skjult':'');
       card.style.setProperty('--zcard-color', COLORS[ci]);
       card.dataset.zkey=zoneKey;
-      const _hHint=window._zcardH[zoneKey];
+      // Utan kjend høgd: eit samanslege kort er berre headeren (~40 px), så
+      // 320 px-standarden ville gjort rullelista fleire hundre px for lang.
+      const _hHint=window._zcardH[zoneKey]||(isCollapsed?40:0);
       if(_hHint)card.style.setProperty('contain-intrinsic-size','auto '+_hHint+'px');
 
       // ── Klikkbar header ──
@@ -7883,6 +7895,27 @@ function updateResults(){
     });
   });
   zlist.appendChild(_zfrag);
+  // Kort over ankeret som aldri har vore synlege har berre ei gjetta høgd
+  // (200–500 px feil for opne kort). Når dei rullar inn, veks dei og lista
+  // hoppar. Mål dei éin gong med ekte layout; etterpå står høgda i _zcardH.
+  // Berre korta OVER ankeret: veks eit kort under, skyv det ingenting du ser.
+  if(_anker){
+    const ukjende=[];
+    for(const c of zlist.children){
+      if(c.dataset.zkey===_anker.key)break;
+      if(c.classList.contains('zcard')&&!window._zcardEkte.has(c.dataset.zkey))ukjende.push(c);
+    }
+    if(ukjende.length){
+      ukjende.forEach(c=>c.style.contentVisibility='visible');
+      const hs=ukjende.map(c=>c.getBoundingClientRect().height-2*c.clientTop);
+      ukjende.forEach((c,i)=>{
+        window._zcardH[c.dataset.zkey]=hs[i];
+        window._zcardEkte.add(c.dataset.zkey);
+        c.style.setProperty('contain-intrinsic-size','auto '+hs[i]+'px');
+        c.style.contentVisibility='';
+      });
+    }
+  }
   // Gjenopprett scroll-posisjon
   if(_spanel){_spanel.scrollTop=_savedScroll;_zlistTilAnker(_spanel,_anker);}
   // Oppdater collapse-all knapp
