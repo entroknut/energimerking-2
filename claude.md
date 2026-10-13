@@ -433,6 +433,17 @@ Fallgruver som er retta, og som ikkje må innførast på nytt:
   eit hoppa-over kort gir tom streng (bruk `textContent`), og
   `getBoundingClientRect()` gir plasshaldarstorleiken til kortet har vore
   synleg i eit frame.
+- **Rulleposisjonen er forankra på eit kort, ikkje på `scrollTop`.**
+  `_zlistAnker()` hugsar kortet brukaren arbeider i (fokus eller sist klikka,
+  om det er synleg — elles det øvste synlege) og kor det stod;
+  `_zlistTilAnker()` set det attende etter ombygginga og rettar ein gong til i
+  neste frame (berre om brukaren ikkje har rulla). `#spanel` har
+  `overflow-anchor:none`, så nettlesaren ikkje rettar i tillegg.
+  To feller som gav hopp på 5–25 px ved kvar lita endring:
+  `_zcardH` må vere **brøk** (`getBoundingClientRect`, ikkje `offsetHeight` —
+  avrundinga hopa seg opp over alle korta over), og **utan kantlinja**
+  (`contain-intrinsic-size` er innhaldshøgda; med kantlinja var kvart nybygd
+  kort 2 px for høgt til det vart teikna).
 - **Bakgrunnsbiletet vert enkoda éin gong per bilete, ikkje per lagring.**
   `serialiserProsjekt()` held `f._bgCache={img,nokkel,data}`; nøkkelen er
   biletobjektet + mime/kvalitet, så eit nytt bilete gir bom av seg sjølv.
@@ -479,6 +490,24 @@ Siste slot MÅ vere `2345-0000`, IKKJE `2345-2400`. Feil her gjer at SIMIEN ikkj
 'Skolebygg'   → type:'Skolebygning',  subtype:'Undervisningslokaler'
 // ... (sjå BYGKAT_SXI i koden)
 ```
+
+### Opningar større enn fasaden stoppar eksporten
+`sxiForStoreOpningar(xml)` les den ferdige SXI-en (DOMParser, som tiltaka) og
+summerer `number×height×width` for vindauge og `area` for dører i kvar
+`<zone> > <facade>`. Er opningane større enn fasaden, vert det **inga fil** —
+feilmeldinga i dialogen listar sone, fasade og areal. Å lese fila i staden for
+å rekne sjølv dekkjer alle `facXml+=`-greinene (samanslegne YV, gavl, kopla
+soner) og sjekkar dei tala SIMIEN faktisk får. `winForTrongt` er framleis
+varselet under teikninga for breidda åleine.
+
+Sonekortet varslar på førehand med `fasadarMedForStoreOpningar(z)` (raud pille i
+«Vindauge og dører», ei raud linje som er synleg òg når lista er samanslegen, og
+«⚠ større enn fasaden» på kvart vindauge). Han speglar reglane i `buildSXI`
+(YV-samanslåing, SK/kjellarvegg ingen fasade, segOverrides, standardmål og
+0,1 m-golv). Endrar du korleis eksporten byggjer `<facade>`, må han følgje med —
+men det er fil-sjekken som stoppar eksporten, så eit avvik gir berre feil varsel.
+
+Nord-kroken heiter `window._nordEndra(deg)` (kartet), kalla frå `setGlobalNorth()`.
 
 ### Panelovnar
 50 W/m² — `capacity` i kW = `totalBra * 0.05`
@@ -1089,6 +1118,69 @@ er berre til å sjå på: bilete, soner med namn og kontrollmål, med eigen zoom
 - `draw()` ber om ei omteikning av ruta via `requestAnimationFrame`, så ho vert
   teikna maks éin gong per frame. Valet vert ikkje lagra.
 
+## 3D-skann (MatterPak) → soner
+
+«⬚ 3D-skann» i verktøylinja les OBJ-fila frå ein MatterPak (Matterport) og
+lagar heile prosjektet, vindauge inkludert, utan at brukaren teiknar noko (`// ── 2d.`,
+`importerMatterpak`). Punktskya (`cloud.xyz`, ~2 GB) og fargeplanane vert aldri lesne. OBJ-en er i meter, Z opp.
+
+- **Etasjar** = toppar i arealet av flater som vender opp (`mpFinnEtasjar`):
+  minst 20 m² og 4 % av den største, minst 2,2 m imellom (bord/stolsete fell
+  då bort).
+- **Soner** = samanhengande golvflate per etasje i eit 5 cm-rutenett, lukka
+  0,3 m, hòl fylte, så kontur → Douglas–Peucker (0,15 m) → Visvalingam
+  (`MP_GLATT_M2`, fjernar vindaugsnisjar). Bitar under 4 m² er støy.
+- **Høgder:** `defaultHoyde` = avstand til neste golv (øvste: himling langs
+  kanten). `z.hoyde` = himling langs ytterkanten, `z.himling` = snittet over
+  flata — berre sett når dei skil seg frå etasjehøgda.
+- Sone som ligg ≥ 80 % over etasjen under får `gulvtype='Gulv mot oppvarma sone'`.
+- **Bakgrunnen** er rendra frå meshen (høgdeskugge, kutt 1,5 m), 25 mm/px,
+  `globalMmPerImgPx=25`. Alle etasjar deler origo, så ingen forskyving.
+- Prosjektet går gjennom `lastProsjekt()` (same veg som «Opne prosjekt»), med
+  `snapshot()` fyrst — importen kan angrast.
+- **Aldri stille:** rapporten (alert) melder areal og høgder per sone, kor
+  mykje som var uskanna men fylt inn, tak som ligg under etasjen over, og kva
+  som IKKJE kjem frå skannet (vindauge/dører, nord, kategori, U-verdiar).
+- Ikkje implementert enno: tette dører, deling av taket under ei øvre etasje,
+  romdeling, zip-opplasting.
+
+**Vindauge frå teksturane** (`mpFinnVindauge`). Knappen opnar ein
+**mappeveljar** (`webkitdirectory`) — brukaren vel den utpakka MatterPak-mappa,
+og OBJ, MTL og teksturar vert plukka ut på filending. Det var ein reell feil at
+filveljaren let brukaren velje berre OBJ-fila: då kom det aldri vindauge. Utan
+teksturane vert det soner utan vindauge, og rapporten seier frå. Geometrien åleine kan ikkje brukast: Matterport lukkar
+vindaugsopningar med flate trekantar, og ein slett vegg er like grovt
+triangulert.
+
+- Per veggsegment: oppriss i 4 cm-ruter frå loddrette flater ≤ 0,6 m frå
+  segmentet og parallelle med det (næraste flate vinn). Kvar tekstur vert
+  dekoda éin gong, skalert til 1024 px.
+- Glas = lokalt standardavvik i lysstyrke > `MP_GLAS_SD` (28). Hòl i meshen er
+  nøytrale. Felt = kolonnar der > 45 % av bandet 0,9–2,0 m er glas, slegne
+  saman over karmar < 0,4 m.
+- **Dagslysfilteret** er det som fjernar dei falske: perforerte akustikkplater,
+  serverrack, dørkarmar og skilt har like mykje variasjon som glas. Krav:
+  snitt ≥ `MP_GLAS_SNITT` og utbrent del ≥ `MP_GLAS_LYST` i bandet — eller
+  persienner (loddrett variasjon > `MP_PERSIENNE` × vassrett). Tersklane er
+  stilte på 1024 px-teksturar; endrar du oppløysinga, flyttar lysverdiane seg.
+- Høgd/breidd vert utvida med «glas eller lyst», og med djupnplanet når glaset
+  ligg i eit anna plan enn veggen (nisje). Minstemål 0,5 m breitt, 0,4 m høgt,
+  0,5 m².
+- Alt vert `type:'vindauge'`, `antal:1`, `posT:null`; `dir` vert sett frå
+  `calcSegments` etter `lastProsjekt`. Glasdører kjem med som vindauge.
+- **Skannet i 3D** («Skann» i 3D-vindauget): `mpSkann` held mesh + teksturfilene
+  etter importen, berre i økta (vert ikkje lagra, `lastProsjekt` nullar det via
+  `mpFjernSkann`). `mpByggSkann3D` byggjer éin mesh per materiale med teksturar
+  skalerte til 512 px (full storleik ville vore ~6 GB på grafikkortet), lastar
+  av seg sjølv fyrste gong 3D vert opna etter importen (`_autoVist`) — knappen åleine vart ikkje funnen. Same verd som sonene: lokal `(X−ox, Z, oy−Y)` × `k`,
+  `k = mpp/25` for omkalibrering, golvet i skannet (`z0`) på `floorBaseY[0]`.
+  Speglinga snur omløpet: `FrontSide` er det som skjuler taket ovanfrå
+  (dukkehus) — `BackSide` viste taket. Med skannet framme vert sonemeshane
+  (`userData.w`) gjennomsiktige (`_skannStil`) og planteikninga gøymd (ligg i
+  same plan som skann-golvet).
+- Prøvefila: 25 felt, ~23 ekte. Kjende manglar: persiennevindauge vert for
+  låge, og lyse flekkar inne (lamper) kan gi små falske felt.
+
 ## Kjende manglar / ikkje implementert
 
 - Import av eksisterande SXI
@@ -1096,14 +1188,6 @@ er berre til å sjå på: bilete, soner med namn og kontrollmål, med eigen zoom
 - Snap til skrå veggar (krev både vassrett og loddrett strek)
 - PDF-rapport / eksport til rekneark
 - Offline-modus (Three.js og pdf.js krev CDN)
-
----
-
-## Easter egg — Lumon Industries
-
-Aktiverast ved å rotere nord-kompassen **3 fulle runder samanhengande (1080°)**. Kontinuerleg rotasjon — hopp >90° nullstillar teljaren. Deaktiverast ved **1 runde (360°)** i Lumon-modus.
-
-`window._trackNorthRotation(newNorth)` vert kalla frå `setGlobalNorth()`. Kart-modulen definerer same funksjonen på nytt — den **må** kalle vidare til den originale, elles sluttar easter-egget å verke.
 
 ---
 
