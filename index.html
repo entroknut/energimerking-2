@@ -14390,6 +14390,10 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
   let _growT0=0;
   let _picked=null,_downPos=null;
   let tgt={x:0,y:0,z:0};
+  // Standardlyset. Summen av det diffuse lyset må liggje godt under 1,
+  // elles vert alle flater mette og modellen ser flat ut — sola skal
+  // vere det som skil taket frå veggane og ein fasade frå den neste.
+  const LYS3D={amb:0.45,hemi:0.55,sun:1.15,fill:0.35};
   const OV=document.getElementById('model3dOverlay');
   const CV=document.getElementById('canvas3d');
   // Konverter COLORS hex-string til THREE-format og bruk same fargelogikk som 2D/sidepanel
@@ -14490,15 +14494,17 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     scene3.fog=new THREE.Fog(getBg3D(),150,400);
     camera3=new THREE.PerspectiveCamera(42,W/H,0.1,800);
 
-    // Lights — refs lagrast i userData slik at solsimuleringa kan styre dei
-    const amb=new THREE.AmbientLight(0xffffff,1.4);scene3.add(amb);
-    const sun=new THREE.DirectionalLight(0xfff8f0,1.6);
+    // Lights — refs lagrast i userData slik at solsimuleringa kan styre dei.
+    // Styrkane står i LYS3D, så solsimuleringa set same standard attende.
+    const amb=new THREE.AmbientLight(0xffffff,LYS3D.amb);scene3.add(amb);
+    const sun=new THREE.DirectionalLight(0xfff8f0,LYS3D.sun);
     sun.position.set(50,90,40);sun.castShadow=true;
     sun.shadow.mapSize.set(2048,2048);
+    sun.shadow.bias=-0.0005;sun.shadow.normalBias=0.02;
     sun.shadow.camera.left=-100;sun.shadow.camera.right=100;sun.shadow.camera.top=100;sun.shadow.camera.bottom=-100;
     scene3.add(sun);
-    const fill=new THREE.DirectionalLight(0xe8f4f2,0.7);fill.position.set(-40,30,-30);scene3.add(fill);
-    const hemi=new THREE.HemisphereLight(0xdbeafe,0xd1fae5,0.6);scene3.add(hemi);
+    const fill=new THREE.DirectionalLight(0xe8f4f2,LYS3D.fill);fill.position.set(-40,30,-30);scene3.add(fill);
+    const hemi=new THREE.HemisphereLight(0xf8fafc,0x9ca3af,LYS3D.hemi);scene3.add(hemi);
     scene3.userData.amb=amb;scene3.userData.sun=sun;scene3.userData.fill=fill;scene3.userData.hemi=hemi;
 
     // Har bygget kjeller? Då vert heile stabelen senka slik at terrenget
@@ -14692,6 +14698,14 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     legendEl.innerHTML='';
     const seenNames=new Set();
 
+    // Delte material for vindauge og dører
+    const WIN3D={
+      glas:new THREE.MeshLambertMaterial({color:0x9bbdd8,side:THREE.DoubleSide}),
+      dor:new THREE.MeshLambertMaterial({color:0x334155,side:THREE.DoubleSide}),
+      // Tynn, dempa kant — markerer opninga mot veggen utan å bli ein karm
+      kant:new THREE.LineBasicMaterial({color:0x1e293b,transparent:true,opacity:0.7})
+    };
+
     floors.forEach((f,fi)=>{
       const baseY=floorBaseY[fi];
       f.zones.forEach((z,zi)=>{
@@ -14707,6 +14721,9 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
         const fdyM=(f.floorDyImg||0)*(_fm||10)/1000;
         const toM=p=>({x:(_fm?p.x*_fm/1000:p.x/10)-cx+fdxM,z:(_fm?p.y*_fm/1000:p.y/10)-cz+fdyM});
         const ptsM=z.pts.map(toM);
+        // Kantfarge: ein mørkare tone av sonefargen — i same farge som
+        // veggen vart kantane borte, og forma med dei
+        const edgeMat=new THREE.LineBasicMaterial({color:new THREE.Color(col).multiplyScalar(0.55),transparent:true,opacity:0.8});
 
         // (Ingen golv-slab — unngår skugge-artefakt)
 
@@ -14729,11 +14746,15 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
           const segWins=wins.filter(w=>w.segIdx===seg.idx);
           const wallMat=new THREE.MeshLambertMaterial({color:wallCol,transparent:wallOp<1,opacity:wallOp});
           wallMat.userData={baseColor:wallCol};
-          const wallGeo=new THREE.BoxGeometry(segLen,fh,thick);
+          // Forlengd med veggtjukna, så hjørna vert lukka i staden for å stå
+          // med eit hakk der to veggboksar møtest. Berre visning — lengda
+          // som vert vist og eksportert er seg.lenM.
+          const wallGeo=new THREE.BoxGeometry(segLen+thick,fh,thick);
           const wall=new THREE.Mesh(wallGeo,wallMat);
           wall.position.set((p1.x+p2.x)/2,baseY+fh/2,(p1.z+p2.z)/2);
           wall.rotation.y=-ang;wall.castShadow=true;wall.receiveShadow=true;
           wall.userData.w=true;
+          if(!isSK)wall.add(new THREE.LineSegments(new THREE.EdgesGeometry(wallGeo),edgeMat));
           // Klikk-info for denne veggen
           wall.userData.pick={
             title:z.name+' — '+(isSK?'skiljevegg':'fasade '+seg.dir),
@@ -14747,9 +14768,11 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
           };
           scene3.add(wall);
 
-          // Windows/doors
+          // Vindauge og dører: ei enkel flate i opninga, på BEGGE sider av
+          // veggen (så dei syner uansett omløpsretning på sona), rett utanfor
+          // veggflata. Med vilje utan karm, handtak og vassbrett — modellen
+          // skal vise kvar opningane er og kor store dei er, ikkje teikne bygget.
           const nx_=-dz/segLen,nz_=dx/segLen;
-          const OFFSET=thick/2+0.01;
           segWins.forEach(w=>{
             expandWindows(w,segLen).forEach(ew=>{
               const isDoor=ew.type==='dor';
@@ -14757,23 +14780,34 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
               // Brystning: manuell (brystningMm) → midtstilt → 0 for dør
               const sillH=isDoor?0:(ew.brystningMm!=null?ew.brystningMm/1000:Math.max(0,(fh-openH)/2));
               const openW=ew.breddeMm/1000; // alltid frå breddeMm, ikkje t1-t0
+              if(!(openW>0.05&&openH>0.05))return;
               const openCentreT=(ew.t0+ew.t1)/2;
               const ocx=p1.x+dx*openCentreT,ocz=p1.z+dz*openCentreT;
               const ocy=baseY+sillH+openH/2;
-              const holeMat=new THREE.MeshLambertMaterial({color:0x020617});
-              const hole=new THREE.Mesh(new THREE.BoxGeometry(Math.max(openW-.04,.05),Math.max(openH-.04,.05),thick+.05),holeMat);
-              hole.position.set(ocx,ocy,ocz);hole.rotation.y=-ang;scene3.add(hole);
-              const glassMat=new THREE.MeshLambertMaterial({color:isDoor?0xfcd34d:0x7dd3fc,transparent:true,opacity:isDoor?.75:.4,side:THREE.DoubleSide});
-              const glass=new THREE.Mesh(new THREE.PlaneGeometry(Math.max(openW-.06,.05),Math.max(openH-.06,.05)),glassMat);
-              glass.position.set(ocx+nx_*OFFSET,ocy,ocz+nz_*OFFSET);glass.rotation.y=-ang;scene3.add(glass);
-              const fc=isDoor?0xfbbf24:0x38bdf8;
-              const hw=openW/2,hh=openH/2;
-              const corners=[[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh],[-hw,-hh]].map(([lx,ly])=>{
-                const wx=ocx+Math.cos(-ang+Math.PI/2)*lx+nx_*OFFSET;
-                const wz=ocz+Math.sin(-ang+Math.PI/2)*lx+nz_*OFFSET;
-                return new THREE.Vector3(wx,ocy+ly,wz);
+              const geo=new THREE.PlaneGeometry(openW,openH);
+              const kantGeo=new THREE.EdgesGeometry(geo);
+              const pickInfo={
+                title:z.name+' — '+(ew.name||w.name||(isDoor?'Dør':'Vindauge')),
+                rows:[
+                  ['Type',isDoor?'Dør':'Vindauge'],
+                  ['Storleik',Math.round(ew.breddeMm)+' × '+Math.round(ew.hoyMm)+' mm'],
+                  ...(isDoor?[]:[['Brystning',Math.round(sillH*1000)+' mm']]),
+                  ['Antal i gruppa',String(winCount(w))],
+                  ['Fasade',seg.dir||'—']
+                ]
+              };
+              [1,-1].forEach(side=>{
+                const off=side*(thick/2+0.01);
+                // Klona per flate: klikk-markeringa set emissive på materialet
+                const m=new THREE.Mesh(geo,(isDoor?WIN3D.dor:WIN3D.glas).clone());
+                m.position.set(ocx+nx_*off,ocy,ocz+nz_*off);m.rotation.y=-ang;
+                m.userData.pick=pickInfo;
+                // Kanten 2 mm framfor flata, på den sida som vender ut frå veggen
+                const kant=new THREE.LineSegments(kantGeo,WIN3D.kant);
+                kant.position.z=side*0.002;
+                m.add(kant);
+                scene3.add(m);
               });
-              scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(corners),new THREE.LineBasicMaterial({color:fc,linewidth:2})));
             });
           });
 
@@ -14790,11 +14824,11 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
           }
         });
 
-        // Floor/ceiling edge outlines
+        // Golv- og takkant
         [baseY,baseY+fh].forEach(ey=>{
           const edPts=ptsM.map(p=>new THREE.Vector3(p.x,ey,p.z));
           edPts.push(edPts[0].clone());
-          scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(edPts),new THREE.LineBasicMaterial({color:col,linewidth:1})));
+          scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(edPts),edgeMat));
         });
 
         // Tak — skrå takflater om definert, elles flatt
@@ -14865,7 +14899,7 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
           ceil.receiveShadow=true;ceil.userData.w=true;scene3.add(ceil);
           const ceilEdgePts=ptsM.map(p=>new THREE.Vector3(p.x,baseY+fh,p.z));
           ceilEdgePts.push(ceilEdgePts[0].clone());
-          scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ceilEdgePts),new THREE.LineBasicMaterial({color:col,linewidth:1})));
+          scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ceilEdgePts),edgeMat));
         }
 
         // ── Gavlflater — trekantforma veggar over veggtopp ──
@@ -14903,7 +14937,7 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
             new THREE.Vector3(gp1.x,baseY+fh,gp1.z),
             new THREE.Vector3(gp1.x+(gp2.x-gp1.x)*gavl.profile[0].t,baseY+fh+gavl.profile[0].h,gp1.z+(gp2.z-gp1.z)*gavl.profile[0].t)
           ];
-          scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(contourPts),new THREE.LineBasicMaterial({color:col,linewidth:1})));
+          scene3.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(contourPts),edgeMat));
         });
 
         // ── Areal-label på golvet ──
@@ -14992,6 +15026,19 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     document.getElementById('model3dInfo').innerHTML=
       `${(n=>n+' etasje'+(n>1?'r':''))(floors.filter(f=>!erDelplan(f)).length)}${floors.some(erDelplan)?' ('+floors.length+' teikningar)':''}&nbsp;·&nbsp;${nZ} sone${nZ>1?'r':''}&nbsp;·&nbsp;<strong>${totalA.toFixed(0)} m² BRA</strong>`;
 
+    // Skuggeutsnittet tett rundt bygget: ±100 m på eit 2048-kart gav
+    // ~10 cm per piksel og grøtete skuggar på alle vanlege bygg
+    (()=>{
+      const bb=new THREE.Box3();
+      scene3.traverse(o=>{if(o.isMesh&&o.userData.w)bb.expandByObject(o);});
+      if(bb.isEmpty())return;
+      const c=bb.getCenter(new THREE.Vector3());
+      const r=Math.max(10,c.length()+bb.getSize(new THREE.Vector3()).length()/2+4);
+      const sc=sun.shadow.camera;
+      sc.left=-r;sc.right=r;sc.top=r;sc.bottom=-r;sc.far=Math.max(500,r*2+200);
+      sc.updateProjectionMatrix();
+    })();
+
     recenter();
     _applySun();
   }
@@ -15021,8 +15068,8 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     if(u.sunDisc){scene3.remove(u.sunDisc);u.sunDisc=null;}
     if(!_sunOn){
       // Tilbake til standardlys
-      u.sun.position.set(50,90,40);u.sun.intensity=1.6;u.sun.color.setHex(0xfff8f0);
-      u.amb.intensity=1.4;u.hemi.intensity=0.6;u.fill.intensity=0.7;
+      u.sun.position.copy(u.sunPos||new THREE.Vector3(50,90,40));u.sun.intensity=LYS3D.sun;u.sun.color.setHex(0xfff8f0);
+      u.amb.intensity=LYS3D.amb;u.hemi.intensity=LYS3D.hemi;u.fill.intensity=LYS3D.fill;
       renderer3.setClearColor(_bg3());if(scene3.fog)scene3.fog.color.setHex(_bg3());
       return;
     }
@@ -15127,7 +15174,12 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
       const s=box.getSize(new THREE.Vector3());
       const diagonal=Math.sqrt(s.x*s.x+s.y*s.y+s.z*s.z);
       tgt={x:c.x,y:Math.max(0,c.y*0.2),z:c.z};
-      sph.radius=diagonal*0.5;
+      // Avstanden der heile bygget (kula rundt boksen) får plass i det
+      // smalaste synsfeltet. diagonal*0.5 sette kameraet på kula, altså
+      // ofte inne i bygget.
+      const vHalf=(camera3?.fov||42)*Math.PI/360;
+      const hHalf=Math.atan(Math.tan(vHalf)*(camera3?.aspect||1.5));
+      sph.radius=Math.max(8,(diagonal/2)/Math.sin(Math.min(vHalf,hHalf))*0.9);
       sph.phi=0.95;sph.theta=0.6;
     }
     updateCam();
