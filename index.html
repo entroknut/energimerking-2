@@ -602,7 +602,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div class="tg">
       <button class="btn plan-only" id="btn3d" title="Opne 3D-visualisering">⬡ 3D</button>
       <button class="btn plan-only" id="nordBtn" title="Nord-sjekk — hald inne for å rotere planteikninga slik at nord peikar opp" style="user-select:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M10.5 5.5 9 9l-3.5 1.5L7 7z" stroke-linejoin="round"/></svg></button>
-      <button class="btn plan-only" id="exportImgBtn" title="Eksporter planteikning som PNG"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="2" y="3" width="12" height="10" rx="1.5"/><circle cx="5.8" cy="6.5" r="1.1"/><path d="M2.5 11.5l3.5-3 3 2.5 2.5-2 2 2"/></svg></button>
+      <button class="btn plan-only" id="exportImgBtn" title="Eksporter soneinndelinga som PDF — éi side per etasje"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3"/><path d="M6 8.5h4.5M6 11h4.5"/></svg></button>
       <button class="btn" id="helpBtn" title="Tastatursnarvegar (?)" style="font-weight:700">?</button>
     </div>
     <div class="tg" style="margin-left:auto">
@@ -640,7 +640,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.7.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.7.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -1004,8 +1004,10 @@ const FILLS=['rgba(26,122,110,.10)','rgba(37,99,235,.10)','rgba(217,119,6,.10)',
 const DIRS=['Nord','Nordøst','Øst','Sørøst','Sør','Sørvest','Vest','Nordvest'];
 
 // ── DOM refs ─────────────────────────────────────────────────
-const cv=document.getElementById('cv');
-const ctx=cv.getContext('2d');
+// `let`, ikkje `const`: PDF-eksporten låner draw() og peikar desse mellombels
+// på eit eige lerret, så utskrifta vert teikna med nøyaktig same kode som skjermen.
+let cv=document.getElementById('cv');
+let ctx=cv.getContext('2d');
 const cwrap=document.getElementById('cwrap');
 const compassCanvas=document.getElementById('compassCanvas');
 const cctx=compassCanvas.getContext('2d');
@@ -12632,46 +12634,220 @@ document.getElementById('scanFi').onchange=async function(){
   });
 })();
 
-// ── 5. Eksporter planteikning med soner som PNG ───────────────
+// ── 5. Eksporter soneinndelinga som PDF — éi side per ark ─────
+// Planen vert teikna av draw() sjølv, ikkje av ein eigen kopi av
+// teiknekoden: cv/ctx/sc/offX/offY og etasjen vert mellombels peika på eit
+// eige lerret, og alt anna (fargar, SK/KJ-strekar, fasadelappar, vindauge,
+// takflater, kontrollmål) kjem med slik det står på skjermen. Ein eigen
+// kopi ville glidd frå skjermen for kvar endring i draw().
+// Alt mellom bytet og attendesettinga er synkront — ingen await — så
+// ingen hendingar kan sjå lerretet medan det er utlånt.
 (()=>{
-  const exportImgBtn=document.getElementById('exportImgBtn');
-  exportImgBtn.onclick=()=>{
-    if(!bgImg){hintText.textContent='Last opp ei plantegning først.';return;}
-    // Render to a fresh canvas at full image resolution
-    const out=document.createElement('canvas');
-    out.width=bgImg.width;out.height=bgImg.height;
-    const octx=out.getContext('2d');
-    octx.drawImage(bgImg,0,0);
-
-    // Draw all zones at image resolution
-    const scaleF=1/sc; // image px per screen px
-    floors.forEach((f,fi)=>{
-      f.zones.forEach((z,zi)=>{
-        if(z.pts.length<3)return;
-        const ci=zi%COLORS.length;
-        octx.beginPath();
-        z.pts.forEach((p,i)=>{i===0?octx.moveTo(p.x,p.y):octx.lineTo(p.x,p.y);});
-        octx.closePath();
-        octx.fillStyle=FILLS[ci]+'99';octx.fill();
-        octx.strokeStyle=COLORS[ci];octx.lineWidth=2/sc;octx.stroke();
-        // Zone label
-        const cx=z.pts.reduce((s,p)=>s+p.x,0)/z.pts.length;
-        const cy=z.pts.reduce((s,p)=>s+p.y,0)/z.pts.length;
-        const area=getAreaM2(z);
-        octx.font=`bold ${14/sc}px Inter,sans-serif`;
-        octx.fillStyle=COLORS[ci];
-        octx.textAlign='center';octx.textBaseline='middle';
-        octx.fillText(z.name+(area?` · ${area.toFixed(0)} m²`:''),cx,cy);
-      });
+  const JSPDF_URL='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  let _jspdfLast=null;
+  function lastJsPdf(){
+    if(window.jspdf&&window.jspdf.jsPDF)return Promise.resolve(window.jspdf.jsPDF);
+    if(_jspdfLast)return _jspdfLast;
+    _jspdfLast=new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src=JSPDF_URL;
+      s.onload=()=>window.jspdf&&window.jspdf.jsPDF?res(window.jspdf.jsPDF):rej(new Error('jsPDF lasta ikkje'));
+      s.onerror=()=>{_jspdfLast=null;rej(new Error('fekk ikkje lasta PDF-biblioteket (krev nett)'));};
+      document.head.appendChild(s);
     });
+    return _jspdfLast;
+  }
 
-    out.toBlob(blob=>{
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      a.href=url;a.download='SXI_generatoren_planteikning_'+new Date().toISOString().slice(0,10)+'.png';
-      document.body.appendChild(a);a.click();
-      document.body.removeChild(a);URL.revokeObjectURL(url);
-    },'image/png');
+  // Sidemål i «skjermpikslar»: A3 ved 96 dpi. Merkelappane i draw() er
+  // faste pikselstorleikar, så dette gir om lag same tekststorleik på
+  // arket som på skjermen. K gir skarp utskrift.
+  const A3L={w:1587,h:1123},K=2.4;
+  const HEAD=64,SIDE=300,MARG=20;
+
+  // Det som skal vere med på arket: biletet og alle sonene (ei sone kan
+  // stikke utanfor teikninga), i biletkoordinatar utan forskyving.
+  function innhaldBoks(f){
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    const ta=(x,y)=>{x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);};
+    if(f.bgImg){ta(0,0);ta(f.bgImg.width,f.bgImg.height);}
+    f.zones.forEach(z=>{if(!z.skjult)z.pts.forEach(p=>ta(p.x,p.y));});
+    return isFinite(x0)&&x1>x0&&y1>y0?{x0,y0,x1,y1}:null;
+  }
+
+  // Teikn planen for etasjen som no er aktiv, med draw(), inn på eit
+  // lerret på w×h logiske pikslar.
+  function teiknPlan(f,boks,w,h){
+    const c=document.createElement('canvas');
+    c.width=Math.round(w*K);c.height=Math.round(h*K);
+    const cx=c.getContext('2d');
+    cx.setTransform(K,0,0,K,0,0);
+    const PAD=14;
+    const s=Math.min((w-2*PAD)/(boks.x1-boks.x0),(h-2*PAD)/(boks.y1-boks.y0));
+    const d={x:f.floorDxImg||0,y:f.floorDyImg||0};
+    const lagra={cv,ctx,sc,offX,offY};
+    cv=c;ctx=cx;sc=s;
+    // i2s() legg til forskyvinga — trekk ho frå så boksen står midt på
+    offX=(w-(boks.x1-boks.x0)*s)/2-(boks.x0+d.x)*s;
+    offY=(h-(boks.y1-boks.y0)*s)/2-(boks.y0+d.y)*s;
+    try{draw();}
+    finally{({cv,ctx,sc,offX,offY}=lagra);}
+    return c;
+  }
+
+  function rr(c,x,y,w,h,r){c.beginPath();c.roundRect(x,y,w,h,r);}
+
+  // Nordpila. Kompasset i programmet er eit eige DOM-lerret med
+  // bruksrettleiing inni — på papiret treng vi berre pila og ein N.
+  function teiknNordpil(c,cx,cy){
+    const r=30,a=((globalNorth||0)-90)*Math.PI/180;
+    c.save();
+    c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);
+    c.fillStyle='rgba(255,255,255,.95)';c.fill();
+    c.strokeStyle='#cbd2db';c.lineWidth=1.2;c.stroke();
+    const ux=Math.cos(a),uy=Math.sin(a),nx=-uy,ny=ux;
+    const tip={x:cx+ux*(r-16),y:cy+uy*(r-16)},tail={x:cx-ux*(r-7),y:cy-uy*(r-7)};
+    c.beginPath();c.moveTo(tail.x,tail.y);c.lineTo(tip.x,tip.y);
+    c.strokeStyle='#1a7a6e';c.lineWidth=2.2;c.lineCap='round';c.stroke();
+    const b={x:tip.x-ux*9,y:tip.y-uy*9};
+    c.beginPath();c.moveTo(tip.x,tip.y);c.lineTo(b.x+nx*4.5,b.y+ny*4.5);c.lineTo(b.x-nx*4.5,b.y-ny*4.5);c.closePath();
+    c.fillStyle='#1a7a6e';c.fill();
+    c.font='700 11px Inter,sans-serif';c.textAlign='center';c.textBaseline='middle';
+    // N framfor pilspissen, inne i ringen — utanfor kunne han hamne utanfor ramma
+    c.fillStyle='#1a7a6e';c.fillText('N',cx+ux*(r-8),cy+uy*(r-8));
+    c.restore();
+  }
+
+  // Ei heil side: topp, plan, og sonelista med teiknforklaring til høgre.
+  function teiknSide(f,fli,sideNr,antSider,boks){
+    const stende=(boks.y1-boks.y0)>(boks.x1-boks.x0)*1.15;
+    const P=stende?{w:A3L.h,h:A3L.w}:A3L;
+    const side=document.createElement('canvas');
+    side.width=Math.round(P.w*K);side.height=Math.round(P.h*K);
+    const c=side.getContext('2d');
+    c.setTransform(K,0,0,K,0,0);
+    c.fillStyle='#ffffff';c.fillRect(0,0,P.w,P.h);
+
+    // Topp
+    c.fillStyle='#1d4f4f';c.fillRect(0,0,P.w,4);
+    c.textAlign='left';c.textBaseline='alphabetic';
+    c.fillStyle='#0d1b2a';c.font='700 22px Inter,sans-serif';
+    c.fillText(arkNamn(f),MARG,38);
+    c.font='12.5px Inter,sans-serif';c.fillStyle='#4b5563';
+    const under=[prosjektAdresse||null,new Date().toLocaleDateString('nb-NO')].filter(Boolean).join('  ·  ');
+    c.fillText(under,MARG,56);
+    c.textAlign='right';c.font='600 12px Inter,sans-serif';c.fillStyle='#1d4f4f';
+    c.fillText('SXI-generatoren · Soneinndeling',P.w-MARG,34);
+    c.font='11.5px Inter,sans-serif';c.fillStyle='#6b7280';
+    c.fillText('Side '+sideNr+' av '+antSider,P.w-MARG,52);
+    c.strokeStyle='#e5e7eb';c.lineWidth=1;
+    c.beginPath();c.moveTo(MARG,HEAD+0.5);c.lineTo(P.w-MARG,HEAD+0.5);c.stroke();
+
+    // Plan — ramma følgjer forma på innhaldet, så det grå lerretet berre
+    // vert ein smal kant rundt teikninga, som i programmet
+    const aw=P.w-SIDE-MARG*3,ah=P.h-HEAD-MARG*2;
+    const bw=boks.x1-boks.x0,bh=boks.y1-boks.y0;
+    const s0=Math.min((aw-28)/bw,(ah-28)/bh);
+    const pw=Math.min(aw,bw*s0+28),ph=Math.min(ah,bh*s0+28);
+    const px=MARG+(aw-pw)/2,py=HEAD+MARG+(ah-ph)/2;
+    const plan=teiknPlan(f,boks,pw,ph);
+    c.drawImage(plan,px,py,pw,ph);
+    c.strokeStyle='#cbd2db';c.lineWidth=1;c.strokeRect(px+0.5,py+0.5,pw-1,ph-1);
+    teiknNordpil(c,px+pw-44,py+ph-44);
+
+    // Sonelista
+    const sx=P.w-SIDE-MARG;let y=HEAD+MARG+6;
+    c.textAlign='left';c.textBaseline='middle';
+    c.font='700 12px Inter,sans-serif';c.fillStyle='#0d1b2a';
+    c.fillText('SONER',sx,y);y+=20;
+    let sum=0,n=0;
+    const synlege=f.zones.map((z,zi)=>({z,zi})).filter(o=>o.z.pts.length>=3);
+    const maksRader=Math.floor((P.h-HEAD-MARG*2-260)/34);
+    synlege.forEach((o,i)=>{
+      const a=getAreaM2(o.z);
+      if(a!=null){sum+=a;n++;}
+      if(i>=maksRader)return;
+      const col=COLORS[zoneColorIdx(fli,o.zi,o.z)];
+      c.fillStyle=FILLS[zoneColorIdx(fli,o.zi,o.z)];rr(c,sx,y-9,16,16,3);c.fill();
+      c.strokeStyle=col;c.lineWidth=1.6;c.stroke();
+      c.font='600 12px Inter,sans-serif';c.fillStyle=o.z.skjult?'#9ca3af':'#0d1b2a';
+      let nm=o.z.name+(o.z.skjult?' (skjult)':'');
+      while(c.measureText(nm).width>SIDE-110&&nm.length>4)nm=nm.slice(0,-2)+'…';
+      c.fillText(nm,sx+24,y-1);
+      c.textAlign='right';c.font='12px Inter,sans-serif';c.fillStyle='#374151';
+      c.fillText(a!=null?fmtM2(a):'–',sx+SIDE,y-1);
+      c.textAlign='left';c.font='10.5px Inter,sans-serif';c.fillStyle='#6b7280';
+      c.fillText([o.z.bygkat,getHoyde(o.z)?('h '+(+getHoyde(o.z)).toFixed(2)+' m'):null].filter(Boolean).join(' · '),sx+24,y+13);
+      y+=34;
+    });
+    if(synlege.length>maksRader){
+      c.font='italic 11px Inter,sans-serif';c.fillStyle='#6b7280';
+      c.fillText('+ '+(synlege.length-maksRader)+' soner til (sjå sonetabellen)',sx,y);y+=20;
+    }
+    if(!synlege.length){c.font='italic 11.5px Inter,sans-serif';c.fillStyle='#6b7280';c.fillText('Ingen soner på dette arket.',sx,y);y+=20;}
+    c.strokeStyle='#e5e7eb';c.beginPath();c.moveTo(sx,y+0.5);c.lineTo(sx+SIDE,y+0.5);c.stroke();y+=16;
+    c.font='700 12.5px Inter,sans-serif';c.fillStyle='#0d1b2a';
+    c.fillText('Sum BRA',sx,y);
+    c.textAlign='right';c.fillText(n?fmtM2(sum):'–',sx+SIDE,y);c.textAlign='left';
+    y+=14;
+    const mpp=mppForFloor(f);
+    c.font='10.5px Inter,sans-serif';c.fillStyle='#6b7280';
+    if(!mpp){y+=12;c.fillText('Arket er ikkje kalibrert — areal manglar.',sx,y);}
+
+    // Teiknforklaring — same strekar som draw() brukar
+    let ly=P.h-MARG-8-7*22;
+    c.font='700 12px Inter,sans-serif';c.fillStyle='#0d1b2a';
+    c.fillText('TEIKNFORKLARING',sx,ly);ly+=22;
+    const linje=(farge,bredd,strek,tekst)=>{
+      c.save();c.strokeStyle=farge;c.lineWidth=bredd;c.setLineDash(strek);
+      c.beginPath();c.moveTo(sx,ly);c.lineTo(sx+34,ly);c.stroke();c.restore();
+      c.font='11.5px Inter,sans-serif';c.fillStyle='#374151';c.fillText(tekst,sx+46,ly);ly+=22;
+    };
+    linje(COLORS[0],1.5,[],'Yttervegg (fasade)');
+    linje('#d97706',2.5,[7,4],'Skiljekonstruksjon (SK)');
+    linje('#8a6a3b',3.5,[2,3],'Kjellarvegg');
+    linje('#10b981',2.5,[7,4],'Sonekopling');
+    linje('#7c3aed',2.5,[8,4],'Kopla soner (same SIMIEN-sone)');
+    linje('#06b6d4',3.5,[],'Vindauge');
+    linje('#f59e0b',3.5,[],'Dør');
+    return {side,P};
+  }
+
+  document.getElementById('exportImgBtn').onclick=async()=>{
+    if(iFasade()){hintText.textContent='PDF-en viser soneinndelinga — byt til planvisinga først.';return;}
+    saveFloorState();
+    const ark=floors.map((f,fli)=>({f,fli,boks:innhaldBoks(f)})).filter(o=>o.boks);
+    if(!ark.length){hintText.textContent='Ingenting å skrive ut enno — last opp ei planteikning eller teikn ei sone.';return;}
+    const btn=document.getElementById('exportImgBtn');
+    btn.disabled=true;hintText.textContent='Lagar PDF …';
+    let JsPDF;
+    try{JsPDF=await lastJsPdf();}
+    catch(e){btn.disabled=false;hintText.textContent='PDF: '+e.message+'.';return;}
+
+    // Tilstand som berre gjeld skjermen og ikkje skal på arket
+    const lagra={activeFloor,mode,editZoneIdx,hoveredWin,hoveredMeasure,dragWin,dragCorner,
+      mouse,drawSnap,nordCheck,ghostMode,draftZones};
+    let doc=null;
+    try{
+      mode='navigate';editZoneIdx=null;hoveredWin=null;hoveredMeasure=null;dragWin=null;dragCorner=null;
+      mouse=null;drawSnap=null;nordCheck=false;ghostMode=false;draftZones=[];
+      ark.forEach((o,i)=>{
+        activeFloor=o.fli;syncFloorState();
+        const {side,P}=teiknSide(o.f,o.fli,i+1,ark.length,o.boks);
+        const orient=P.w>P.h?'landscape':'portrait';
+        if(!doc)doc=new JsPDF({orientation:orient,unit:'mm',format:'a3',compress:true});
+        else doc.addPage('a3',orient);
+        const wMm=orient==='landscape'?420:297,hMm=orient==='landscape'?297:420;
+        doc.addImage(side.toDataURL('image/jpeg',0.9),'JPEG',0,0,wMm,hMm,undefined,'FAST');
+      });
+    } finally {
+      ({activeFloor,mode,editZoneIdx,hoveredWin,hoveredMeasure,dragWin,dragCorner,
+        mouse,drawSnap,nordCheck,ghostMode,draftZones}=lagra);
+      syncFloorState();draw();
+      btn.disabled=false;
+    }
+    const namn=foreslaaFilnamn().replace(/\.entro$/,'')+'_soneinndeling.pdf';
+    doc.save(namn);
+    hintText.textContent='PDF lagra: '+ark.length+(ark.length===1?' side':' sider')+' ('+namn+').';
   };
 })();
 
