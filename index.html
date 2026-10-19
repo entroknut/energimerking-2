@@ -76,6 +76,9 @@ return mapboxgl$1;
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
+/* Skjemaelement arvar ikkje skrifta av seg sjølv — utan dette fekk ein del
+   knappar og felt Arial midt i Inter-grensesnittet. */
+button,input,select,textarea{font-family:inherit}
 :root{
   --bg:#f8fafc;
   --surface:#ffffff;
@@ -157,10 +160,24 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
    dei lengste merkelappane vert korta ned; er det framleis for
    smalt, brekk gruppene ned på ei ny rad (flex-wrap over). */
 .tb-short{display:none}
+/* Med fulle merkelappar treng verktøylinja ~1650 px. Vanlege bærbare
+   (1440–1536 px) fekk difor to rader. Dei korte merkelappane kjem no før
+   linja brekk; «Eksporter SXI» står lengst, sidan det er hovudhandlinga. */
+@media (max-width:1700px){
+  .tb-full{display:none}
+  .tb-short{display:inline}
+  #sxiBtn .tb-full{display:inline}
+  #sxiBtn .tb-short{display:none}
+}
 @media (max-width:1600px){
   #toolbar{gap:1px}
   .btn{padding:0 8px}
   .tg{padding-right:6px;margin-right:4px}
+}
+@media (max-width:1500px){
+  .btn{padding:0 7px}
+  #sxiBtn .tb-full{display:none}
+  #sxiBtn .tb-short{display:inline}
 }
 @media (max-width:1340px){
   .btn{padding:0 6px;font-size:11.5px;gap:3px}
@@ -559,7 +576,9 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div class="tg">
       <button class="btn teal" id="upBtn">↑ Last opp</button>
       <input type="file" id="fi" accept=".pdf,image/*" style="display:none">
-      <button class="btn plan-only" id="scanBtn" title="Importer 3D-skann: vel den utpakka MatterPak-mappa — etasjar, soner og vindauge vert laga automatisk">⬚ 3D-skann</button>
+      <!-- 3D-skann er ikkje klar for brukarar enno: knappen er gøymd, koden (// ── 2d.) står.
+           Fjern style="display:none" for å slå han på att. -->
+      <button class="btn plan-only" id="scanBtn" style="display:none" title="Importer 3D-skann: vel den utpakka MatterPak-mappa — etasjar, soner og vindauge vert laga automatisk">⬚ 3D-skann</button>
       <input type="file" id="scanFi" webkitdirectory directory multiple style="display:none">
       <div id="pgctrl" style="display:none;align-items:center;gap:3px">
         <button class="btn" id="prevPg">‹</button>
@@ -588,7 +607,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <button class="btn plan-only" id="winBtn" title="Legg til vindauge/dør — klikk på ein fasade (Ctrl+C/V for å kopiere)">▭ <span class="tb-full">Vindauge/dør</span><span class="tb-short">Vindauge</span></button>
       <button class="btn on" id="snapBtn" title="Snap til hjørne — låser punktet til hjørne i planteikninga og på eksisterande soner. Slå av om det snappar til feil stad.">⌖ Snap</button>
       <button class="btn" id="measureBtn" title="Kontrollmål avstand (påverkar ikkje SXI) — klikk start og slutt, Shift for 90°/45°, Esc for å avslutte"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="1.5" y="6" width="13" height="4.5" rx="1"/><path d="M4.5 6v2M7.5 6v3M10.5 6v2"/></svg> Mål</button>
-      <button class="btn on" id="measShowBtn" style="display:none" title="Vis eller skjul lagra mål. Måla følgjer etasjen og blir lagra med prosjektet — høgreklikk på ei målelinje for å slette henne."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="1.9"/></svg> Mål (<span class="mcount">0</span>)</button>
+      <button class="btn on" id="measShowBtn" style="display:none" title="Vis eller skjul lagra mål. Måla følgjer etasjen og blir lagra med prosjektet — høgreklikk på ei målelinje for å slette henne."><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="1.9"/></svg> <span>Mål (<span class="mcount">0</span>)</span></button>
     </div>
     <div class="tg">
       <button class="btn plan-only" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ <span class="tb-full">Slå saman fasadar</span><span class="tb-short">Fasadar</span></button>
@@ -634,13 +653,13 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
         Plasser
       </button>
       <div id="floorOffsetBar" style="display:none;align-items:center;gap:5px;padding:0 8px">
-        <span id="floorOffsetVal" style="font-size:10px;font-family:'DM Mono',monospace;color:var(--accent);white-space:nowrap">0, 0 px</span>
+        <span id="floorOffsetVal" style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--accent);white-space:nowrap">0, 0 px</span>
         <button id="floorOffsetReset" title="Nullstill forskyving" style="font-size:10.5px;padding:1px 5px;border:1px solid var(--border2);border-radius:3px;background:var(--surface);color:var(--text3);cursor:pointer;font-family:inherit;line-height:1.4">↺</button>
       </div>
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.7.1</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.7.2</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -650,7 +669,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <div id="dropz-text"><strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp fil her</small></div>
     </div>
     <div id="scaleBadge" class="uncal">Ikkje kalibrert</div>
-    <canvas id="compassCanvas" class="plan-only" width="96" height="96"></canvas>
+    <canvas id="compassCanvas" class="plan-only" width="96" height="96" title="Nordpila — dra for å justere kva veg nord peikar"></canvas>
     <button id="compassNordBtn" class="plan-only" title="Hald inne for å sjå planteikninga med nord opp (som kart)" style="position:absolute;bottom:14px;right:122px;height:28px;padding:0 10px;font-size:11px;font-weight:600;font-family:inherit;background:rgba(255,255,255,.92);border:1px solid var(--border2);border-radius:7px;color:var(--text2);cursor:pointer;box-shadow:var(--shadow-sm);backdrop-filter:blur(6px);white-space:nowrap;transition:all .12s;display:flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M10.5 5.5 9 9l-3.5 1.5L7 7z" stroke-linejoin="round"/></svg> Nord-sjekk</button>
 
     <!-- Mapbox Kart Overlay — direkte barn av cwrap, eiga header -->
@@ -3936,7 +3955,7 @@ function drawCompass(){
   // Shadow + background circle
   cctx.beginPath();cctx.arc(cx,cy,r,0,Math.PI*2);
   cctx.fillStyle='rgba(255,255,255,.96)';cctx.fill();
-  cctx.strokeStyle='var(--border, #e2e6ed)';cctx.lineWidth=1.5;cctx.stroke();
+  cctx.strokeStyle='#e2e6ed';cctx.lineWidth=1.5;cctx.stroke();
   // Subtle ring inside
   cctx.beginPath();cctx.arc(cx,cy,r-8,0,Math.PI*2);
   cctx.strokeStyle='rgba(0,0,0,.04)';cctx.lineWidth=1;cctx.stroke();
@@ -3980,7 +3999,7 @@ function drawCompass(){
     x: cx + Math.cos(arrowAngle)*(tipR - 18),
     y: cy + Math.sin(arrowAngle)*(tipR - 18)
   };
-  cctx.font='bold 11px "DM Sans",sans-serif';
+  cctx.font='bold 11px Inter,sans-serif';
   cctx.fillStyle='#fff';
   cctx.textAlign='center';cctx.textBaseline='middle';
   // White halo
@@ -3994,12 +4013,8 @@ function drawCompass(){
   cctx.fillStyle='#1a7a6e';cctx.fill();
   cctx.beginPath();cctx.arc(cx,cy,1.5,0,Math.PI*2);
   cctx.fillStyle='#fff';cctx.fill();
-
-  // Tooltip hint at bottom of circle
-  cctx.font='9px "DM Sans",sans-serif';
-  cctx.fillStyle='#9ca3af';
-  cctx.textAlign='center';cctx.textBaseline='middle';
-  cctx.fillText('dra for å justere', cx, cy+r-8);
+  // «Dra for å justere» står i title-attributtet på lerretet. Som tekst inne
+  // i ringen la han seg over pila kvar gong nord peika nedover.
 }
 
 // ── Compass drag interaction ──────────────────────────────────
@@ -6137,7 +6152,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
       v.value=getTakvinkel(z)||'';
       v.placeholder='0';
       v.title='Takvinkel i grader frå horisontalt. Tomt eller 0 = flatt tak. Arealet vert korrigert med 1/cos(vinkel).';
-      v.style.cssText="width:38px;flex-shrink:0;padding:3px 4px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace";
+      v.style.cssText="width:38px;flex-shrink:0;padding:3px 4px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'JetBrains Mono',monospace";
       v.onchange=()=>{
         const raw=v.value.trim();
         const n=raw===''?0:parseFloat(v.value);
@@ -6247,12 +6262,12 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
     const dot=document.createElement('span');dot.style.cssText=`width:7px;height:7px;border-radius:2px;background:${col};flex-shrink:0`;
     const nInp=document.createElement('input');nInp.type='text';nInp.value=fl.name||(F.lbl+' '+(fli+1));
     nInp.title='Namnet går rett inn i SIMIEN som elementnamn';
-    nInp.style.cssText="flex:1;min-width:0;font-size:10.5px;border:1px solid transparent;border-radius:4px;padding:1px 3px;font-family:'DM Mono',monospace;background:transparent";
+    nInp.style.cssText="flex:1;min-width:0;font-size:10.5px;border:1px solid transparent;border-radius:4px;padding:1px 3px;font-family:'JetBrains Mono',monospace;background:transparent";
     nInp.onfocus=()=>{nInp.style.borderColor='var(--border2)';nInp.style.background='#fff';};
     nInp.onblur=()=>{nInp.style.borderColor='transparent';nInp.style.background='transparent';};
     nInp.onchange=()=>{fl.name=nInp.value.trim()||fl.name;markDirty();renderTable();draw();};
     const aLbl=document.createElement('span');
-    aLbl.style.cssText="font-size:9.5px;color:var(--text3);font-family:'DM Mono',monospace;white-space:nowrap";
+    aLbl.style.cssText="font-size:9.5px;color:var(--text3);font-family:'JetBrains Mono',monospace;white-space:nowrap";
     aLbl.textContent=flateAreaM2(z,fl).toFixed(1)+' m²';
     const klippFl=ikon('✂','Del denne flata i to','#dc2626');
     klippFl.onclick=()=>startKlippFlate(z,kind,fli,fi);
@@ -6294,7 +6309,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
       uInp.value=fl.uverdi!=null?fl.uverdi:'';
       uInp.placeholder=uStd!=null?uStd.toFixed(2):'U';
       uInp.title='U-verdi (W/m²K) for denne flata. Blank = sona sin ('+(uStd!=null?uStd.toFixed(2):'ikkje sett')+').';
-      uInp.style.cssText="width:44px;flex-shrink:0;font-size:10.5px;border:1px solid "+(fl.uverdi!=null?'var(--amber)':'var(--border2)')+";border-radius:4px;padding:2px 3px;text-align:right;font-family:'DM Mono',monospace;background:"+(fl.uverdi!=null?'var(--amber-dim)':'#fff');
+      uInp.style.cssText="width:44px;flex-shrink:0;font-size:10.5px;border:1px solid "+(fl.uverdi!=null?'var(--amber)':'var(--border2)')+";border-radius:4px;padding:2px 3px;text-align:right;font-family:'JetBrains Mono',monospace;background:"+(fl.uverdi!=null?'var(--amber-dim)':'#fff');
       uInp.onchange=()=>{
         const v=parseFloat(uInp.value);
         fl.uverdi=(isNaN(v)||v<=0)?null:v;
@@ -6309,7 +6324,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
       const vInp=document.createElement('input');vInp.type='number';vInp.min='0';vInp.max='89';vInp.step='0.1';vInp.value=fl.vinkel||'';
       vInp.placeholder='0';
       vInp.title='Takvinkel i grader. Tomt eller 0 = flatt.';
-      vInp.style.cssText="width:38px;flex-shrink:0;font-size:10.5px;border:1px solid var(--border2);border-radius:4px;padding:2px 3px;text-align:right;font-family:'DM Mono',monospace;background:#fff";
+      vInp.style.cssText="width:38px;flex-shrink:0;font-size:10.5px;border:1px solid var(--border2);border-radius:4px;padding:2px 3px;text-align:right;font-family:'JetBrains Mono',monospace;background:#fff";
       vInp.onchange=()=>{
         const v=parseFloat(vInp.value);
         fl.vinkel=(isNaN(v)||v<0||v>=90)?0:v;
@@ -6356,7 +6371,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
       }
       if(fl.vinkel>0){
         const sk=document.createElement('span');
-        sk.style.cssText="font-size:9.5px;color:var(--text3);font-family:'DM Mono',monospace;white-space:nowrap";
+        sk.style.cssText="font-size:9.5px;color:var(--text3);font-family:'JetBrains Mono',monospace;white-space:nowrap";
         sk.title='Skrått areal etter vinkelkorrigering';
         sk.textContent='→ '+(flateAreaM2(z,fl)/Math.cos(fl.vinkel*Math.PI/180)).toFixed(1);
         r3.appendChild(sk);
@@ -6371,7 +6386,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
   const bunn=document.createElement('div');
   bunn.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:6px;padding-top:3px;border-top:1px solid var(--border)';
   const sumTxt=document.createElement('span');
-  sumTxt.style.cssText="font-size:10px;font-weight:700;color:var(--text);font-family:'DM Mono',monospace";
+  sumTxt.style.cssText="font-size:10px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace";
   sumTxt.textContent='Σ '+sum.toFixed(2)+' m²';
   sumTxt.title='Sum av flatene mot sonearealet '+((getAreaM2(z)??0).toFixed(2))+' m²';
   const reset=document.createElement('button');
@@ -6414,7 +6429,7 @@ function byggKjellerBoks(z,sec){
   inp.value=z.oppfylling!=null?z.oppfylling:'';
   inp.placeholder=getHoyde(z).toFixed(2);
   inp.title='Kor djupt kjellaren ligg under terreng. Blank = heile veggen er under terreng (= etasjehøgda).';
-  inp.style.cssText="width:60px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace";
+  inp.style.cssText="width:60px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'JetBrains Mono',monospace";
   const u=document.createElement('span');u.style.cssText='font-size:11px;color:var(--text3)';u.textContent='m';
   inp.onchange=()=>{const v=parseFloat(inp.value);z.oppfylling=(isNaN(v)||v<=0)?null:v;markDirty();updateResults();renderTable();};
   wrap.appendChild(inp);wrap.appendChild(u);
@@ -6480,13 +6495,13 @@ function byggGavlBoks(z,sec){
     liste.forEach(gf=>{
       const r=document.createElement('div');
       r.style.cssText='display:flex;justify-content:space-between;align-items:center;font-size:10.5px;padding:2px 0;color:var(--text2)';
-      r.innerHTML=`<span>⊿ ${gf.dir||'Gavl'}</span><span style="font-family:'DM Mono',monospace;color:var(--text)">${gf.area.toFixed(2)} m²</span>`;
+      r.innerHTML=`<span>⊿ ${gf.dir||'Gavl'}</span><span style="font-family:'JetBrains Mono',monospace;color:var(--text)">${gf.area.toFixed(2)} m²</span>`;
       box.appendChild(r);
     });
     const tot=liste.reduce((t,g)=>t+g.area,0);
     const tr=document.createElement('div');
     tr.style.cssText='display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;padding-top:3px;border-top:1px solid var(--border);margin-top:2px;color:var(--text)';
-    tr.innerHTML=`<span>Totalt</span><span style="font-family:'DM Mono',monospace">${tot.toFixed(2)} m²</span>`;
+    tr.innerHTML=`<span>Totalt</span><span style="font-family:'JetBrains Mono',monospace">${tot.toFixed(2)} m²</span>`;
     box.appendChild(tr);
   } else {
     const n=document.createElement('div');n.style.cssText='font-size:10.5px;color:var(--text3)';
@@ -7104,7 +7119,7 @@ function updateResults(){
         cardHeader.appendChild(ftag);
       }
       const areaPreview=document.createElement('span');
-      areaPreview.style.cssText=`font-size:10.5px;color:var(--text3);font-family:'DM Mono',monospace;white-space:nowrap;flex-shrink:0;display:${isCollapsed?'inline':'none'}`;
+      areaPreview.style.cssText=`font-size:10.5px;color:var(--text3);font-family:'JetBrains Mono',monospace;white-space:nowrap;flex-shrink:0;display:${isCollapsed?'inline':'none'}`;
       areaPreview.textContent=dispArea!=null?dispArea.toFixed(1)+' m²':'—';
       cardHeader.appendChild(areaPreview);
       const eye=document.createElement('button');
@@ -7171,13 +7186,13 @@ function updateResults(){
           const isCur=lz===z;
           const row=document.createElement('div');
           row.style.cssText=`display:flex;justify-content:space-between;align-items:center;padding:3px 6px;border-radius:5px;margin-bottom:2px;background:${isCur?'rgba(99,102,241,.12)':'transparent'}`;
-          row.innerHTML=`<span style="font-weight:${isCur?'700':'400'};color:${isCur?'#4338ca':'var(--text2)'}">${lz.name}${lf&&floors.length>1?' <span style="font-size:9px;color:var(--text3)">('+lf.name+')</span>':''}</span><span style="font-family:'DM Mono',monospace;font-size:10.5px;color:${isCur?'#4338ca':'var(--text3)'}">${la!=null?la.toFixed(1)+' m²':'—'}</span>`;
+          row.innerHTML=`<span style="font-weight:${isCur?'700':'400'};color:${isCur?'#4338ca':'var(--text2)'}">${lz.name}${lf&&floors.length>1?' <span style="font-size:9px;color:var(--text3)">('+lf.name+')</span>':''}</span><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:${isCur?'#4338ca':'var(--text3)'}">${la!=null?la.toFixed(1)+' m²':'—'}</span>`;
           breakdown.appendChild(row);
         });
         const totalA=getTotalAreaM2(z);
         const sumRow=document.createElement('div');
         sumRow.style.cssText='display:flex;justify-content:space-between;margin-top:5px;padding-top:5px;border-top:1px solid #c7d2fe;font-weight:700;color:#4338ca';
-        sumRow.innerHTML=`<span>Sum</span><span style="font-family:'DM Mono',monospace">${totalA!=null?totalA.toFixed(1)+' m²':'—'}</span>`;
+        sumRow.innerHTML=`<span>Sum</span><span style="font-family:'JetBrains Mono',monospace">${totalA!=null?totalA.toFixed(1)+' m²':'—'}</span>`;
         breakdown.appendChild(sumRow);
         cardBody.appendChild(breakdown);
       }
@@ -7189,7 +7204,7 @@ function updateResults(){
         const el=document.createElement('div');
         el.style.cssText='background:var(--surface2);border-radius:6px;padding:6px 8px';
         el.innerHTML=`<div style="font-size:9.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">${label}</div>`
-          +`<div style="font-size:13px;font-weight:700;color:var(--text);font-family:'DM Mono',monospace;line-height:1.2">${value}</div>`
+          +`<div style="font-size:13px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace;line-height:1.2">${value}</div>`
           +(sub?`<div style="font-size:10px;color:var(--text3)">${sub}</div>`:'');
         return el;
       };
@@ -7245,7 +7260,7 @@ function updateResults(){
       // Byggeår + apply-all
       const byWrap=document.createElement('div');byWrap.style.cssText='display:flex;align-items:center;gap:5px;flex:1';
       const byInp=document.createElement('input');byInp.type='number';byInp.min='1800';byInp.max='2030';byInp.placeholder='t.d. 1985';byInp.value=z.byggeaar||'';
-      byInp.style.cssText="width:70px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace";
+      byInp.style.cssText="width:70px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'JetBrains Mono',monospace";
       byInp.title=(piBygg.byggeaar&&z.byggeaar===piBygg.byggeaar)
         ?'Byggeår frå EntroPi ('+piBygg.byggeaar+') — skriv over for å endre'
         :'Byggeår for denne sona';
@@ -7272,7 +7287,7 @@ function updateResults(){
       // Etasjehøyde + himlingshøgde
       const hWrap=document.createElement('div');hWrap.style.cssText='display:flex;align-items:center;gap:4px;flex:1';
       const hInp=document.createElement('input');hInp.type='number';hInp.min='0.1';hInp.step='0.1';hInp.value=getHoyde(z);
-      hInp.style.cssText="width:60px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace";
+      hInp.style.cssText="width:60px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'JetBrains Mono',monospace";
       const hU=document.createElement('span');hU.style.cssText='font-size:11px;color:var(--text3)';hU.textContent='m';
       hInp.onchange=()=>{const v=parseFloat(hInp.value);z.hoyde=(isNaN(v)||v<=0)?null:v;updateResults();renderTable();draw();};
       hWrap.appendChild(hInp);hWrap.appendChild(hU);
@@ -7283,7 +7298,7 @@ function updateResults(){
       const himCb=document.createElement('input');himCb.type='checkbox';himCb.style.cssText='cursor:pointer;accent-color:var(--accent)';himCb.checked=z.himling!=null;
       const himCbLbl=document.createElement('span');himCbLbl.style.cssText='font-size:10.5px;color:var(--text3)';himCbLbl.textContent='Eigen himlingshøgde';
       const himInp=document.createElement('input');himInp.type='number';himInp.min='0.1';himInp.step='0.1';himInp.value=z.himling!=null?z.himling:getHoyde(z);
-      himInp.style.cssText=`width:52px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'DM Mono',monospace;display:${z.himling!=null?'block':'none'}`;
+      himInp.style.cssText=`width:52px;padding:3px 6px;font-size:11px;border:1px solid var(--border2);border-radius:4px;text-align:right;background:#fff;font-family:'JetBrains Mono',monospace;display:${z.himling!=null?'block':'none'}`;
       const himU=document.createElement('span');himU.style.cssText=`font-size:11px;color:var(--text3);display:${z.himling!=null?'inline':'none'}`;himU.textContent='m';
       himCb.onchange=()=>{
         if(himCb.checked){himInp.style.display='block';himU.style.display='inline';himInp.value=getHoyde(z);z.himling=getHoyde(z);}
@@ -7393,7 +7408,7 @@ function updateResults(){
         gavlSum.style.cssText='margin-top:8px;padding-top:8px;border-top:1px solid var(--border)';
         const gavlSumHdr=document.createElement('div');
         gavlSumHdr.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:5px';
-        gavlSumHdr.innerHTML=`<span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Gavlflater</span><span style="font-size:10px;font-family:'DM Mono',monospace;color:var(--accent)">${z.gavlflater.reduce((s,g)=>s+g.area,0).toFixed(2)} m² tot.</span>`;
+        gavlSumHdr.innerHTML=`<span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Gavlflater</span><span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--accent)">${z.gavlflater.reduce((s,g)=>s+g.area,0).toFixed(2)} m² tot.</span>`;
         gavlSum.appendChild(gavlSumHdr);
         const gavlList=document.createElement('div');gavlList.className='win-list';
         z.gavlflater.forEach((gf,gfi)=>{
@@ -7615,7 +7630,7 @@ function updateResults(){
             row.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;margin:2px 0;border-radius:6px;background:#fef3c7;border:1px solid #d97706';
             const nameTag=document.createElement('span');nameTag.style.cssText='font-size:11px;font-weight:700;color:#92400e;white-space:nowrap';
             nameTag.textContent=mergedObj?.name||'SK';
-            const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:10.5px;color:#6b7280;font-family:'DM Mono',monospace;flex:1";
+            const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:10.5px;color:#6b7280;font-family:'JetBrains Mono',monospace;flex:1";
             statsSpan.textContent=`${grpSegs.length} veggar · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx?fmtM2(totalA):'—'}`;
             row.title='Eitt element i SIMIEN, sett saman av: '+grpSegs.map(s2=>labels2[segs.indexOf(s2)]).join(', ');
             const unmergeBtn=document.createElement('button');
@@ -7648,7 +7663,7 @@ function updateResults(){
                   row.style.cssText='display:flex;align-items:center;gap:4px;padding:3px 6px;margin:2px 0;border-radius:4px;background:#d1fae5;border:1px solid #10b981;font-size:10px';
                   const nameTag=document.createElement('span');nameTag.style.cssText='font-weight:700;color:#047857;white-space:nowrap;font-size:10px';
                   nameTag.textContent=grpName;
-                  const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:9.5px;color:#6b7280;font-family:'DM Mono',monospace;flex:1";
+                  const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:9.5px;color:#6b7280;font-family:'JetBrains Mono',monospace;flex:1";
                   statsSpan.textContent=`${zcSegs.length} veggar · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx?fmtM2(totalA):'—'}`;
                   row.title='Sonekobling — ein <zone_connection> element i SXI-fila: '+zcSegs.map((s2,i)=>labels2[segs.indexOf(s2)]).join(', ');
                   const remBtn=document.createElement('button');
@@ -7757,7 +7772,7 @@ function updateResults(){
               row.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;margin:2px 0;border-radius:6px;background:#dbeafe;border:1px solid #3b82f6';
               const nameTag=document.createElement('span');nameTag.style.cssText='font-size:11px;font-weight:700;color:#1e40af;white-space:nowrap';
               nameTag.textContent=yvMerged.name;
-              const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:10.5px;color:#6b7280;font-family:'DM Mono',monospace;flex:1";
+              const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:10.5px;color:#6b7280;font-family:'JetBrains Mono',monospace;flex:1";
               statsSpan.textContent=`${grpSegs.length} fasadar · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx&&netA!=null?fmtM2(netA>0?netA:totalGrossA):'—'} · ${meanAz}°`;
               const unmergeBtn=document.createElement('button');
               unmergeBtn.style.cssText='font-size:10px;padding:2px 6px;border:1px solid #3b82f6;border-radius:4px;background:#fff;color:#1e40af;cursor:pointer;font-family:inherit;white-space:nowrap';
@@ -7794,11 +7809,11 @@ function updateResults(){
             :'Klikk for å endre mellom yttervegg (YV) og skillekonstruksjon (SK)';
           const left=document.createElement('div');left.style.cssText='display:flex;align-items:center;gap:7px;min-width:0;flex:1';
           const dirBadge=document.createElement('span');dirBadge.style.cssText=`font-size:11px;font-weight:700;color:${fg.tekst};white-space:nowrap`;dirBadge.textContent=nm;
-          const lenSpan=document.createElement('span');lenSpan.style.cssText="font-size:11px;color:#6b7280;font-family:'DM Mono',monospace";lenSpan.textContent=seg.lenM!==null?fmtM(seg.lenM):'—';
+          const lenSpan=document.createElement('span');lenSpan.style.cssText="font-size:11px;color:#6b7280;font-family:'JetBrains Mono',monospace";lenSpan.textContent=seg.lenM!==null?fmtM(seg.lenM):'—';
           left.appendChild(dirBadge);left.appendChild(lenSpan);
           const right=document.createElement('div');right.style.cssText='display:flex;align-items:center;gap:4px';
           if(!isSK&&!isKJ){
-            const areaSpan=document.createElement('span');areaSpan.style.cssText="font-size:10.5px;color:#374151;font-family:'DM Mono',monospace";
+            const areaSpan=document.createElement('span');areaSpan.style.cssText="font-size:10.5px;color:#374151;font-family:'JetBrains Mono',monospace";
             areaSpan.textContent=netA!=null?fmtM2(netA>0?netA:seg.areaM2):'—';
             right.appendChild(areaSpan);
           }
@@ -7982,7 +7997,7 @@ window._toggleAllZcards=function(){
     if(allCollapsed){c.classList.remove('collapsed');if(c._buildBody){c._buildBody();c._buildBody=null;}}
     else c.classList.add('collapsed');
     // Sync areaPreview
-    const ap=c.querySelector('.zcard-header span[style*="DM Mono"]');
+    const ap=c.querySelector('.zcard-header span[style*="JetBrains Mono"]');
     if(ap)ap.style.display=c.classList.contains('collapsed')?'inline':'none';
   });
   // Lagre state
@@ -8099,7 +8114,7 @@ function showCopyWindowMenu(w, srcZone, srcZi, srcFloor, srcFi){
   antalWrap.innerHTML=`<span style="font-size:12px;color:var(--text3);flex:1">Antal stk ved kopiering:</span>`;
   const antalInp=document.createElement('input');
   antalInp.type='number';antalInp.min='1';antalInp.max='999';antalInp.value=w.antal||1;
-  antalInp.style.cssText="width:56px;padding:4px 8px;font-size:13px;border:1px solid var(--border2);border-radius:6px;text-align:right;font-family:'DM Mono',monospace;background:#fff";
+  antalInp.style.cssText="width:56px;padding:4px 8px;font-size:13px;border:1px solid var(--border2);border-radius:6px;text-align:right;font-family:'JetBrains Mono',monospace;background:#fff";
   antalWrap.appendChild(antalInp);
 
   box.innerHTML=`<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px">${icon} Kopier "${wLabel}"</div>
@@ -8220,7 +8235,7 @@ function showLinkZoneMenu(z, srcFloor, srcFi){
       const tzArea=getAreaM2(tz);
       const row=document.createElement('button');
       row.style.cssText=`width:100%;display:flex;align-items:center;gap:10px;padding:8px 12px;border:2px solid ${isLinked?COLORS[srcCi]:'var(--border)'};border-left:4px solid ${tzColor};border-radius:8px;background:${isLinked?'#f5f3ff':'#fff'};cursor:pointer;text-align:left;margin-bottom:5px;font-family:inherit;transition:all .12s`;
-      row.innerHTML=`<div style="width:10px;height:10px;border-radius:50%;background:${tzColor};flex-shrink:0"></div><div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:var(--text)">${tz.name}${tzArea!=null?' <span style="font-size:10.5px;font-weight:400;color:var(--text3);font-family:DM Mono,monospace">'+tzArea.toFixed(1)+' m²</span>':''}</div><div style="font-size:10.5px;color:${isLinked?'#7c3aed':'var(--text3)'}">${isLinked?'✓ Kopla — klikk for å frikoble':'Klikk for å koble saman'}</div></div>`;
+      row.innerHTML=`<div style="width:10px;height:10px;border-radius:50%;background:${tzColor};flex-shrink:0"></div><div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:var(--text)">${tz.name}${tzArea!=null?' <span style="font-size:10.5px;font-weight:400;color:var(--text3);font-family:JetBrains Mono,monospace">'+tzArea.toFixed(1)+' m²</span>':''}</div><div style="font-size:10.5px;color:${isLinked?'#7c3aed':'var(--text3)'}">${isLinked?'✓ Kopla — klikk for å frikoble':'Klikk for å koble saman'}</div></div>`;
       row.onmouseenter=()=>{if(!isLinked)row.style.borderColor='var(--accent)';};
       row.onmouseleave=()=>{if(!isLinked)row.style.borderColor='var(--border)';};
       row.onclick=()=>{
@@ -8340,7 +8355,7 @@ function renderTable(){
         const skraaA=erTak?(flate?(tvDeg>0?area/Math.cos(tvDeg*Math.PI/180):area):(getTakAreal(z)??0)):null;
         const tvCelle=erTak
           ?(delt
-            ?`<span style="font-family:'DM Mono',monospace;color:${tvDeg>0?'var(--accent)':'var(--text3)'}">${tvDeg.toFixed(0)}</span>`
+            ?`<span style="font-family:'JetBrains Mono',monospace;color:${tvDeg>0?'var(--accent)':'var(--text3)'}">${tvDeg.toFixed(0)}</span>`
             :`<input class="tbl-input" data-ztakvinkel="${fli},${zi}" value="${tvDeg||''}" placeholder="0" style="width:46px" title="Takvinkel i grader (0=flatt). Arealet vert korrigert med 1/cos(vinkel).">`)
           :'<span style="color:var(--text3)">—</span>';
         // Perimeter: berre golv på grunn. Ei delflate har berre si eiga ytterkant.
@@ -8392,11 +8407,11 @@ function renderTable(){
       const bg=isOv?'var(--amber-dim)':stdVal?'':'var(--surface2)';
       const border=isOv?'var(--amber)':stdVal?'var(--border2)':'var(--border2)';
       const title=isOv?'Manuelt overstyrt':stdVal?'Standard':'Ikkje sett — legg inn byggeår';
-      return `<td class="${isOv?'cell-overridden':''}"><input class="tbl-input${isOv?' overridden':''}" data-uval="${fli},${zi},${field}" value="${dispV!=null?dispV:''}" placeholder="${stdVal!=null?stdVal:'—'}" style="width:52px;font-family:'DM Mono',monospace" title="${title}"></td>`;
+      return `<td class="${isOv?'cell-overridden':''}"><input class="tbl-input${isOv?' overridden':''}" data-uval="${fli},${zi},${field}" value="${dispV!=null?dispV:''}" placeholder="${stdVal!=null?stdVal:'—'}" style="width:52px;font-family:'JetBrains Mono',monospace" title="${title}"></td>`;
     };
     html+=`<tr style="${_isInherited?'opacity:.7':''}">`
       +`<td style="font-weight:600;color:var(--text)">${z.name}${_fltag}</td>`
-      +`<td style="font-family:'DM Mono',monospace;color:${_isInherited?'var(--text3)':'var(--text)'}">${z.byggeaar||'—'}${_isInherited?' <small style="color:var(--text3)">(arva)</small>':''}</td>`
+      +`<td style="font-family:'JetBrains Mono',monospace;color:${_isInherited?'var(--text3)':'var(--text)'}">${z.byggeaar||'—'}${_isInherited?' <small style="color:var(--text3)">(arva)</small>':''}</td>`
       +mkUCell('uVegg',std?.uVegg,z.uVegg)
       +mkUCell('uTak',std?.uTak,z.uTak)
       +mkUCell('uGulv',std?.uGulv,z.uGulv)
@@ -8476,7 +8491,7 @@ function renderTable(){
           const bc=isOv?'var(--amber)':isSoneOv?'var(--accent)':'var(--border2)';
           const bg=isOv?'var(--amber-dim)':isSoneOv?'var(--accent-dim)':'';
           const tt=isOv?'Fasade-spesifikk':isSoneOv?'Frå sone':stdZ?'Standard':'Legg inn byggeår';
-          return `<td class="${isOv?'cell-overridden':''}"><input class="tbl-input${isOv?' overridden':''}" data-uvseg="${fli},${zi},${segKey}" value="${effU!=null?effU:''}" placeholder="${ph!=null?ph:''}" style="width:52px;font-family:'DM Mono',monospace;border-color:${bc};background:${bg}" title="${tt}"></td>`;
+          return `<td class="${isOv?'cell-overridden':''}"><input class="tbl-input${isOv?' overridden':''}" data-uvseg="${fli},${zi},${segKey}" value="${effU!=null?effU:''}" placeholder="${ph!=null?ph:''}" style="width:52px;font-family:'JetBrains Mono',monospace;border-color:${bc};background:${bg}" title="${tt}"></td>`;
         })()}
       </tr>`;
     });
@@ -8531,7 +8546,7 @@ function renderTable(){
           const _wPh=_wz.uVindu??_wstd?.uVindu??'';
           const _wBc=_wOv?'var(--amber)':_wSone?'var(--accent)':'var(--border2)';
           const _wBg=_wOv?'var(--amber-dim)':_wSone?'var(--accent-dim)':'';
-          return `<td class="${_wOv?'cell-overridden':''}"><input class="tbl-input${_wOv?' overridden':''}" data-wuv="${w.fli},${w.zi},${w.wi}" value="${_wEff??''}" placeholder="${_wPh}" style="width:52px;font-family:'DM Mono',monospace;border-color:${_wBc};background:${_wBg}" title="${_wOv?'Vindauge-spesifikk':_wSone?'Frå sone':_wstd?'Standard':'Legg inn byggeår'}"></td>`;
+          return `<td class="${_wOv?'cell-overridden':''}"><input class="tbl-input${_wOv?' overridden':''}" data-wuv="${w.fli},${w.zi},${w.wi}" value="${_wEff??''}" placeholder="${_wPh}" style="width:52px;font-family:'JetBrains Mono',monospace;border-color:${_wBc};background:${_wBg}" title="${_wOv?'Vindauge-spesifikk':_wSone?'Frå sone':_wstd?'Standard':'Legg inn byggeår'}"></td>`;
         })()}
         <td><button onclick="floors[${w.fli}].zones[${w.zi}].windows.splice(${w.wi},1);updateResults();renderTable();draw();" style="background:none;border:none;color:#ef444499;cursor:pointer;font-size:12px">✕</button></td>
       </tr>`;
@@ -8562,14 +8577,14 @@ function renderTable(){
           <td style="color:var(--accent);font-weight:700">${i===0?gk:''}</td>
           <td style="color:var(--text3)">${e.fname}</td>
           <td style="color:var(--text)">${e.z.name}</td>
-          <td style="font-family:'DM Mono',monospace">${a!=null?a.toFixed(2):'—'}</td>
-          <td style="font-family:'DM Mono',monospace">${v!=null?v.toFixed(1):'—'}</td>
+          <td style="font-family:'JetBrains Mono',monospace">${a!=null?a.toFixed(2):'—'}</td>
+          <td style="font-family:'JetBrains Mono',monospace">${v!=null?v.toFixed(1):'—'}</td>
         </tr>`;
       });
       html+=`<tr style="background:var(--accent-dim)">
         <td colspan="3" style="font-weight:600;color:var(--accent);font-size:11px">Totalt</td>
-        <td style="font-weight:700;font-family:'DM Mono',monospace;color:var(--accent)">${totalA.toFixed(2)}</td>
-        <td style="font-weight:700;font-family:'DM Mono',monospace;color:var(--accent)">${totalV.toFixed(1)}</td>
+        <td style="font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent)">${totalA.toFixed(2)}</td>
+        <td style="font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent)">${totalV.toFixed(1)}</td>
       </tr>`;
     });
     html+='</tbody></table>';
@@ -9508,7 +9523,7 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   const mkInput=(val,type='text',width='100%')=>{
     const i=document.createElement('input');
     i.type=type;i.value=val;
-    i.style.cssText=`flex:1;padding:6px 10px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:${type==='number'?"'DM Mono',monospace":'inherit'};width:${width}`;
+    i.style.cssText=`flex:1;padding:6px 10px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:${type==='number'?"'JetBrains Mono',monospace":'inherit'};width:${width}`;
     i.onfocus=()=>{i.style.borderColor='var(--accent)';};
     i.onblur=()=>{i.style.borderColor='var(--border2)';};
     return i;
@@ -9526,7 +9541,7 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   brystCb.type='checkbox';brystCb.checked=hasBrystning;
   brystCb.style.cssText='width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0';
   const brystI=mkInput(w.brystningMm??900,'number');brystI.min=0;brystI.step=10;
-  brystI.style.cssText=`flex:1;padding:6px 10px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:'DM Mono',monospace;display:${hasBrystning?'block':'none'}`;
+  brystI.style.cssText=`flex:1;padding:6px 10px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:'JetBrains Mono',monospace;display:${hasBrystning?'block':'none'}`;
   brystI.onfocus=()=>{brystI.style.borderColor='var(--accent)'};
   brystI.onblur=()=>{brystI.style.borderColor='var(--border2)'};
   brystCb.onchange=()=>{brystI.style.display=brystCb.checked?'block':'none';};
@@ -14286,7 +14301,7 @@ const ANSVARLEG_KEY='sxiAnsvarleg';
   dlg.style.cssText='position:fixed;inset:0;background:rgba(13,27,42,.5);z-index:400;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
   dlg.id='sxiDlg';
   dlg.innerHTML=`
-  <div style="background:#fff;border-radius:16px;padding:28px;width:420px;max-width:96vw;box-shadow:0 12px 48px rgba(13,27,42,.2);border:1px solid var(--border)">
+  <div style="background:#fff;border-radius:16px;padding:28px;width:480px;max-width:96vw;box-shadow:0 12px 48px rgba(13,27,42,.2);border:1px solid var(--border)">
     <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:9px">
       <span style="width:28px;height:28px;background:linear-gradient(140deg,#23917f,#0e5a50);border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;flex-shrink:0">⬇</span>
       Eksporter til SIMIEN SXI
@@ -14307,7 +14322,7 @@ const ANSVARLEG_KEY='sxiAnsvarleg';
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <label style="font-size:12px;color:var(--text3);width:120px;font-weight:500;flex-shrink:0">Byggeår</label>
-        <input id="sxi_byggeaar" type="number" placeholder="1985" min="1800" max="2025" style="flex:1;padding:8px 11px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:'DM Mono',monospace;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
+        <input id="sxi_byggeaar" type="number" placeholder="1985" min="1800" max="2025" style="flex:1;padding:8px 11px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:'JetBrains Mono',monospace;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <label style="font-size:12px;color:var(--text3);width:120px;font-weight:500;flex-shrink:0">Klimasted</label>
@@ -14318,7 +14333,7 @@ const ANSVARLEG_KEY='sxiAnsvarleg';
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <label style="font-size:12px;color:var(--text3);width:120px;font-weight:500;flex-shrink:0">Kommunenr.</label>
-        <input id="sxi_kommunenr" type="text" placeholder="4601" maxlength="6" style="flex:1;padding:8px 11px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:'DM Mono',monospace;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
+        <input id="sxi_kommunenr" type="text" placeholder="4601" maxlength="6" style="flex:1;padding:8px 11px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;outline:none;font-family:'JetBrains Mono',monospace;transition:border-color .15s" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
       </div>
     </div>
     <div style="margin-top:17px;border-top:1px solid var(--border);padding-top:14px">
@@ -14354,7 +14369,7 @@ const ANSVARLEG_KEY='sxiAnsvarleg';
       sp.title=t.navn+' — '+t.hint;
       const hi=document.createElement('span');
       hi.textContent=t.hint;
-      hi.style.cssText="font-family:'DM Mono',monospace;font-size:10.5px;color:var(--text3);flex-shrink:0";
+      hi.style.cssText="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text3);flex-shrink:0;margin-left:auto";
       l.appendChild(cb);l.appendChild(sp);l.appendChild(hi);
       box.appendChild(l);
     });
@@ -15631,19 +15646,19 @@ function renderFasadeView(){
     const netto=brutto+gavlA-winA;
     html+=`<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:5px 6px;font-weight:600;color:var(--accent)">${DIR_SHORT[dir]}</td>
-      <td style="padding:5px 6px;text-align:right;font-family:'DM Mono',monospace;color:var(--text2)">${brutto.toFixed(1)}</td>
-      <td style="padding:5px 6px;text-align:right;font-family:'DM Mono',monospace;color:#d97706">${gavlA>0?gavlA.toFixed(1):'—'}</td>
-      <td style="padding:5px 6px;text-align:right;font-family:'DM Mono',monospace;color:#0891b2">${winA.toFixed(1)}</td>
-      <td style="padding:5px 6px;text-align:right;font-family:'DM Mono',monospace;color:var(--accent)">${netto.toFixed(1)}</td>
+      <td style="padding:5px 6px;text-align:right;font-family:'JetBrains Mono',monospace;color:var(--text2)">${brutto.toFixed(1)}</td>
+      <td style="padding:5px 6px;text-align:right;font-family:'JetBrains Mono',monospace;color:#d97706">${gavlA>0?gavlA.toFixed(1):'—'}</td>
+      <td style="padding:5px 6px;text-align:right;font-family:'JetBrains Mono',monospace;color:#0891b2">${winA.toFixed(1)}</td>
+      <td style="padding:5px 6px;text-align:right;font-family:'JetBrains Mono',monospace;color:var(--accent)">${netto.toFixed(1)}</td>
     </tr>`;
   });
 
   html+=`<tr style="background:var(--surface2)">
     <td style="padding:6px;font-weight:700;color:var(--text)">Totalt</td>
-    <td style="padding:6px;text-align:right;font-weight:700;font-family:'DM Mono',monospace">${grandBrutto.toFixed(1)}</td>
-    <td style="padding:6px;text-align:right;font-weight:700;font-family:'DM Mono',monospace;color:#d97706">${grandGavl>0?grandGavl.toFixed(1):'—'}</td>
-    <td style="padding:6px;text-align:right;font-weight:700;font-family:'DM Mono',monospace;color:#0891b2">${grandWin.toFixed(1)}</td>
-    <td style="padding:6px;text-align:right;font-weight:700;font-family:'DM Mono',monospace;color:var(--accent)">${grandNetto.toFixed(1)}</td>
+    <td style="padding:6px;text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace">${grandBrutto.toFixed(1)}</td>
+    <td style="padding:6px;text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace;color:#d97706">${grandGavl>0?grandGavl.toFixed(1):'—'}</td>
+    <td style="padding:6px;text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace;color:#0891b2">${grandWin.toFixed(1)}</td>
+    <td style="padding:6px;text-align:right;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent)">${grandNetto.toFixed(1)}</td>
   </tr></tbody></table>
   <div style="margin-top:8px;display:flex;align-items:center;gap:6px">
     <div style="flex:1;height:6px;border-radius:3px;background:var(--surface3);overflow:hidden">
@@ -15717,7 +15732,7 @@ function renderFasadeView(){
         // Gavl-areal-label
         if(segW>24&&_gavl.area>0){
           const _gLabel='⊿ '+_gavl.area.toFixed(1)+'m²';
-          cx.font='7px "DM Mono",monospace';
+          cx.font='7px "JetBrains Mono",monospace';
           cx.fillStyle=color;cx.textAlign='center';cx.textBaseline='middle';
           const _apexY=segTop-Math.max(..._gavl.profile.map(p=>p.h))*scale;
           const _midY=(_apexY+segTop)/2;
@@ -15732,7 +15747,7 @@ function renderFasadeView(){
       }
 
       // Zone label at top of segment
-      cx.font='bold 8px "DM Sans",sans-serif';
+      cx.font='bold 8px Inter,sans-serif';
       cx.fillStyle=color;cx.textAlign='center';cx.textBaseline='top';
       const lbl=e.z.name+(floors.length>1?' ('+e.f.name+')':'');
       const lblW=cx.measureText(lbl).width+8;
@@ -15744,7 +15759,7 @@ function renderFasadeView(){
 
       // Width label (bottom, below ground line)
       if(e.seg.lenM!=null&&segW>28){
-        cx.font='8px "DM Mono",monospace';
+        cx.font='8px "JetBrains Mono",monospace';
         cx.fillStyle='#6b7280';cx.textAlign='center';cx.textBaseline='top';
         cx.fillText(e.seg.lenM.toFixed(1)+'m',curX+segW/2,groundY+3);
       }
@@ -15801,7 +15816,7 @@ function renderFasadeView(){
 
       // Height annotation on first segment
       if(ei===0&&segH>24){
-        cx.font='7px "DM Mono",monospace';
+        cx.font='7px "JetBrains Mono",monospace';
         cx.fillStyle='#94a3b8';cx.textAlign='left';cx.textBaseline='middle';
         const hLabel=getHoyde(e.z).toFixed(1)+'m';
         cx.save();cx.translate(curX+3,segTop+segH/2);cx.rotate(-Math.PI/2);cx.fillText(hLabel,0,0);cx.restore();
@@ -15835,7 +15850,7 @@ function compassSvgSmall(azDeg){
   const pts=`${tx},${ty} ${bx+px*3},${by+py*3} ${bx-px*3},${by-py*3}`;
   return `<svg width="28" height="28" viewBox="0 0 28 28" style="position:absolute;inset:0">
     <polygon points="${pts}" fill="white" opacity="0.9"/>
-    <text x="14" y="14" text-anchor="middle" dominant-baseline="central" font-size="7" font-weight="bold" fill="white" font-family="DM Sans,sans-serif">N</text>
+    <text x="14" y="14" text-anchor="middle" dominant-baseline="central" font-size="7" font-weight="bold" fill="white" font-family="Inter,sans-serif">N</text>
   </svg>`;
 }
 
