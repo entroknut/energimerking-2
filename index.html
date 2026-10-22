@@ -660,7 +660,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.8.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.8.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -8143,11 +8143,11 @@ window._toggleAllZcards=function(){
     const ap=c.querySelector('.zcard-header span[style*="JetBrains Mono"]');
     if(ap)ap.style.display=c.classList.contains('collapsed')?'inline':'none';
   });
-  // Lagre state
-  const allZones2=window._floors_ref||[];
-  // Enkel sync: marker alle som collapsed/ikkje
+  // Lagre state for KVART kort, ikkje berre nøklane som alt finst — eit kort
+  // som aldri er klikka på einskild har ingen nøkkel, og sprett elles opp att
+  // ved neste updateResults() (t.d. etter ein takklipp).
   const collapsed=!allCollapsed;
-  Object.keys(window._zcardCollapsed).forEach(k=>window._zcardCollapsed[k]=collapsed);
+  cards.forEach(c=>{if(c.dataset.zkey)window._zcardCollapsed[c.dataset.zkey]=collapsed;});
   _updateCollapseAllBtn();
 };
 
