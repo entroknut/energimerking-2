@@ -660,7 +660,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.8.1</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.8.2</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -6227,7 +6227,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
     kl.onclick=()=>{
       if((z.pts||[]).length<3){hintText.textContent='Sona har ikkje nok punkt.';return;}
       snapshot();initFlater(z,kind);flateLag=kind;
-      if(window._flateCollapsed)delete window._flateCollapsed[`fl_${fi}_${zi}_${kind}`];
+      if(window._flateCollapsed)delete window._flateCollapsed[`fl_${_zuk(z)}_${kind}`];
       updateResults();renderTable();
       startKlippFlate(z,kind,0,fi);
     };
@@ -6241,7 +6241,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
   // Tilstanden vert hugsa per sone og lag på tvers av dei hyppige rebuildane,
   // som i vindaugslista. Lange lister startar samanslegne.
   if(!window._flateCollapsed)window._flateCollapsed={};
-  const key=`fl_${fi}_${zi}_${kind}`;
+  const key=`fl_${_zuk(z)}_${kind}`;
   if(window._flateCollapsed[key]===undefined)
     window._flateCollapsed[key]=list.length>FLATELIST_AUTO_COLLAPSE;
   const collapsed=!!window._flateCollapsed[key];
@@ -6287,7 +6287,7 @@ function byggFlateSeksjon(z,kind,fi,zi,settings){
     if(e.altKey){
       // Alt+klikk: same tilstand for alle soner, så eit stort prosjekt kan
       // ryddast med eitt klikk i staden for eitt per sonekort
-      floors.forEach((_f,_fi)=>_f.zones.forEach((_z,_zi)=>{window._flateCollapsed[`fl_${_fi}_${_zi}_${kind}`]=ny;}));
+      floors.forEach(_f=>_f.zones.forEach(_z=>{window._flateCollapsed[`fl_${_zuk(_z)}_${kind}`]=ny;}));
       updateResults();return;
     }
     window._flateCollapsed[key]=ny;
@@ -7089,6 +7089,15 @@ document.getElementById('winCancel').onclick=()=>{winOverlay.classList.remove('s
 // gjer rader over i same kort høgare (SK-rader får «Slå saman»-knappar).
 // Elementet vert funne att i det nybygde kortet via stien av barneindeksar.
 let _zlistSist=null;   // {key, path}
+// Stabil nøkkel per sone for all tilstand i sidepanelet: samanslegne kort,
+// tak/golv-seksjonar, vindaugslister, rulleankeret og korthøgdene. Indeksen
+// (`z_${fi}_${zi}`) dugde ikkje — slett eller del ei sone, og tilstanden flytta
+// seg til kortet under; lista hoppa fordi ankeret og høgdene høyrde til feil kort.
+// Følgjer med i angre-historikken (spread), men vert ikkje lagra i fila
+// (serialiserEtasje fjernar han). Kopiar arvar nøkkelen — updateResults gir
+// difor duplikat ein ny.
+let _zukN=0;
+function _zuk(z){if(!z._uk)z._uk='u'+Date.now().toString(36)+'_'+(++_zukN);return z._uk;}
 function _zlistSti(card,el){
   const p=[];
   while(el&&el!==card){const par=el.parentElement;if(!par)return null;p.unshift([...par.children].indexOf(el));el=par;}
@@ -7189,6 +7198,8 @@ function updateResults(){
     if(Math.abs(h-ph)>0.5){window._zcardH[k]=h;window._zcardEkte.add(k);window._zcardSig[k]=_zcardSig(c);}
   });
   zlist.innerHTML='';
+  {const sett=new Set();
+   floors.forEach(f=>f.zones.forEach(z=>{if(z._uk&&sett.has(z._uk))delete z._uk;sett.add(_zuk(z));}));}
   // Sonekorta vert bygde utanfor dokumentet og sette inn i éin operasjon.
   // Å leggje dei inn eitt for eitt i live DOM tvingar fram omrekning av
   // layout for kvart kort, og det dominerer kostnaden ved mange soner.
@@ -7231,7 +7242,7 @@ function updateResults(){
       const dispVolum=getVolum(z);
       const std=entroStandard(z.byggeaar);
 
-      const zoneKey=`z_${fi}_${zi}`;
+      const zoneKey=`z_${_zuk(z)}`;
       if(!window._zcardCollapsed)window._zcardCollapsed={};
       const isCollapsed=!!window._zcardCollapsed[zoneKey];
 
@@ -7481,7 +7492,7 @@ function updateResults(){
         // Kollapsbar liste — ei sone kan ha titals vindauge, og då sprengjer
         // kortet sidepanelet. Lange lister startar samanslegne; valet til
         // brukaren vert hugsa per sone på tvers av dei hyppige rebuildane.
-        const winKey=`w_${fi}_${zi}`;
+        const winKey=`w_${_zuk(z)}`;
         if(!window._winlistCollapsed)window._winlistCollapsed={};
         const nWin=z.windows.length;
         if(window._winlistCollapsed[winKey]===undefined)
@@ -10417,6 +10428,7 @@ function serialiserEtasje(f,opts){
     measurements:normMaal(f.measurements),
     zones:f.zones.map(z=>{
       const obj={...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]};
+      delete obj._uk;   // UI-nøkkel for sidepanelet — berre for økta
       if(z.zoneConnections){
         if(z.zoneConnections instanceof Map){
           obj.zoneConnections=Array.from(z.zoneConnections.entries());
