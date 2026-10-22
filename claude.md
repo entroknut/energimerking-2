@@ -325,6 +325,60 @@ tasta fasit skal ikkje skalerast.
 
 ---
 
+## Rett ut skeiv teikning
+
+«Rett ut» (ved «Roter») er for dårlege skann og foto. Dialogen spør fyrst kva
+brukaren kjenner (`rettType`):
+
+- **To mål** (`'linjer'`): eitt kjent mål i x og eitt i y, klikka som to linjer
+  som ikkje treng møtast. Gir ein **affin** transform (`_rettH0`: A = T·V⁻¹) —
+  rettar rotasjon, skeivheit og ulik x/y-skala, men ikkje perspektiv. Den mest
+  vassrette linja er x (`_rettOrdneLinjer`); under 30° imellom vert avvist.
+  Forteikna følgjer klikkretninga, og spegling vert hindra (determinanten).
+- **Rektangel** (`'rekt'`): fire hjørne med kjende mål → homografi
+  (`_homografi`, 4 punkt → 4 punkt), som i tillegg rettar perspektiv (foto).
+
+Ei automatisk retting (finn veggretningane sjølv med projeksjonsprofil) vart
+bygd og testa, men fjerna før publisering (v5.8.0) etter ønske frå brukaren.
+
+Begge endar i éi 3×3-matrise H0, og `_rettUtfor` gjer resten (utsnitt og
+skalering med `_hMul`, invers `_hInv`, biletet, dataflyttinga, skalaen).
+
+**Skeiv hjørnesnap** (`_linjeKryssSkeiv`): berre i `rett-ut`-modus, og berre
+når `_linjeKryss` ikkje finn noko (han sluttar ved ~8° på tynne strekar).
+Same prinsipp — lengste samanhengande strek, så tekst ikkje gir snap — men
+langs linjer kvar 1,5°. Dei to beste med ≥30° imellom vert finjusterte med
+minste kvadrat på pikslane langs kvar (ikkje rundt krysset), 5 rundar så ein
+tjukk strek vert dregen mot midten. Målt: 0,1 px på tynne strekar i alle
+vinklar, ≤2 px på 6 px strekar, ~14 ms. Utanfor «Rett ut» gjeld framleis
+regelen om at ingen snap er betre enn feil snap. Utsnittet hentar begge frå
+`_snapVindauge`.
+
+- Rektangel: klikkrekkjefølgja er likegyldig — `_rettOrdne` sorterer rundt
+  sentrum og lèt A vere hjørnet der kanten vidare peikar mest mot høgre (ingen
+  90°-snu). Ikkje-konveks firkant vert avvist.
+- To mål kan starte i same hjørne — duplikatsjekken gjeld berre innanfor linja.
+- Biletet vert rekna om i `_rettBilete` (bilineær, invers transform, kvitt
+  utanfor). ~1,3 s ved 48 Mpx. Pikselbudsjett ≈ originalen, maks 64 Mpx.
+  Sterkt perspektiv vert klipt til 1,5× rektangelet rundt — og meldt. To mål
+  vert aldri klipte: ein affin transform er endeleg, og måla kan vere korte
+  samanlikna med teikninga.
+- Alt i biletkoordinatar på arket følgjer med: `z.pts`, tak-/golvflater,
+  kontrollmål, `plassAnker` (a på arket, b på ark plasserte mot det).
+  Vindauge: `t0`/`t1`/`posT` vert mappa gjennom transformen (rette linjer
+  held seg rette), `breddeMm` skalert med veglengda i mm. Gavlflater på nytt.
+- Skala: `ownCal` → eigen. Global, men andre etasjar har teikning/soner →
+  etasjen får `ownCal=true` (meldt). Elles vert den globale sett.
+- Etasje utan anker i eit fleiretasjes prosjekt: `floorDxImg/Dy` vert sett så
+  midten av referansepunkta står på same stad i verda.
+- `paperWMm/HMm` vert nullstilte — målestokk-kalibreringa gjeld ikkje eit
+  omrekna bilete. Ei ny PDF-side (‹ ›) vert rendra frå originalen, ikkje retta.
+- Verkar på fasadeark òg (berre måla og arket sin eigen skala).
+- `snapshot()` etter at biletet er rekna ut, så ein feil ikkje lagar eit tomt
+  angre-steg. Biletet ligg som referanse i historikken, så Ctrl+Z gir originalen.
+- Ventinga før utrekninga er `setTimeout`, ikkje `requestAnimationFrame` —
+  rAF fyrer ikkje i ei bakgrunnsfane, og då hang verktøyet.
+
 ## Snapping
 
 `unifiedSnap(sx, sy, ownPts)` — prioritert rekkjefølgje:
@@ -1140,6 +1194,9 @@ er berre til å sjå på: bilete, soner med namn og kontrollmål, med eigen zoom
   teikna maks éin gong per frame. Valet vert ikkje lagra.
 
 ## 3D-skann (MatterPak) → soner
+
+**Knappen er gøymd (v5.7.2)** — funksjonen er ikkje klar for brukarar. Koden
+står urørt; fjern `style="display:none"` på `#scanBtn` for å slå han på att.
 
 «⬚ 3D-skann» i verktøylinja les OBJ-fila frå ein MatterPak (Matterport) og
 lagar heile prosjektet, vindauge inkludert, utan at brukaren teiknar noko (`// ── 2d.`,

@@ -593,6 +593,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div class="tg">
       <button class="btn" id="calBtn" title="Kalibrer skala">⊕ Kalibrer</button>
       <button class="btn" id="rotBtn" title="Roter 90°">↻ Roter</button>
+      <button class="btn" id="rettBtn" title="Rett ut ei skeiv teikning — klikk fire hjørne på eit rektangel du kjenner (t.d. ytterveggane), tast inn måla, og teikninga vert retta opp og kalibrert"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2.5 4 12.5 1.8 14 12.2 1.6 14z" stroke-dasharray="2 1.6" opacity=".55"/><rect x="4.2" y="4.6" width="7.6" height="6.8"/></svg> Rett ut</button>
       <span class="lbl plan-only eo-inline" style="margin-left:4px"><span class="tb-full">Etg.høgde</span><span class="tb-short">Etg.</span></span>
       <input type="number" class="ni plan-only" id="fhI" value="3.0" min="0.1" step="0.1">
       <span class="lbl plan-only eo-inline">m</span>
@@ -659,7 +660,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.7.2</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.8.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -840,6 +841,55 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
           <div class="dbtns">
             <button class="dcancel" id="calBack">← Tilbake</button>
             <button class="dok" id="calOk">Sett skala ✓</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rett ut skeiv teikning -->
+    <div class="dialog-overlay" id="rettOverlay" style="backdrop-filter:none;background:rgba(17,24,39,.12)">
+      <div class="dialog">
+        <h3>Rett ut teikninga</h3>
+        <!-- Steg 1: vel kva ein kjenner -->
+        <div id="rettSteg1">
+          <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Vel kva du kjenner på teikninga:</p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button id="rettVelLinjer" class="rett-val" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid var(--border2);border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:all .12s">
+              <svg width="26" height="26" style="flex-shrink:0" viewBox="0 0 26 26" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><path d="M3 21 21 18"/><path d="M5 17 7 4"/></svg>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--text)">To mål — eitt i x og eitt i y</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Rettar skeivheit, rotasjon og ulik skala på langs og tvers. Passar for skeive skann. Måla treng ikkje møtast.</div>
+              </div>
+            </button>
+            <button id="rettVelRekt" class="rett-val" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid var(--border2);border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:all .12s">
+              <svg width="26" height="26" style="flex-shrink:0" viewBox="0 0 26 26" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"><path d="M5 5 22 7 20 21 3 19z"/></svg>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:var(--text)">Rektangel — fire hjørne</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px">Rettar i tillegg perspektiv. Passar for foto tekne på skrå.</div>
+              </div>
+            </button>
+          </div>
+          <div class="dbtns" style="margin-top:16px">
+            <button class="dcancel" id="rettAvbryt1">Avbryt</button>
+          </div>
+        </div>
+        <!-- Steg 2: måla -->
+        <div id="rettSteg2" style="display:none">
+          <p id="rettTekst" style="font-size:12px;color:var(--text3);margin-bottom:12px"></p>
+          <div class="irow">
+            <label id="rettWLbl">Breidde (A–B, øvst)</label>
+            <input type="number" class="big-input" id="rettW" min="1" step="1" placeholder="12000">
+            <span class="unit">mm</span>
+          </div>
+          <div class="irow">
+            <label id="rettHLbl">Djupn (B–C, høgre)</label>
+            <input type="number" class="big-input" id="rettH" min="1" step="1" placeholder="8000">
+            <span class="unit">mm</span>
+          </div>
+          <p id="rettInfo" style="font-size:11px;color:var(--text3);margin-top:-6px"></p>
+          <div class="dbtns">
+            <button class="dcancel" id="rettAvbryt">Avbryt</button>
+            <button class="dok" id="rettOk">Rett ut ✓</button>
           </div>
         </div>
       </div>
@@ -1042,6 +1092,7 @@ const scaleBadge=document.getElementById('scaleBadge');
 const hintText=document.getElementById('hintText');
 const modeLabel=document.getElementById('modeLabel');
 const calOverlay=document.getElementById('calOverlay');
+const rettOverlay=document.getElementById('rettOverlay');
 const calPxSpan=document.getElementById('calPxSpan');
 const calMmInput=document.getElementById('calMmInput');
 const winOverlay=document.getElementById('winOverlay');
@@ -1115,6 +1166,7 @@ function _syncAdresseFelt(){
   if(n&&!n.value){const g=gateadresse(prosjektAdresse);if(g)n.value=g;}
 }
 let zones=[],curPts=[],mode='navigate',calPts=[];
+let rettPts=[],rettSnap=null;   // «Rett ut»: fire punkt i biletkoordinatar (rektangel eller to mål)
 let draftZones=[];
 let editZoneIdx=null,dragCorner=null,dragZone=null; // dragZone={zoneIdx,startIx,startIy,origPts}
 let pendingCalImgPx=0;
@@ -3385,8 +3437,9 @@ const HINTS={
   'klipp-takflate':'Klikk for å legge til punkt på klippelinja · Shift for 90°/45° · Enter eller dobbelklikk for å klippe · Esc for å avbryte',
   'del-sone':'Teikn ei linje tvers gjennom sona · Shift for 90°/45° · Enter eller dobbelklikk for å dele · Esc for å avbryte',
   'plasser-ark':'Klikk eit kjent punkt på DETTE arket (t.d. eit hjørne) · piltastar flyttar arket litt · Esc for å avbryte',
+  'rett-ut':'Klikk punkta på teikninga · Backspace angrar siste punkt · Esc for å avbryte',
 };
-const MODELABELS={navigate:'Naviger',draw:'Tegn sone',edit:'Rediger',calibrate:'Kalibrer',window:'Vindauge/dør',measure:'Kontrollmål','tegn-takflate':'Teikn takflate','klipp-takflate':'Klipp flate','del-sone':'Del sone','plasser-ark':'Plasser delplan'};
+const MODELABELS={navigate:'Naviger',draw:'Tegn sone',edit:'Rediger',calibrate:'Kalibrer',window:'Vindauge/dør',measure:'Kontrollmål','tegn-takflate':'Teikn takflate','klipp-takflate':'Klipp flate','del-sone':'Del sone','plasser-ark':'Plasser delplan','rett-ut':'Rett ut'};
 
 function setMode(m){
   if(m!=='plasser-ark')_avbrytPlassering();
@@ -3398,7 +3451,9 @@ function setMode(m){
   winBtn.classList.toggle('on',m==='window');
   calBtn.classList.toggle('on',m==='calibrate');
   measureBtn.classList.toggle('on',m==='measure');
-  cv.style.cursor=m==='navigate'?'grab':m==='draw'||m==='calibrate'||m==='window'||m==='measure'||m==='tegn-takflate'||m==='klipp-takflate'||m==='del-sone'||m==='plasser-ark'?'crosshair':'default';
+  document.getElementById('rettBtn').classList.toggle('on',m==='rett-ut');
+  if(m!=='rett-ut'){rettPts=[];rettSnap=null;}
+  cv.style.cursor=m==='navigate'?'grab':m==='draw'||m==='calibrate'||m==='rett-ut'||m==='window'||m==='measure'||m==='tegn-takflate'||m==='klipp-takflate'||m==='del-sone'||m==='plasser-ark'?'crosshair':'default';
   modeLabel.textContent=MODELABELS[m]||m;
   hintText.textContent=HINTS[m]||'';
   if(m!=='measure')measurePts=[];
@@ -4868,6 +4923,8 @@ function draw(){
     drawSnapMarker(i2s(calSnap.x,calSnap.y),calSnap.type,
       calSnap.type==='imgcorner'?'rgb(219,39,119)':calSnap.type==='edge'?'rgb(184,106,10)':'rgb(217,119,6)');
   }
+
+  if(mode==='rett-ut')_teiknRettUt();
 
   // ── Måleverktøy ─────────────────────────────────────────────
   if(mode==='measure'||(showMeasurements&&measureResults.length>0)){
@@ -6701,7 +6758,8 @@ let _snapKjelde=null;
 function imgLineSnap(sx,sy){
   if(!snapEnabled||_snapBlocked)return null;
   if(bgImg&&_snapKjelde!=='syster'){
-    const r=_linjeKryss(bgImg,s2i(sx,sy),Math.max(10,Math.round(SNAP_R.imgcorner/sc)));
+    const _ip=s2i(sx,sy),_R=Math.max(10,Math.round(SNAP_R.imgcorner/sc));
+    const r=_linjeKryss(bgImg,_ip,_R)||(mode==='rett-ut'&&!_snapBlocked?_linjeKryssSkeiv(bgImg,_ip,_R):null);
     if(r){const sp=i2s(r.x,r.y);return{x:r.x,y:r.y,type:'imgcorner',sx:sp.x,sy:sp.y};}
   }
   // Delplanar: veggkryss i systerteikningane, der det aktive arket er blankt
@@ -6721,7 +6779,9 @@ function imgLineSnap(sx,sy){
 }
 // Linjekrysset nærast ip (biletpikslar på img), eller null. Rimg er
 // søkeradien i biletpikslar.
-function _linjeKryss(img,ip,Rimg){
+// Utsnittet rundt ip, skalert til maks 81×81, som gråtonar med terskel.
+// Null ved for lite kontrast eller utanfor biletet.
+function _snapVindauge(img,ip,Rimg){
   const iw=img.width||img.naturalWidth,ih=img.height||img.naturalHeight;
   if(!iw||!ih)return null;
   const src=Rimg*2+1;
@@ -6746,6 +6806,12 @@ function _linjeKryss(img,ip,Rimg){
   }
   if(mx-mn<25)return null;                    // for lite kontrast
   const t=mn+(mx-mn)*0.45;                    // terskel mellom papir og strek
+  return{g,W,t,x0,y0,src};
+}
+function _linjeKryss(img,ip,Rimg){
+  const v=_snapVindauge(img,ip,Rimg);
+  if(!v)return null;
+  const{g,W,t,x0,y0,src}=v;
   // Lengste SAMANHENGANDE strek per rad/kolonne — ikkje totalt tal mørke
   // pikslar. Ei tekstlinje har like mange mørke pikslar som ein vegg, men
   // oppstykka i bokstavar; ein vegg er ubroten. Små hol (1 px) vert tolererte
@@ -6791,6 +6857,83 @@ function _linjeKryss(img,ip,Rimg){
   if(hy<0||vx<0)return null;                   // treng både vassrett og loddrett
   const f=src/W;
   return{x:x0+vx*f+f/2,y:y0+hy*f+f/2};
+}
+
+
+// Veggkryss i vilkårleg vinkel — berre i «Rett ut», der teikninga per
+// definisjon er skeiv. _linjeKryss krev vassrette og loddrette strekar og
+// sluttar å finne tynne strekar ved om lag 8°. Same prinsipp her: lengste
+// SAMANHENGANDE strek (tekst er oppstykka), no langs linjer i kvar 1,5°.
+// Dei to beste linjene med minst 30° imellom vert finjusterte med minste
+// kvadrat på dei mørke pikslane langs kvar (ikkje dei rundt krysset, som
+// høyrer til begge), og krysset mellom dei er snappunktet.
+// Utanfor «Rett ut» står regelen om at ingen snap er betre enn feil snap.
+function _linjeKryssSkeiv(img,ip,Rimg){
+  const v=_snapVindauge(img,ip,Rimg);
+  if(!v)return null;
+  const{g,W,t,x0,y0,src}=v;
+  const c=(W-1)/2,need=Math.max(6,Math.round(W*LINE_MIN_FRAC));
+  let ant=0;for(let i=0;i<W*W;i++)if(g[i]<t)ant++;
+  if(ant<need*2)return null;
+  const mork=(x,y)=>{const xi=Math.round(x),yi=Math.round(y);return xi>=0&&yi>=0&&xi<W&&yi<W&&g[yi*W+xi]<t;};
+  const L=Math.ceil(c*1.42);
+  const run=(deg,o)=>{
+    const a=deg*Math.PI/180,dx=Math.cos(a),dy=Math.sin(a);
+    const bx=c-dy*o,by=c+dx*o;
+    let best=0,cur=0,hol=0;
+    for(let s=-L;s<=L;s++){
+      if(mork(bx+dx*s,by+dy*s)){cur++;hol=0;if(cur>best)best=cur;}
+      else if(cur&&hol===0){hol=1;cur++;}
+      else{cur=0;hol=0;}
+    }
+    return best;
+  };
+  // Kandidatar: per vinkel, toppane i o med lang nok strek
+  const kand=[];
+  const R=Math.floor(c);
+  for(let deg=0;deg<180;deg+=1.5){
+    const rr=[];
+    for(let o=-R;o<=R;o++)rr.push(run(deg,o));
+    for(let i=0;i<rr.length;i++){
+      if(rr[i]<need)continue;
+      if(i>0&&rr[i-1]>rr[i])continue;
+      if(i<rr.length-1&&rr[i+1]>rr[i])continue;
+      const o=i-R;
+      kand.push({deg,o,score:rr[i]/W-0.45*(Math.abs(o)/c)});
+    }
+  }
+  if(kand.length<2)return null;
+  const diff=(a,b)=>{const v=Math.abs(a-b)%180;return Math.min(v,180-v);};
+  const l1=kand.reduce((b,k)=>k.score>b.score?k:b);
+  const rest=kand.filter(k=>diff(k.deg,l1.deg)>=30);
+  if(!rest.length)return null;
+  const l2=rest.reduce((b,k)=>k.score>b.score?k:b);
+  // Linje som {p, d}: eit punkt og ein einingsvektor
+  const tilLinje=k=>{const a=k.deg*Math.PI/180,d={x:Math.cos(a),y:Math.sin(a)};return{p:{x:c-d.y*k.o,y:c+d.x*k.o},d};};
+  const avst=(q,l)=>Math.abs((q.x-l.p.x)*-l.d.y+(q.y-l.p.y)*l.d.x);
+  const tilpass=(l,anna)=>{
+    let sx=0,sy=0,n=0;const pts=[];
+    for(let y=0;y<W;y++)for(let x=0;x<W;x++){
+      if(g[y*W+x]>=t)continue;
+      const q={x,y};
+      if(avst(q,l)<=2.5&&avst(q,anna)>4){pts.push(q);sx+=x;sy+=y;n++;}
+    }
+    if(n<5)return l;
+    const mx=sx/n,my=sy/n;let xx=0,xy=0,yy=0;
+    pts.forEach(q=>{const a=q.x-mx,b=q.y-my;xx+=a*a;xy+=a*b;yy+=b*b;});
+    const ang=0.5*Math.atan2(2*xy,xx-yy);
+    return{p:{x:mx,y:my},d:{x:Math.cos(ang),y:Math.sin(ang)}};
+  };
+  let a=tilLinje(l1),b=tilLinje(l2);
+  // Fleire rundar: på ein tjukk strek dreg kvar runde linja nærare midten
+  for(let it=0;it<5;it++){const na=tilpass(a,b),nb=tilpass(b,a);a=na;b=nb;}
+  const det=a.d.x*b.d.y-a.d.y*b.d.x;
+  if(Math.abs(det)<0.3)return null;            // under ~17° imellom etter tilpassinga
+  const s=((b.p.x-a.p.x)*b.d.y-(b.p.y-a.p.y)*b.d.x)/det;
+  const X=a.p.x+a.d.x*s,Y=a.p.y+a.d.y*s;
+  if(X<0||Y<0||X>W-1||Y>W-1)return null;
+  const f=src/W;
+  return{x:x0+X*f+f/2,y:y0+Y*f+f/2};
 }
 
 
@@ -8846,6 +8989,7 @@ function oppdaterSnap(){
       drawSnap={x:s2i(snapped.x,snapped.y).x,y:s2i(snapped.x,snapped.y).y,_ortho:true};
     }
   }
+  if(mode==='rett-ut')rettSnap=rettPts.length<4?unifiedSnap(mouse.x,mouse.y,rettPts):null;
   if(mode==='calibrate'){
     calSnap=unifiedSnap(mouse.x,mouse.y,calPts);
     // Shift ortho for lengdemodus og arealmodus
@@ -9640,10 +9784,12 @@ function showWindowEditDialog(w,wi,z,zi,fli){
 cv.addEventListener('click',e=>{
   if(e.button!==0||e.altKey||dragging||dragCorner)return;
   if(calOverlay.classList.contains('show'))return;
+  if(rettOverlay.classList.contains('show'))return;
   const r=cv.getBoundingClientRect();
   const sx=e.clientX-r.left,sy=e.clientY-r.top;
 
   if(mode==='plasser-ark'){_plasserKlikk(sx,sy);return;}
+  if(mode==='rett-ut'){_rettKlikk(sx,sy);return;}
 
   // ── Måleverktøy ──
   if(mode==='measure'){
@@ -10039,6 +10185,7 @@ document.addEventListener('keydown',e=>{
     else if(mode==='klipp-takflate'){klippTakflatePts=[];klippTakflateTarget=null;setMode('navigate');draw();}
     else if(mode==='del-sone'){delSonePts=[];delSoneTarget=null;delSoneSnap=null;setMode('navigate');draw();}
     else if(mode==='plasser-ark'){setMode('navigate');hintText.textContent='Plasseringa vart avbroten — arket står der det stod.';draw();}
+    else if(mode==='rett-ut'&&!rettOverlay.classList.contains('show')){setMode('navigate');draw();}
   }
   if(e.key==='Backspace'||e.key==='Delete'){
     // Slett hovered vindauge/dør
@@ -10064,6 +10211,10 @@ document.addEventListener('keydown',e=>{
     }
     if(mode==='tegn-takflate'){
       if(takflatePts.length>0){takflatePts.pop();draw();}
+      e.preventDefault();
+    }
+    if(mode==='rett-ut'&&!rettOverlay.classList.contains('show')){
+      if(rettPts.length>0){rettPts.pop();draw();}
       e.preventDefault();
     }
   }
@@ -12954,6 +13105,459 @@ document.getElementById('rotBtn').onclick=()=>{
     rotated.src=tmp.toDataURL('image/png');
   }
 };
+
+// ── Rett ut skeiv teikning ───────────────────────────────────
+// Ein dårleg skann eller eit foto av ei planteikning er sjeldan berre rotert:
+// arket kan vere skeivt, ha perspektiv og ulik skala på langs og tvers. To
+// variantar, valde i dialogen:
+//
+// - «To mål» (rettType 'linjer'): eitt kjent mål i x og eitt i y. Kvar linje
+//   gir retning og lengd, og saman gir dei ein affin transform — rotasjon,
+//   skeivheit og ulik skala på langs og tvers vert retta. Perspektiv kan to
+//   linjer ikkje seie noko om. Måla treng ikkje møtast.
+// - «Rektangel» (rettType 'rekt'): fire hjørne på eit rektangel med kjende mål
+//   gir ein full perspektivtransform (homografi), som i tillegg rettar
+//   perspektiv — for foto tekne på skrå.
+//
+// Begge endar i éin 3×3-matrise H, og resten er felles: biletet vert rekna
+// om, og alt som ligg i biletkoordinatar på arket (soner, tak-/golvflater,
+// vindauge, kontrollmål, plasseringsanker) vert flytta med same transformen,
+// så det følgjer bygget.
+//
+// Skalaen vert sett frå måla. Brukar etasjen den globale skalaen, og andre
+// etasjar har teikning eller soner på same skala, får etasjen eigen skala
+// (ownCal) — den globale ville elles flytta dei andre etasjane.
+// Ei ny PDF-side (‹ ›) vert rendra frå originalen og er ikkje retta.
+let rettType='linjer';
+
+// 4 punkt → 4 punkt. Gir [h0..h8] med h8=1, eller null om punkta ligg på linje.
+function _homografi(src,dst){
+  const A=[];
+  for(let i=0;i<4;i++){
+    const x=src[i].x,y=src[i].y,u=dst[i].x,v=dst[i].y;
+    A.push([x,y,1,0,0,0,-u*x,-u*y,u]);
+    A.push([0,0,0,x,y,1,-v*x,-v*y,v]);
+  }
+  for(let c=0;c<8;c++){
+    let pr=c;
+    for(let r=c+1;r<8;r++)if(Math.abs(A[r][c])>Math.abs(A[pr][c]))pr=r;
+    if(Math.abs(A[pr][c])<1e-12)return null;
+    [A[c],A[pr]]=[A[pr],A[c]];
+    for(let r=0;r<8;r++){
+      if(r===c)continue;
+      const f=A[r][c]/A[c][c];
+      if(f)for(let k=c;k<9;k++)A[r][k]-=f*A[c][k];
+    }
+  }
+  const h=A.map((row,i)=>row[8]/row[i]);
+  h.push(1);
+  return h;
+}
+function _hBruk(H,p){
+  const w=H[6]*p.x+H[7]*p.y+H[8];
+  return{x:(H[0]*p.x+H[1]*p.y+H[2])/w,y:(H[3]*p.x+H[4]*p.y+H[5])/w};
+}
+function _hMul(A,B){
+  const C=[];
+  for(let r=0;r<3;r++)for(let c=0;c<3;c++)
+    C.push(A[r*3]*B[c]+A[r*3+1]*B[3+c]+A[r*3+2]*B[6+c]);
+  return C;
+}
+function _hInv(m){
+  const[a,b,c,d,e,f,g,h,i]=m;
+  const A=e*i-f*h,B=-(d*i-f*g),C=d*h-e*g;
+  const det=a*A+b*B+c*C;
+  if(Math.abs(det)<1e-15)return null;
+  return[A/det,-(b*i-c*h)/det,(b*f-c*e)/det,
+         B/det,(a*i-c*g)/det,-(a*f-c*d)/det,
+         C/det,-(a*h-b*g)/det,(a*e-b*d)/det];
+}
+
+// Ordnar fire punkt rundt sentrum (med klokka på skjermen) og startar på
+// hjørnet der kanten vidare peikar mest mot høgre — det er toppkanten A–B,
+// så ei teikning som er skeiv med under 45° ikkje vert snudd. Null om
+// firkanten ikkje er konveks (eit punkt inne i trekanten av dei andre).
+function _rettOrdne(pts){
+  const cx=pts.reduce((s,p)=>s+p.x,0)/4,cy=pts.reduce((s,p)=>s+p.y,0)/4;
+  const q=pts.slice().sort((a,b)=>Math.atan2(a.y-cy,a.x-cx)-Math.atan2(b.y-cy,b.x-cx));
+  let teikn=0;
+  for(let i=0;i<4;i++){
+    const a=q[i],b=q[(i+1)%4],c=q[(i+2)%4];
+    const k=(b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x);
+    if(Math.abs(k)<1e-6)return null;
+    if(teikn&&Math.sign(k)!==teikn)return null;
+    teikn=Math.sign(k);
+  }
+  let best=0,bestA=Infinity;
+  for(let i=0;i<4;i++){
+    const a=q[i],b=q[(i+1)%4];
+    const v=Math.abs(Math.atan2(b.y-a.y,b.x-a.x));
+    if(v<bestA){bestA=v;best=i;}
+  }
+  return[0,1,2,3].map(i=>q[(best+i)%4]);
+}
+// Lengdene i biletpikslar som måla gjeld: for eit rektangel snittet av
+// toppen/botnen og av sidene, for to mål sjølve linjene.
+function _rettSider(q){
+  const d=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+  if(rettType==='linjer')return{b:d(q[0],q[1]),h:d(q[2],q[3])};
+  return{b:(d(q[0],q[1])+d(q[3],q[2]))/2,h:(d(q[1],q[2])+d(q[0],q[3]))/2};
+}
+// To mål: den mest vassrette linja er x. Null om linjene er nesten parallelle
+// (under 30° imellom) — då seier dei ingenting om den andre retninga.
+function _rettOrdneLinjer(p){
+  const l1=[p[0],p[1]],l2=[p[2],p[3]];
+  const v=l=>({x:l[1].x-l[0].x,y:l[1].y-l[0].y});
+  const v1=v(l1),v2=v(l2),n1=Math.hypot(v1.x,v1.y),n2=Math.hypot(v2.x,v2.y);
+  if(n1<1||n2<1)return null;
+  if(Math.abs(v1.x*v2.y-v1.y*v2.x)/(n1*n2)<0.5)return null;
+  const x1=Math.abs(v1.y)/n1<=Math.abs(v2.y)/n2;
+  return x1?[...l1,...l2]:[...l2,...l1];
+}
+
+document.getElementById('rettBtn').onclick=()=>{
+  if(!bgImg){hintText.textContent='Last opp ei teikning først.';return;}
+  if(mode==='rett-ut'){setMode('navigate');draw();return;}
+  document.getElementById('rettSteg1').style.display='';
+  document.getElementById('rettSteg2').style.display='none';
+  rettOverlay.classList.add('show');
+};
+function _rettStart(type){
+  rettType=type;
+  rettOverlay.classList.remove('show');
+  setMode('rett-ut');editZoneIdx=null;curPts=[];calPts=[];
+  rettPts=[];
+  hintText.textContent=type==='linjer'
+    ?'Klikk start og slutt på eit mål du kjenner i x-retning (t.d. ein lang yttervegg) · Backspace angrar · Esc for å avbryte'
+    :'Klikk fire hjørne på eit rektangel du kjenner målet på — t.d. ytterveggane · Backspace angrar · Esc for å avbryte';
+  draw();
+}
+document.getElementById('rettVelLinjer').onclick=()=>_rettStart('linjer');
+document.getElementById('rettVelRekt').onclick=()=>_rettStart('rekt');
+document.querySelectorAll('#rettOverlay .rett-val').forEach(btn=>{
+  btn.onmouseenter=()=>{btn.style.borderColor='var(--accent)';btn.style.background='var(--accent-dim)';};
+  btn.onmouseleave=()=>{btn.style.borderColor='var(--border2)';btn.style.background='#fff';};
+});
+
+function _rettKlikk(sx,sy){
+  if(rettPts.length>=4)return;
+  const ip=rettSnap?{x:rettSnap.x,y:rettSnap.y}:s2i(sx,sy);
+  // Same punkt to gonger: i eit rektangel aldri, med to mål berre innanfor
+  // same linja — dei to måla kan godt starte i same hjørne.
+  const sjekk=rettType==='linjer'?(rettPts.length%2?[rettPts[rettPts.length-1]]:[]):rettPts;
+  if(sjekk.some(p=>Math.hypot(p.x-ip.x,p.y-ip.y)<2))return;
+  rettPts.push(ip);rettSnap=null;
+  if(rettPts.length<4){
+    hintText.textContent=rettType==='linjer'
+      ?['','Klikk slutten av målet','Klikk start og slutt på eit mål du kjenner i y-retning (på tvers av det fyrste)','Klikk slutten av målet'][rettPts.length]+' · Backspace angrar'
+      :'Hjørne '+rettPts.length+' av 4 · klikk dei andre hjørna på rektangelet (rekkjefølgja spelar inga rolle) · Backspace angrar';
+    draw();return;
+  }
+  const q=rettType==='linjer'?_rettOrdneLinjer(rettPts):_rettOrdne(rettPts);
+  if(!q){
+    rettPts.pop();
+    hintText.textContent=rettType==='linjer'
+      ?'Dei to måla må gå på tvers av kvarandre (minst 30° imellom). Klikk slutten av det andre målet på nytt.'
+      :'Dei fire punkta dannar ikkje ein firkant (eitt ligg inne i dei andre eller på linje). Klikk det fjerde hjørnet på nytt.';
+    draw();return;
+  }
+  rettPts=q;
+  const sd=_rettSider(q);
+  const linjer=rettType==='linjer';
+  document.getElementById('rettTekst').textContent=linjer
+    ?'Linjene vert vassrett og loddrett med desse lengdene. Skeivheit, rotasjon og ulik skala på langs og tvers vert retta opp, og skalaen vert sett samstundes.'
+    :'Dei fire punkta vert eit rektangel med desse måla. Skeivheit, perspektiv og ulik skala på langs og tvers vert retta opp, og skalaen vert sett samstundes.';
+  document.getElementById('rettWLbl').textContent=linjer?'Mål X (vassrett)':'Breidde (A–B, øvst)';
+  document.getElementById('rettHLbl').textContent=linjer?'Mål Y (loddrett)':'Djupn (B–C, høgre)';
+  const wI=document.getElementById('rettW'),hI=document.getElementById('rettH');
+  // Framlegg frå dagens skala — brukaren skal skrive inn det verkelege målet
+  wI.value=mmPerImgPx?Math.round(sd.b*mmPerImgPx/10)*10:'';
+  hI.value=mmPerImgPx?Math.round(sd.h*mmPerImgPx/10)*10:'';
+  document.getElementById('rettInfo').textContent=mmPerImgPx
+    ?'Framlegga er målte med dagens skala. Skriv inn dei verkelege måla. Tomt felt: lengda vert rekna frå teikninga.'
+    :'Teikninga er ikkje kalibrert. Skriv inn begge måla for å få rett skala.';
+  document.getElementById('rettSteg1').style.display='none';
+  document.getElementById('rettSteg2').style.display='';
+  rettOverlay.classList.add('show');
+  draw();
+  setTimeout(()=>{wI.select();wI.focus();},50);
+}
+
+function _teiknRettUt(){
+  const sp=rettPts.map(p=>i2s(p.x,p.y));
+  const ferdig=sp.length===4;
+  const col='#7c3aed';
+  const m=mouse?(rettSnap?i2s(rettSnap.x,rettSnap.y):mouse):null;
+  const lapp=(x,y,t)=>{
+    ctx.font='bold 12px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.stroke();
+    ctx.fillStyle=col;ctx.fillText(t,x,y+.5);
+  };
+  ctx.save();
+  if(rettType==='linjer'){
+    // To separate linjer; den pågåande følgjer musa
+    for(let i=0;i<sp.length;i+=2){
+      const a=sp[i],b=sp[i+1]||(!ferdig?m:null);
+      if(!b)continue;
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+      ctx.strokeStyle=col;ctx.lineWidth=2.5;ctx.setLineDash(sp[i+1]?[]:[6,4]);ctx.stroke();ctx.setLineDash([]);
+    }
+    sp.forEach(p=>{
+      ctx.beginPath();ctx.arc(p.x,p.y,5.5,0,Math.PI*2);
+      ctx.fillStyle=col;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+    });
+    if(ferdig){
+      [[0,'X'],[2,'Y']].forEach(([i,t])=>{
+        const a=sp[i],b=sp[i+1],dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy)||1;
+        lapp((a.x+b.x)/2-dy/l*16,(a.y+b.y)/2+dx/l*16,t);
+      });
+    }
+  } else {
+    if(sp.length){
+      ctx.beginPath();ctx.moveTo(sp[0].x,sp[0].y);
+      sp.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
+      if(ferdig)ctx.closePath();
+      else if(m){
+        ctx.lineTo(m.x,m.y);
+        if(sp.length===3)ctx.lineTo(sp[0].x,sp[0].y);
+      }
+      if(ferdig){ctx.fillStyle='rgba(124,58,237,.08)';ctx.fill();}
+      ctx.strokeStyle=col;ctx.lineWidth=2;ctx.setLineDash(ferdig?[]:[6,4]);ctx.stroke();ctx.setLineDash([]);
+    }
+    const cx=sp.reduce((s,q)=>s+q.x,0)/(sp.length||1),cy=sp.reduce((s,q)=>s+q.y,0)/(sp.length||1);
+    sp.forEach((p,i)=>{
+      ctx.beginPath();ctx.arc(p.x,p.y,5.5,0,Math.PI*2);
+      ctx.fillStyle=col;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+      if(ferdig){
+        const dx=p.x-cx,dy=p.y-cy,l=Math.hypot(dx,dy)||1;
+        lapp(p.x+dx/l*16,p.y+dy/l*16,'ABCD'[i]);
+      }
+    });
+  }
+  ctx.restore();
+  if(rettSnap&&!ferdig)drawSnapMarker(i2s(rettSnap.x,rettSnap.y),rettSnap.type,
+    rettSnap.type==='imgcorner'?'rgb(219,39,119)':'rgb(124,58,237)');
+}
+
+// Reknar biletet om. Hinv går frå utbiletet til originalen; bilineær
+// interpolasjon, kvitt utanfor. ~1,3 s ved 48 Mpx.
+function _rettBilete(img,Hinv,W,H){
+  const iw=img.width||img.naturalWidth,ih=img.height||img.naturalHeight;
+  const sc0=document.createElement('canvas');sc0.width=iw;sc0.height=ih;
+  const sctx=sc0.getContext('2d');
+  sctx.fillStyle='#fff';sctx.fillRect(0,0,iw,ih);   // gjennomsiktig PNG vert kvit, ikkje svart
+  sctx.drawImage(img,0,0);
+  const sd=sctx.getImageData(0,0,iw,ih).data;
+  sc0.width=sc0.height=1;
+  const out=document.createElement('canvas');out.width=W;out.height=H;
+  const octx=out.getContext('2d',{alpha:false});
+  const od=octx.createImageData(W,H),o=od.data;
+  const[a,b,c,d,e,f,g,h,i]=Hinv;
+  const rad=iw*4;
+  let k=0;
+  for(let y=0;y<H;y++){
+    const yy=y+.5;
+    let X=a*.5+b*yy+c,Y=d*.5+e*yy+f,Z=g*.5+h*yy+i;
+    for(let x=0;x<W;x++,k+=4,X+=a,Y+=d,Z+=g){
+      o[k+3]=255;
+      if(Z<=0){o[k]=o[k+1]=o[k+2]=255;continue;}
+      const fx0=X/Z-.5,fy0=Y/Z-.5;
+      if(!(fx0>=0&&fy0>=0&&fx0<iw-1&&fy0<ih-1)){o[k]=o[k+1]=o[k+2]=255;continue;}
+      const x0=fx0|0,y0=fy0|0,fx=fx0-x0,fy=fy0-y0;
+      const p=(y0*iw+x0)*4,q=p+rad;
+      const w00=(1-fx)*(1-fy),w10=fx*(1-fy),w01=(1-fx)*fy,w11=fx*fy;
+      o[k]=sd[p]*w00+sd[p+4]*w10+sd[q]*w01+sd[q+4]*w11;
+      o[k+1]=sd[p+1]*w00+sd[p+5]*w10+sd[q+1]*w01+sd[q+5]*w11;
+      o[k+2]=sd[p+2]*w00+sd[p+6]*w10+sd[q+2]*w01+sd[q+6]*w11;
+    }
+  }
+  octx.putImageData(od,0,0);
+  return out;
+}
+
+['rettAvbryt','rettAvbryt1'].forEach(id=>document.getElementById(id).onclick=()=>{
+  rettOverlay.classList.remove('show');
+  setMode('navigate');draw();
+});
+['rettW','rettH'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{
+  if(e.key==='Enter')document.getElementById('rettOk').click();
+  if(e.key==='Escape')document.getElementById('rettAvbryt').click();
+  e.stopPropagation();
+}));
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&rettOverlay.classList.contains('show'))document.getElementById('rettAvbryt').click();
+});
+
+// Transformen frå originalbiletet til eit rett bilete der måla er Wr×Hr
+// pikslar (før utsnitt og pikselbudsjett).
+function _rettH0(q,Wr,Hr){
+  if(rettType==='rekt')
+    return _homografi(q,[{x:0,y:0},{x:Wr,y:0},{x:Wr,y:Hr},{x:0,y:Hr}]);
+  // To mål: lineær del A = T·V⁻¹, der V har linjevektorane som kolonnar og T
+  // det dei skal bli — (±Wr,0) og (0,±Hr), med forteikn etter retninga dei
+  // vart klikka i, så teikninga ikkje snur. Startpunktet til x-målet → origo.
+  const v1={x:q[1].x-q[0].x,y:q[1].y-q[0].y},v2={x:q[3].x-q[2].x,y:q[3].y-q[2].y};
+  const det=v1.x*v2.y-v2.x*v1.y;
+  if(Math.abs(det)<1e-9)return null;
+  const sx=v1.x<0?-1:1;
+  let sy=v2.y<0?-1:1;
+  // Spegling (forteiknet til determinanten snur) skal aldri skje
+  if(Math.sign(sx*sy)!==Math.sign(det))sy=-sy;
+  const t1x=sx*Wr,t2y=sy*Hr;
+  const a=t1x*v2.y/det,b=-t1x*v2.x/det;
+  const c=-t2y*v1.y/det,d=t2y*v1.x/det;
+  return[a,b,-(a*q[0].x+b*q[0].y),c,d,-(c*q[0].x+d*q[0].y),0,0,1];
+}
+
+document.getElementById('rettOk').onclick=async()=>{
+  const q=rettPts;
+  if(q.length!==4||!bgImg)return;
+  const wMm=parseFloat(document.getElementById('rettW').value);
+  const hMm=parseFloat(document.getElementById('rettH').value);
+  const harW=wMm>0,harH=hMm>0;
+  const sd=_rettSider(q);
+  // Måla i pikslar. Same oppløysing som originalen i snitt; eit mål som
+  // manglar vert rekna frå teikninga.
+  const bmm=harW?wMm:(harH?hMm*sd.b/sd.h:null);
+  const hmm=harH?hMm:(harW?wMm*sd.h/sd.b:null);
+  let Wr,Hr,pxPerMm=null;
+  if(bmm){pxPerMm=(sd.b+sd.h)/(bmm+hmm);Wr=bmm*pxPerMm;Hr=hmm*pxPerMm;}
+  else{Wr=sd.b;Hr=sd.h;}
+  if(Wr<20||Hr<20){hintText.textContent='Måla er for korte på teikninga — vel punkt lenger frå kvarandre.';return;}
+  const H0=_rettH0(q,Wr,Hr);
+  if(!H0){hintText.textContent='Klarte ikkje å rekne ut rettinga — prøv andre punkt.';return;}
+  // Ein affin transform (to mål) gir alltid eit endeleg utsnitt og vert ikkje
+  // klipt — måla kan vere korte samanlikna med teikninga.
+  const M=rettType==='rekt'?Math.max(Wr,Hr)*1.5:Infinity;
+  const res=await _rettUtfor({H0,Wr,Hr,M,pxPerMm,q});
+  if(!res)return;
+  const skalaTxt=res.nyMppFraMaal?' Skalaen er sett frå '+(harW&&harH?'måla.':'eitt mål — det andre er rekna frå teikninga.')
+    :(mmPerImgPx?' Skalaen er omtrentleg — kalibrer på nytt.':'');
+  hintText.textContent='✓ Teikninga er retta ut.'+skalaTxt+res.melding+(res.klipt?' Sterkt perspektiv: kantane langt ute er skorne bort.':'')+' Ctrl+Z for å angre.';
+};
+
+// Felles for begge vegane: H0 går frå originalbiletet til eit rett bilete
+// (før utsnitt og pikselbudsjett). Sterkt perspektiv kan sende eit hjørne mot
+// det uendelege; då vert utsnittet avgrensa til M rundt referansen.
+// pxPerMm=null ⇒ skalaen står (berre justert for pikselbudsjettet).
+// Returnerer {klipt,melding,nyMppFraMaal}, eller null ved feil.
+async function _rettUtfor({H0,Wr,Hr,M,pxPerMm,q}){
+  const iw=bgImg.width||bgImg.naturalWidth,ih=bgImg.height||bgImg.naturalHeight;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity,bomHj=false;
+  [{x:0,y:0},{x:iw,y:0},{x:iw,y:ih},{x:0,y:ih}].forEach(p=>{
+    const w=H0[6]*p.x+H0[7]*p.y+H0[8];
+    if(w<=1e-9){bomHj=true;return;}
+    const t=_hBruk(H0,p);
+    x0=Math.min(x0,t.x);y0=Math.min(y0,t.y);x1=Math.max(x1,t.x);y1=Math.max(y1,t.y);
+  });
+  if(bomHj){x0=-M;y0=-M;x1=Wr+M;y1=Hr+M;}
+  const klipt=bomHj||x0<-M||y0<-M||x1>Wr+M||y1>Hr+M;
+  x0=Math.max(x0,-M);y0=Math.max(y0,-M);x1=Math.min(x1,Wr+M);y1=Math.min(y1,Hr+M);
+  // Pikselbudsjett: om lag like mange pikslar som originalen, maks 64 Mpx
+  const budsjett=Math.min(Math.max(iw*ih*1.2,4e6),64e6);
+  const s=Math.min(1,Math.sqrt(budsjett/((x1-x0)*(y1-y0))));
+  const W=Math.max(1,Math.ceil((x1-x0)*s)),Hh=Math.max(1,Math.ceil((y1-y0)*s));
+  const H=_hMul([s,0,-x0*s,0,s,-y0*s,0,0,1],H0),Hinv=_hInv(H);
+  if(!Hinv){hintText.textContent='Klarte ikkje å rekne ut rettinga — prøv andre punkt.';return null;}
+
+  rettOverlay.classList.remove('show');
+  hintText.textContent='Rettar ut teikninga …';
+  await new Promise(r=>setTimeout(r,40));   // lèt hintlinja teiknast (rAF står i ei bakgrunnsfane)
+  let cvUt;
+  try{cvUt=_rettBilete(bgImg,Hinv,W,Hh);}
+  catch(e){
+    setMode('navigate');draw();
+    hintText.textContent='Klarte ikkje å lese biletet ('+(e&&e.message||e)+').';
+    return null;
+  }
+  const bmp=typeof createImageBitmap!=='undefined'?await createImageBitmap(cvUt)
+    :await new Promise(res=>{const im=new Image();im.onload=()=>res(im);im.src=cvUt.toDataURL('image/png');});
+
+  saveFloorState();
+  snapshot();   // angre-steg (biletet ligg som referanse i historikken) + ulagra
+  const P=p=>_hBruk(H,p);
+  const nyMppFraMaal=pxPerMm?1/(pxPerMm*s):null;
+  let melding='';
+
+  if(iFasade()){
+    const fa=curFasade();
+    const gml=fa.mmPerImgPx??null;
+    fa.bgImg=bmp;
+    (fa.measurements||[]).forEach(m=>{m.p1=P(m.p1);m.p2=P(m.p2);});
+    fa.mmPerImgPx=nyMppFraMaal??(gml?gml/s:null);
+    fa.paperWMm=fa.paperHMm=null;fa.paperSource=null;
+    syncFasadeState();fitImage();
+    renderFasadeTabs();renderFasadePanel();
+  } else {
+    const f=curFloor();
+    const gmlMpp=mppForFloor(f);
+    const nyMpp=nyMppFraMaal??(gmlMpp?gmlMpp/s:null);
+    // Punkta før, så vindauga kan følgje veggen sin
+    const gmlPts=f.zones.map(z=>z.pts.map(p=>({...p})));
+    const segLen=(pts,i)=>{const a=pts[i],b=pts[(i+1)%pts.length];return a&&b?Math.hypot(b.x-a.x,b.y-a.y):0;};
+    f.zones.forEach(z=>{
+      z.pts=z.pts.map(P);
+      ['takflater','gulvflater'].forEach(k=>(z[k]||[]).forEach(fl=>{if(fl.pts)fl.pts=fl.pts.map(P);}));
+    });
+    // Ny skala
+    if(nyMpp){
+      const andreBrukarGlobal=floors.some(fl=>fl!==f&&!fl.ownCal&&(fl.bgImg||(fl.zones||[]).length));
+      if(f.ownCal)f.mmPerImgPx=nyMpp;
+      else if(andreBrukarGlobal){
+        f.ownCal=true;f.mmPerImgPx=nyMpp;
+        melding=' Etasjen fekk eigen skala, så dei andre etasjane står urørte.';
+      } else {
+        globalMmPerImgPx=nyMpp;
+        floors.forEach(fl=>{if(!fl.ownCal)fl.mmPerImgPx=nyMpp;});
+      }
+      mmPerImgPx=nyMpp;
+    }
+    const nyM=mppForFloor(f);
+    // Vindauge: posisjonen langs veggen vert flytta med transformen (ei rett
+    // linje er framleis rett), breidda med forholdet mellom veglengdene i mm.
+    f.zones.forEach((z,zi)=>{
+      const op=gmlPts[zi];
+      (z.windows||[]).forEach(w=>{
+        const i=w.segIdx;if(i==null||!op[i])return;
+        const a0=op[i],b0=op[(i+1)%op.length],a1=z.pts[i],b1=z.pts[(i+1)%z.pts.length];
+        const dx=b1.x-a1.x,dy=b1.y-a1.y,L2=dx*dx+dy*dy;
+        const nyT=t=>{
+          if(!L2)return t;
+          const p=P({x:a0.x+(b0.x-a0.x)*t,y:a0.y+(b0.y-a0.y)*t});
+          return Math.max(0,Math.min(1,((p.x-a1.x)*dx+(p.y-a1.y)*dy)/L2));
+        };
+        if(w.t0!=null)w.t0=nyT(w.t0);
+        if(w.t1!=null)w.t1=nyT(w.t1);
+        if(Array.isArray(w.posT))w.posT=w.posT.map(nyT);
+        const l0=segLen(op,i)*(gmlMpp||0),l1=segLen(z.pts,i)*(nyM||0);
+        if(w.breddeMm&&l0>0&&l1>0)w.breddeMm=Math.round(w.breddeMm*l1/l0);
+      });
+      _syncGavlflater(z);
+    });
+    (f.measurements||[]).forEach(m=>{m.p1=P(m.p1);m.p2=P(m.p2);});
+    // Plassering i etasjestabelen: anker på arket og ark plasserte mot det
+    if(f.plassAnker&&f.plassAnker.a)f.plassAnker.a=P(f.plassAnker.a);
+    floors.forEach(fl=>{if(fl.plassAnker&&fl.plassAnker.til===f.id&&fl.plassAnker.b)fl.plassAnker.b=P(fl.plassAnker.b);});
+    if(!f.plassAnker&&floors.length>1){
+      // Utan anker: hald midten av referansepunkta på same stad i verda, så
+      // etasjen ikkje glir bort frå dei andre i 3D og ghost-laget.
+      const c={x:q.reduce((t,p)=>t+p.x,0)/4,y:q.reduce((t,p)=>t+p.y,0)/4},cn=P(c);
+      const k=(gmlMpp&&nyM)?gmlMpp/nyM:1/s;
+      f.floorDxImg=(c.x+(f.floorDxImg||0))*k-cn.x;
+      f.floorDyImg=(c.y+(f.floorDyImg||0))*k-cn.y;
+    }
+    f.bgImg=bmp;
+    f.paperWMm=f.paperHMm=null;f.paperSource=null;   // målestokk-metoden gjeld ikkje lenger
+    _brukAlleAnker();
+    syncFloorState();fitImage();
+    updateResults();renderTable();renderFloorTabs();
+  }
+  updateScaleBadge();
+  setMode('navigate');
+  draw();
+  return{klipt,melding,nyMppFraMaal};
+}
 
 // ── Lagre / opne prosjekt ─────────────────────────────────────
 // Lagrar prosjektet som .entro-fil på maskina. I EntroPi ligg dette på ein eigen
