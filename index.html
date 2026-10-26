@@ -410,6 +410,10 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .ai-valbtns{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
 .ai-valbtns button{padding:5px 10px;font-size:12px}
 .ai-valbtns button:disabled{opacity:.45;cursor:default}
+.ai-skil{height:1px;background:var(--border);margin:6px 0 4px}
+.ai-etg{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.ai-etg button{padding:3px 9px;font-size:11.5px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);border-radius:99px;cursor:pointer;font-family:inherit}
+.ai-etg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
 /* ── Tekniske system frå EntroPi (beta) ── */
 /* Eige vindauge, ikkje ein .dialog-overlay: dei ligg inne i #cwrap og dekkjer
@@ -602,7 +606,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
   <div id="toolbar">
     <div class="tg">
       <button class="btn teal" id="upBtn">↑ Last opp</button>
-      <input type="file" id="fi" accept=".pdf,image/*" style="display:none">
+      <input type="file" id="fi" accept=".pdf,image/*" multiple style="display:none">
       <!-- 3D-skann er ikkje klar for brukarar enno: knappen er gøymd, koden (// ── 2d.) står.
            Fjern style="display:none" for å slå han på att. -->
       <button class="btn plan-only" id="scanBtn" style="display:none" title="Importer 3D-skann: vel den utpakka MatterPak-mappa — etasjar, soner og vindauge vert laga automatisk">⬚ 3D-skann</button>
@@ -688,14 +692,14 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.9.2</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.10.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
     <canvas id="cv"></canvas>
     <div id="dropz">
       <div id="dropz-icon">📐</div>
-      <div id="dropz-text"><strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp fil her</small></div>
+      <div id="dropz-text"><strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp filer her — fleire filer eller sider vert kvar sin etasje</small></div>
     </div>
     <div id="scaleBadge" class="uncal">Ikkje kalibrert</div>
     <canvas id="compassCanvas" class="plan-only" width="96" height="96" title="Nordpila — dra for å justere kva veg nord peikar"></canvas>
@@ -1001,15 +1005,22 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
         <h3>✦ KI-oppteikning <span class="sys-beta">BETA</span></h3>
         <div class="aisub">Claude les planteikninga og teiknar eit forslag du ser over før du godtek det. Hjørna vert snappa til veggane i teikninga.</div>
         <div id="aiOpts">
+          <div id="aiOmfangRow">
+            <label class="ai-opt"><input type="radio" name="aiOmfang" value="etasje" checked> <span id="aiOmfangEtg">Denne etasjen</span></label>
+            <label class="ai-opt"><input type="radio" name="aiOmfang" value="bygg"> <span id="aiOmfangBygg">Heile bygget</span></label>
+            <div class="ai-skil"></div>
+          </div>
           <label class="ai-opt"><input type="checkbox" id="aiSoner" checked> Teikn soner</label>
           <div class="ai-sub2" id="aiDelRow">
             <label class="ai-opt"><input type="radio" name="aiDel" value="ein" checked> Éi sone per bygningskropp</label>
             <label class="ai-opt"><input type="radio" name="aiDel" value="bruk"> Del etter bruk, leigetakar og byggetrinn</label>
           </div>
           <label class="ai-opt"><input type="checkbox" id="aiOpn" checked> Finn vindauge og dører på fasadane</label>
+          <label class="ai-opt" id="aiHoyderRow"><input type="checkbox" id="aiHoyder" checked> Etasjehøgder frå fasadeteikningane</label>
           <div class="ai-note" id="aiNote"></div>
         </div>
         <div id="aiLog"></div>
+        <div id="aiEtasjar" class="ai-etg" style="display:none"></div>
         <div id="aiSoneVal" style="display:none">
           <div class="ai-valhint">Kryss av, eller klikk på sonene i teikninga, for å slå dei saman.</div>
           <div id="aiSoneListe"></div>
@@ -1640,21 +1651,8 @@ function renderFloorTabs(){
                  :'Slett "'+f.name+'" og alle sonene i denne etasjen?';
         if(!confirm(_sp+'\n\nKan angrast med Ctrl+Z.')){return;}
         snapshot();
-        if(_arv){
-          _arv.delAv=null;_arv.plassAnker=null;
-          _ark.slice(2).forEach(x=>{x.delAv=_arv.id;});
-          _arv.name=f.name;
-        }
-        floors.splice(fi,1);
-        // Slettar vi ei etasje FØR den aktive, forskyvast indeksen — juster
-        if(fi<activeFloor)activeFloor--;
-        if(activeFloor>=floors.length)activeFloor=floors.length-1;
-        // Fjern groupId frå soner som mista koplingspartnarane sine
-        const _gidCount={};
-        floors.forEach(fl=>fl.zones.forEach(z=>{if(z.groupId)_gidCount[z.groupId]=(_gidCount[z.groupId]||0)+1;}));
-        floors.forEach(fl=>fl.zones.forEach(z=>{if(z.groupId&&_gidCount[z.groupId]<2)delete z.groupId;}));
-        _ordneDelplanar();
-        syncFloorState();renderFloorTabs();updateResults();renderTable();draw();
+        slettArk(f);
+        etterSletting();
       };
       tab.appendChild(del);
     }
@@ -1671,6 +1669,8 @@ function switchFloor(fi){
   editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
   updateResults();renderTable();renderFloorTabs();
   if(bgImg)fitImage();else draw();
+  // KI-forslaget ligg per etasje — hent fram forslaget for etasjen vi kom til
+  if(typeof kiEtterEtasjebyte==='function')kiEtterEtasjebyte();
 }
 
 document.getElementById('addFloorBtn').onclick=async()=>{
@@ -1682,6 +1682,12 @@ document.getElementById('addFloorBtn').onclick=async()=>{
   if(choice==='clip'){await limInnEtasjeFraKlippbord();return;}
   if(choice==='from-file'){await hentEtasjeFraFil();return;}
   if(choice==='delplan'){await leggTilDelplan(curFloor());return;}
+  if(choice==='mass'){
+    const l=await new Promise(res=>{const inp=document.createElement('input');inp.type='file';
+      inp.accept='.pdf,image/*';inp.multiple=true;inp.onchange=()=>res([...inp.files]);inp.click();});
+    if(l.length)await masseImport(l);
+    return;
+  }
   saveFloorState();
   // Inherit calibration from current floor
   const newFloor={
@@ -2430,6 +2436,7 @@ function showAddFloorMenu(klipp){
     const opts=[
       {key:'blank',icon:'⬡',label:'Tom etasje','desc':'Last opp teikning seinare'},
       {key:'file',icon:'↑',label:'Last opp fil','desc':'PDF eller bilete for ny etasje'},
+      {key:'mass',icon:'⇶',label:'Legg inn mange teikningar','desc':'Fleire filer eller ei PDF med mange sider — kvar side vert ein etasje eller fasade'},
       {key:'pdf-page',icon:'⊕',label:'Neste side i same PDF','desc':pdfDoc?`Side ${curPage+1} av ${totalPages}`:'Ingen PDF lasta'},
       {key:'delplan',icon:'▣',label:'Ny delplan i «'+hovudEtasje(curFloor()).name+'»','desc':'Ei teikning til for same etasje — t.d. ein annan fløy'},
       {key:'clip',icon:'⧈',label:'Lim inn kopiert etasje',
@@ -2543,19 +2550,20 @@ const PDF_MAX_PX=124e6;     // hardt tak — Firefox nektar canvas over 124 Mpx
 const PDF_MAX_SIDE=16000;   // under dimensjonstaket i alle nettlesarar
 const PDF_MIN_SCALE=4.0;
 const PDF_MAX_SCALE=10.0;
-function pdfRenderScale(w1,h1){
+function pdfRenderScale(w1,h1,maalPx){
   const px=w1*h1;
   if(!(px>0))return PDF_MIN_SCALE;
-  const budsjett=Math.sqrt(PDF_TARGET_PX/px);
+  const budsjett=Math.sqrt((maalPx||PDF_TARGET_PX)/px);
   const tak=Math.min(PDF_MAX_SIDE/w1,PDF_MAX_SIDE/h1,Math.sqrt(PDF_MAX_PX/px));
   const s=Math.max(PDF_MIN_SCALE,Math.min(PDF_MAX_SCALE,budsjett));
   return Math.max(1,Math.min(s,tak));
 }
 
-async function loadPdfPage_with(doc,n){
+// maalPx: lågare pikselbudsjett (masseimport av mange ark), elles PDF_TARGET_PX
+async function loadPdfPage_with(doc,n,maalPx){
   const page=await doc.getPage(n);
   const vp1=page.getViewport({scale:1});
-  const skala=pdfRenderScale(vp1.width,vp1.height);
+  const skala=pdfRenderScale(vp1.width,vp1.height,maalPx);
   const vp=page.getViewport({scale:skala});
   console.log('PDF s.'+n+': '+Math.round(vp1.width)+'×'+Math.round(vp1.height)+' pt → skala '
     +skala.toFixed(2)+' ('+Math.round(skala*72)+' DPI, '
@@ -3974,10 +3982,11 @@ function fitImage(){
 }
 
 document.getElementById('upBtn').onclick=()=>fi.click();
-fi.onchange=async e=>{await handleFile(e.target.files[0]);e.target.value='';};
+// Fleire filer eller ei fleirsidig PDF går til masseimporten (kvar side ein etasje)
+fi.onchange=async e=>{const l=[...e.target.files];e.target.value='';await lastInnFiler(l);};
 dropz.onclick=()=>fi.click();
 cwrap.addEventListener('dragover',e=>e.preventDefault());
-cwrap.addEventListener('drop',async e=>{e.preventDefault();await handleFile(e.dataTransfer.files[0]);});
+cwrap.addEventListener('drop',async e=>{e.preventDefault();await lastInnFiler(e.dataTransfer.files);});
 // Sidebla-kontrollen høyrer til den AKTIVE etasjen — ein etasje kan ha si eiga
 // PDF (t.d. lasta inn med «+ Etasje → Last opp fil»), og ein annan ingen.
 // Difor er dette den einaste staden som styrer synlegheita, og han vert kalla
@@ -4046,6 +4055,352 @@ document.getElementById('prevPg').onclick=async()=>{
 document.getElementById('nextPg').onclick=async()=>{
   if(!pdfDoc&&!(await _hentPdfPaaNytt()))return;
   if(curPage>=totalPages)return;await _byttPdfSide(curPage+1);};
+
+// ── Masseimport: mange teikningar på ein gong ─────────────────
+// Fleire filer, eller ei PDF med fleire sider, vert ikkje lagde på den
+// aktive etasjen. Kvar side får ei rad i ein dialog med miniatyr, type
+// (etasje, delplan, fasade, hopp over) og namn — gjetta frå teksten på arket
+// (PDF) eller filnamnet — og brukaren rettar før noko vert lagt inn. Alt
+// vert lagt inn som eitt angre-steg.
+//
+// Kalibreringa: PDF-ane vert rendra til om lag same tal pikslar uansett
+// papirformat, så ein global skala gjeld berre ark med same pikseltettleik
+// (px per mm papir) som arket skalaen vart sett på. Eit ark med annan
+// tettleik får eiga kalibrering — med same målestokk føreslått når
+// referansen har ein vanleg målestokk (som ved delplanar).
+const MASSE_TYPAR=[['etasje','Etasje'],['del','Delplan'],['fasade','Fasade'],['hopp','Hopp over']];
+const erPdfFil=f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+const masseStor=s=>s.charAt(0).toUpperCase()+s.slice(1);
+// Type, namn og etasjenummer gjetta frå teksten på arket eller filnamnet
+function masseGjett(tekst){
+  const s=' '+String(tekst||'').toLowerCase().replace(/[_\-]+/g,' ').replace(/\s+/g,' ')+' ';
+  let type='etasje',namn=null,nr=null,m;
+  if(/fasade|oppriss|elevation/.test(s))type='fasade';
+  else if(/situasjonsplan|tittelblad|forside|innhaldsliste|innholdsfortegnelse|tegningsliste/.test(s))type='hopp';
+  else if(/\bsnitt\b/.test(s)&&!/etasje|etg\b|plan\b|plantegning|planteikning/.test(s))type='hopp';
+  if(type==='fasade'){
+    m=/fasade\s*(?:mot\s*)?(nord|sør|syd|aust|øst|vest)/.exec(s);
+    if(m)namn='Fasade '+masseStor(m[1]==='syd'?'sør':m[1]);
+  }else if(type==='etasje'){
+    if(/kjell[ae]r|underetasje|u\.?\s*etg/.test(s)){namn='Kjeller';nr=0;}
+    else if((m=/(\d+)\s*\.?\s*(?:etasje|etg)/.exec(s))||(m=/(?:etasje|etg|plan)\s*(\d+)\b/.exec(s))){nr=+m[1];namn='Etasje '+nr;}
+    else if(/\bloft/.test(s)){namn='Loft';nr=90;}
+    else if(/takplan|tak\s*plan/.test(s)){namn='Takplan';nr=95;type='hopp';}
+  }
+  return{type,namn,nr};
+}
+// Miniatyr som dataURL, lengste kant maks px
+function masseMini(kjelde,px){
+  const s=Math.min(1,px/Math.max(kjelde.width,kjelde.height));
+  const c=document.createElement('canvas');
+  c.width=Math.max(1,Math.round(kjelde.width*s));c.height=Math.max(1,Math.round(kjelde.height*s));
+  const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
+  g.drawImage(kjelde,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',0.8);
+}
+// Les filene til ei liste med ark: {fil, doc, side, n, img, mini, tekst, paperWMm, paperHMm}
+async function masseLes(filer){
+  const ark=[];let ukjende=0;
+  for(const f of filer){
+    hintText.textContent='Les '+f.name+'…';
+    try{
+      if(erPdfFil(f)){
+        const doc=await opnePdf(await f.arrayBuffer());
+        for(let p=1;p<=doc.numPages;p++){
+          const page=await doc.getPage(p);
+          const vp1=page.getViewport({scale:1});
+          const s=180/Math.max(vp1.width,vp1.height),vp=page.getViewport({scale:s});
+          const c=document.createElement('canvas');c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);
+          const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
+          await page.render({canvasContext:g,viewport:vp}).promise;
+          let tekst='';
+          try{tekst=(await page.getTextContent()).items.map(i=>i.str).join(' ');}catch(e){}
+          ark.push({fil:f.name,doc,side:p,n:doc.numPages,mini:c.toDataURL('image/jpeg',0.8),
+            tekst:tekst+' '+f.name,paperWMm:vp1.width*25.4/72,paperHMm:vp1.height*25.4/72});
+        }
+      }else if(/^image\//.test(f.type)||/\.(png|jpe?g|gif|bmp|webp|tiff?)$/i.test(f.name)){
+        const url=URL.createObjectURL(f);
+        const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});
+        const dpi=await lesBiletDpi(f);
+        const okDpi=dpi&&dpi>=50&&dpi<=2400;
+        ark.push({fil:f.name,img,mini:masseMini(img,180),tekst:f.name,
+          paperWMm:okDpi?img.width/dpi*25.4:null,paperHMm:okDpi?img.height/dpi*25.4:null});
+      }else ukjende++;
+    }catch(e){ukjende++;console.warn('Masseimport: kunne ikkje lese '+f.name,e);}
+  }
+  return{ark,ukjende};
+}
+// Dialogen. Returnerer rader, 'gammal' (berre side 1, som før) eller null.
+function masseDialog(rader,einPdf){
+  return new Promise(resolve=>{
+    const ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(13,27,42,.45);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+    const box=document.createElement('div');
+    box.style.cssText='background:#fff;border-radius:14px;width:min(780px,94vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(13,27,42,.2);overflow:hidden';
+    box.innerHTML='<div style="padding:18px 22px 10px"><div style="font-size:15px;font-weight:700;color:var(--text)">Legg inn teikningar</div>'
+      +'<div style="font-size:12.5px;color:var(--text2);margin-top:4px;line-height:1.5">Kvar side vert ei eiga etasje, ein delplan eller eit fasadeark. '
+      +'Type og namn er gjetta frå teksten på arket — rett det som er feil, og hopp over snitt og situasjonsplanar.</div></div>';
+    const liste=document.createElement('div');
+    liste.style.cssText='overflow-y:auto;padding:4px 22px;flex:1;border-top:1px solid var(--border);border-bottom:1px solid var(--border)';
+    box.appendChild(liste);
+    const fot=document.createElement('div');
+    fot.style.cssText='padding:12px 22px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    const sum=document.createElement('div');sum.style.cssText='flex:1;font-size:12px;color:var(--text3);min-width:180px';
+    const knapp=(t,stil)=>{const b=document.createElement('button');b.textContent=t;
+      b.style.cssText='padding:7px 14px;border-radius:8px;font-family:inherit;font-size:13px;cursor:pointer;'+stil;return b;};
+    const avbryt=knapp('Avbryt','border:1px solid var(--border2);background:#fff;color:var(--text2)');
+    const ok=knapp('','border:none;background:var(--accent);color:#fff;font-weight:600');
+    fot.appendChild(sum);
+    if(einPdf){
+      const gml=knapp('Berre side 1 her','border:1px solid var(--border2);background:#fff;color:var(--text2)');
+      gml.title='Legg berre fyrste sida på den aktive etasjen og bla med ‹ › — som før';
+      gml.onclick=()=>{ov.remove();resolve('gammal');};
+      fot.appendChild(gml);
+    }
+    fot.appendChild(avbryt);fot.appendChild(ok);
+    box.appendChild(fot);
+    const oppdater=()=>{
+      const t={etasje:0,del:0,fasade:0,hopp:0};rader.forEach(r=>t[r.type]++);
+      const n=rader.length-t.hopp;
+      sum.textContent=[t.etasje&&t.etasje+' etasje'+(t.etasje===1?'':'r'),t.del&&t.del+' delplan'+(t.del===1?'':'ar'),
+        t.fasade&&t.fasade+' fasade'+(t.fasade===1?'':'r'),t.hopp&&t.hopp+' hoppa over'].filter(Boolean).join(' · ');
+      ok.textContent='Legg inn '+n+' teikning'+(n===1?'':'ar');
+      ok.disabled=!n;ok.style.opacity=n?'1':'.45';
+    };
+    const teikn=()=>{
+      liste.innerHTML='';
+      rader.forEach((r,i)=>{
+        const rad=document.createElement('div');
+        rad.style.cssText='display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)'
+          +(r.type==='hopp'?';opacity:.5':'');
+        const bilde=document.createElement('img');bilde.src=r.k.mini;
+        bilde.style.cssText='width:90px;height:64px;object-fit:contain;border:1px solid var(--border);border-radius:6px;background:#fff;flex-shrink:0';
+        const midt=document.createElement('div');midt.style.cssText='flex:1;min-width:0';
+        const kj=document.createElement('div');kj.style.cssText='font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        kj.textContent=r.k.fil+(r.k.doc&&r.k.n>1?' · side '+r.k.side+' av '+r.k.n:'');
+        const namn=document.createElement('input');namn.value=r.namn;namn.disabled=r.type==='hopp';
+        namn.style.cssText='margin-top:4px;width:100%;padding:5px 8px;border:1px solid var(--border2);border-radius:6px;font-family:inherit;font-size:13px';
+        namn.oninput=()=>{r.namn=namn.value;};
+        midt.append(kj,namn);
+        const sel=document.createElement('select');
+        sel.style.cssText='padding:5px 6px;border:1px solid var(--border2);border-radius:6px;font-family:inherit;font-size:12.5px';
+        MASSE_TYPAR.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;if(v===r.type)o.selected=true;sel.appendChild(o);});
+        sel.onchange=()=>{r.type=sel.value;teikn();};
+        const pil=(t,d)=>{const b=document.createElement('button');b.textContent=t;
+          b.style.cssText='width:26px;height:24px;border:1px solid var(--border2);border-radius:5px;background:#fff;cursor:pointer;color:var(--text2)';
+          const j=i+d;b.disabled=j<0||j>=rader.length;if(b.disabled)b.style.opacity='.3';
+          b.onclick=()=>{[rader[i],rader[j]]=[rader[j],rader[i]];teikn();};return b;};
+        const pilar=document.createElement('div');pilar.style.cssText='display:flex;flex-direction:column;gap:2px';
+        pilar.title='Rekkjefølgja er etasjerekkjefølgja — nedste etasje øvst';
+        pilar.append(pil('↑',-1),pil('↓',1));
+        rad.append(bilde,midt,sel,pilar);
+        liste.appendChild(rad);
+      });
+      oppdater();
+    };
+    avbryt.onclick=()=>{ov.remove();resolve(null);};
+    ok.onclick=()=>{ov.remove();resolve(rader);};
+    teikn();
+    ov.appendChild(box);document.body.appendChild(ov);
+  });
+}
+async function masseImport(filer){
+  const {ark,ukjende}=await masseLes(filer);
+  hintText.textContent='';
+  if(!ark.length){hintText.textContent='Fann ingen teikningar å leggje inn'+(ukjende?' ('+ukjende+' filer kunne ikkje lesast)':'')+'.';return;}
+  // Gjett, gi namn til dei utan, og sorter etasjane nedanfrå
+  let rader=ark.map((k,i)=>{const g=masseGjett(k.tekst);if(!g.namn&&k.tekst!==k.fil){const f=masseGjett(k.fil);if(f.namn)Object.assign(g,f);}return{k,i,...g};});
+  const etg=rader.filter(r=>r.type==='etasje'),fas=rader.filter(r=>r.type==='fasade'),hopp=rader.filter(r=>r.type==='hopp');
+  etg.sort((a,b)=>(a.nr??500+a.i)-(b.nr??500+b.i));
+  let ne=floors.filter(f=>!erDelplan(f)&&(f.bgImg||f.zones.length)).length;
+  etg.forEach(r=>{if(!r.namn)r.namn='Etasje '+(++ne);});
+  // Same etasjenamn to gonger: den andre er truleg ein annan fløy av same etasje
+  const sett=new Set();
+  etg.forEach(r=>{if(sett.has(r.namn))r.type='del';sett.add(r.namn);});
+  fas.forEach((r,i)=>{if(!r.namn)r.namn='Fasade '+(fasadar.length+i+1);});
+  hopp.forEach(r=>{if(!r.namn)r.namn=r.k.fil.replace(/\.[^.]+$/,'')+(r.k.doc&&r.k.n>1?' s.'+r.k.side:'');});
+  rader=[...etg,...fas,...hopp];
+  const val=await masseDialog(rader,filer.length===1&&!!ark[0].doc);
+  if(val==='gammal'){await handleFile(filer[0]);return;}
+  if(!val)return;
+  await masseLeggInn(val.filter(r=>r.type!=='hopp'));
+  if(ukjende)hintText.textContent+=' ('+ukjende+' filer kunne ikkje lesast.)';
+}
+async function masseLeggInn(bruk){
+  if(!bruk.length)return;
+  saveFloorState();
+  snapshot();
+  const tomStart=floors.length===1&&!floors[0].bgImg&&!floors[0].zones.length;
+  // Mange ark på 48 Mpx kvar vert fort fleire GB i minnet — halv oppløysing då
+  const target=bruk.length>6?24e6:undefined;
+  const ref=floors.find(f=>f.bgImg&&f.paperWMm&&!f.ownCal&&mppForFloor(f))||null;
+  let dRef=ref?ref.bgImg.width/ref.paperWMm:null;
+  const ms=ref?_arkMaalestokk(ref):null;
+  const nye=[],nyeF=[];let eiga=0,foreslatt=0,lastHov=null;
+  for(let i=0;i<bruk.length;i++){
+    const r=bruk[i],k=r.k;
+    hintText.textContent='Legg inn '+(i+1)+' av '+bruk.length+'…';
+    const img=k.doc?await loadPdfPage_with(k.doc,k.side,target):k.img;
+    const felles={bgImg:img,pdfDoc:k.doc||null,pdfPage:k.side||1,totalPages:k.doc?k.n:1,
+      paperWMm:k.paperWMm??null,paperHMm:k.paperHMm??null,paperSource:k.doc?'pdf':(k.paperWMm?'dpi':null)};
+    const namn=String(r.namn||'').trim();
+    if(r.type==='fasade'){
+      const fa=nyFasade({name:namn||undefined});
+      Object.assign(fa,felles);
+      nyeF.push(fa);
+      continue;
+    }
+    const del=r.type==='del'&&lastHov;
+    // Ein delplan med same namn som etasjen sin heiter «Del n», som ved «+»
+    let fnamn=namn||(del?'':'Etasje');
+    if(del&&(!fnamn||fnamn===lastHov.name))fnamn='Del '+(nye.filter(x=>x.delAv===lastHov.id).length+2);
+    const f={id:_nextFloorId++,name:fnamn,...felles,
+      mmPerImgPx:null,ownCal:!!del,defaultHoyde:del?(lastHov.defaultHoyde??3.0):(parseFloat(fhI.value)||3.0),
+      floorDxImg:0,floorDyImg:0,sc:1,offX:0,offY:0,zones:[],measurements:[],
+      delAv:del?lastHov.id:null,plassAnker:null};
+    const d=k.paperWMm?img.width/k.paperWMm:null;
+    if(!dRef&&d&&!del)dRef=d;   // ingen skala frå før: det fyrste arket er referansen
+    if(f.ownCal||(d&&dRef&&Math.abs(d/dRef-1)>0.01)){
+      f.ownCal=true;
+      if(!del)eiga++;          // delplanar har alltid eiga kalibrering — ikkje noko å melde
+      if(ms&&k.paperWMm){f.mmPerImgPx=k.paperWMm/img.width*ms;foreslatt++;}
+    }
+    if(!del)lastHov=f;
+    nye.push(f);
+  }
+  if(tomStart&&nye.length)floors.splice(0,1);
+  floors.push(...nye);
+  // Nye etasjar på rett plass i stabelen (Kjeller under Etasje 1 …) — men
+  // berre når kvar hovudetasje har eit nummer i namnet. Elles står dei sist,
+  // og brukaren dreg fanene på plass.
+  const hov=floors.filter(f=>f.delAv==null),nr=new Map(hov.map(f=>[f,kiEtgNr(f.name)]));
+  if(hov.every(f=>nr.get(f)!=null)){
+    const rekkje=hov.slice().sort((a,b)=>nr.get(a)-nr.get(b));
+    floors.sort((a,b)=>rekkje.indexOf(hovudEtasje(a))-rekkje.indexOf(hovudEtasje(b)));
+  }
+  _ordneDelplanar();
+  if(nye.length)activeFloor=floors.indexOf(nye[0]);
+  syncFloorState();
+  editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
+  renderFloorTabs();renderFasadeTabs();updateResults();renderTable();
+  if(bgImg)fitImage();else draw();
+  markDirty();
+  const ne=nye.filter(f=>!f.delAv).length,nd=nye.length-ne;
+  hintText.textContent=[ne&&ne+' etasje'+(ne===1?'':'r'),nd&&nd+' delplan'+(nd===1?'':'ar'),
+    nyeF.length&&nyeF.length+' fasadeark'].filter(Boolean).join(', ')+' lagt inn.'
+    +(eiga?' '+eiga+' har anna pikseltettleik enn dei andre og fekk eiga kalibrering.':'')
+    +(nd?' Delplanane har eiga kalibrering, som alltid.':'')
+    +(foreslatt?' Målestokken 1:'+ms+' er føreslått på '+foreslatt+' — kontroller med eit kontrollmål.'
+      :(eiga||nd)?' Kalibrer dei som ikkje har skala.':'')
+    +(nyeF.length?' Fasadeteikningane ligg under «Fasade».':'');
+}
+// Éin eller fleire filer inn. Éi fil som er eit bilete eller ei einsida PDF
+// går til den aktive etasjen som før; alt anna til masseimporten.
+async function lastInnFiler(liste){
+  const filer=[...(liste||[])].filter(Boolean);
+  if(!filer.length)return;
+  if(filer.length===1&&!erPdfFil(filer[0]))return handleFile(filer[0]);
+  if(filer.length===1){
+    let n=1;
+    try{const doc=await pdfjsLib.getDocument({data:await filer[0].arrayBuffer()}).promise;n=doc.numPages;doc.destroy&&doc.destroy();}catch(e){}
+    if(n<=1)return handleFile(filer[0]);
+  }
+  return masseImport(filer);
+}
+
+// ── Slett etasjar ──
+// Same reglar som ✕ på fana: ei delplan går åleine, ei hovudteikning med
+// delplanar lèt den fyrste delplanen ta over etasjen og namnet.
+function slettArk(f){
+  const fi=floors.indexOf(f);
+  if(fi<0)return;
+  const _del=erDelplan(f),_ark=etasjeArk(f);
+  const _arv=!_del&&_ark.length>1?_ark[1]:null;
+  if(_arv){
+    _arv.delAv=null;_arv.plassAnker=null;
+    _ark.slice(2).forEach(x=>{x.delAv=_arv.id;});
+    _arv.name=f.name;
+  }
+  floors.splice(fi,1);
+  // Slettar vi ei etasje FØR den aktive, forskyvast indeksen — juster
+  if(fi<activeFloor)activeFloor--;
+  if(activeFloor>=floors.length)activeFloor=floors.length-1;
+}
+function etterSletting(){
+  if(!floors.length){
+    floors.push({id:_nextFloorId++,name:'Etasje 1',bgImg:null,pdfDoc:null,pdfPage:1,totalPages:1,
+      paperWMm:null,paperHMm:null,paperSource:null,mmPerImgPx:null,ownCal:false,defaultHoyde:3.0,
+      floorDxImg:0,floorDyImg:0,sc:1,offX:0,offY:0,zones:[],measurements:[],delAv:null,plassAnker:null});
+    activeFloor=0;
+  }
+  if(activeFloor<0)activeFloor=0;
+  // Fjern groupId frå soner som mista koplingspartnarane sine
+  const _gidCount={};
+  floors.forEach(fl=>fl.zones.forEach(z=>{if(z.groupId)_gidCount[z.groupId]=(_gidCount[z.groupId]||0)+1;}));
+  floors.forEach(fl=>fl.zones.forEach(z=>{if(z.groupId&&_gidCount[z.groupId]<2)delete z.groupId;}));
+  _ordneDelplanar();
+  syncFloorState();
+  editZoneIdx=null;curPts=[];draftZones=[];winPts=[];
+  renderFloorTabs();updateResults();renderTable();
+  if(bgImg)fitImage();else{dropz.style.display='';draw();}
+}
+// Dialog med alle arka: kryss av og slett i eitt angre-steg.
+function slettEtasjarDialog(){
+  saveFloorState();
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(13,27,42,.45);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+  const box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:14px;width:min(520px,94vw);max-height:86vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(13,27,42,.2);overflow:hidden';
+  box.innerHTML='<div style="padding:18px 22px 10px"><div style="font-size:15px;font-weight:700;color:var(--text)">Slett etasjar</div>'
+    +'<div style="font-size:12.5px;color:var(--text2);margin-top:4px;line-height:1.5">Sonene på arka du slettar forsvinn òg. Kan angrast med Ctrl+Z.</div></div>';
+  const liste=document.createElement('div');
+  liste.style.cssText='overflow-y:auto;padding:4px 22px;flex:1;border-top:1px solid var(--border);border-bottom:1px solid var(--border)';
+  const valt=new Set();
+  floors.forEach(f=>{
+    const rad=document.createElement('label');
+    rad.style.cssText='display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer'
+      +(erDelplan(f)?';padding-left:22px':'');
+    const cb=document.createElement('input');cb.type='checkbox';
+    cb.onchange=()=>{cb.checked?valt.add(f):valt.delete(f);oppdater();};
+    const bilde=document.createElement('div');
+    bilde.style.cssText='width:64px;height:44px;border:1px solid var(--border);border-radius:5px;background:#f8fafc center/contain no-repeat;flex-shrink:0';
+    if(f.bgImg)bilde.style.backgroundImage='url('+masseMini(f.bgImg,120)+')';
+    const t=document.createElement('div');t.style.cssText='flex:1;min-width:0;font-size:13px;color:var(--text)';
+    t.textContent=arkNamn(f);
+    const u=document.createElement('div');u.style.cssText='font-size:11px;color:var(--text3)';
+    u.textContent=(f.bgImg?'':'Inga teikning · ')+f.zones.length+' soner';
+    t.appendChild(u);
+    rad.append(cb,bilde,t);
+    liste.appendChild(rad);
+  });
+  box.appendChild(liste);
+  const fot=document.createElement('div');
+  fot.style.cssText='padding:12px 22px;display:flex;gap:8px;justify-content:flex-end';
+  const avbryt=document.createElement('button');avbryt.textContent='Avbryt';
+  avbryt.style.cssText='padding:7px 14px;border:1px solid var(--border2);background:#fff;color:var(--text2);border-radius:8px;font-family:inherit;font-size:13px;cursor:pointer';
+  const ok=document.createElement('button');
+  ok.style.cssText='padding:7px 14px;border:none;background:#dc2626;color:#fff;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer';
+  const oppdater=()=>{
+    const n=valt.size,s=[...valt].reduce((a,f)=>a+f.zones.length,0);
+    ok.textContent='Slett '+n+' ark'+(s?' og '+s+' soner':'');
+    ok.disabled=!n;ok.style.opacity=n?'1':'.45';
+  };
+  avbryt.onclick=()=>ov.remove();
+  ok.onclick=()=>{
+    if(!valt.size)return;
+    ov.remove();
+    snapshot();markDirty();
+    const n=valt.size;
+    // Hovudteikningar sist, så ein delplan som skal slettast ikkje fyrst arvar etasjen
+    [...valt].sort((a,b)=>(erDelplan(b)?1:0)-(erDelplan(a)?1:0)).forEach(slettArk);
+    etterSletting();
+    hintText.textContent=n+' ark sletta. Ctrl+Z angrar.';
+  };
+  fot.append(avbryt,ok);box.appendChild(fot);
+  oppdater();
+  ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  ov.appendChild(box);document.body.appendChild(ov);
+}
 
 // ── Compass ───────────────────────────────────────────────────
 function drawCompass(){
@@ -10339,12 +10694,21 @@ renderFasadeTabs();
 // knappen er .embed-only. Prompt og JSON-skjema bur her; verten sender dei
 // vidare til Claude og svarar med det tolka resultatet.
 //
+// Omfang: denne etasjen, eller heile bygget (alle ark med planteikning).
+// Fasadeteikningane (fasadar[]) vert lesne fyrst når dei finst: retning,
+// etasjenivå og opningar med høgd og brystning. Dei gir høgd og brystning
+// til vindauga planen finn, og etasjehøgdene.
+//
 // To steg, kvart med sitt eige forslag og sitt eige angre-steg:
-//   1. soner frå heile arket
+//   1. soner — éin førespurnad per ark, forslaget ligg per etasje (kiUtkast)
+//      og vert sett over etasje for etasje
 //   2. opningar, éin førespurnad per sone, på dei veggane som er fasade
-// Steg 2 køyrer på sonene som ligg i etasjen når det startar — anten dei kom
+// Steg 2 køyrer på sonene som ligg i etasjane når det startar — anten dei kom
 // frå steg 1 eller vart teikna for hand. Fyrst då er skiljekonstruksjonen
 // sett, og vi veit kva veggar som er fasade.
+//
+// Stega les aldri lerret-globalane (bgImg, zones, mmPerImgPx) for anna enn
+// den aktive etasjen: alt går gjennom eit «ark» {f,img,mpp,zones} frå kiArk().
 //
 // KI-koordinatane er grove (om lag 1 % av arket). Difor vert kvart hjørne
 // snappa til veggkrysset i teikninga (_linjeKryss), hjørne som høyrer saman
@@ -10359,6 +10723,17 @@ const aiGo=document.getElementById('aiGo');
 let kiKoyring=0;              // aukar ved avbrot — svar frå ei gammal køyring vert kasta
 let kiSteg=null;              // 'soner' | 'opningar' medan eit forslag ligg framme
 let kiVidareTilOpningar=false;
+let kiUtkast=null;            // Map etasje → soneforslag (draftZones er forslaget for den aktive)
+let kiFasadeInfo=null;        // det som vart lese av fasadeteikningane, sjå kiLesFasadar
+let kiInnst={};               // vala frå dialogen for køyringa som går
+let kiHoyderBrukt=false;      // etasjehøgdene vert lagde inn éin gong, ved fyrste «Godta»
+
+// Etasjen som eit sjølvstendig ark. saveFloorState() må ha gått, så den
+// aktive etasjen sitt bilete og soneliste ligg på etasjeobjektet.
+function kiArk(f){return{f,img:f.bgImg,mpp:mppForFloor(f),zones:f.zones};}
+// Arka køyringa gjeld: alle med planteikning, eller berre den aktive
+function kiMaal(bygg){return bygg?floors.filter(f=>f.bgImg):[curFloor()];}
+const kiFasadeArk=()=>fasadar.filter(a=>a&&a.bgImg);
 
 function logAi(t){aiLog.textContent+=t+'\n';aiLog.scrollTop=aiLog.scrollHeight;}
 function kiKnappar(stadfest,tekst){
@@ -10370,23 +10745,58 @@ function kiKnappar(stadfest,tekst){
   const val=!!stadfest&&kiSteg==='soner'&&draftZones.length>1;
   document.getElementById('aiSoneVal').style.display=val?'':'none';
   if(val)kiTeiknSoneListe();
+  kiTeiknEtasjar(!!stadfest);
+}
+// Knapperad med etasjane forslaget dekkjer. Eit trykk byter etasje på
+// lerretet — forslaget for etasjen kjem fram av seg sjølv (kiEtterEtasjebyte).
+function kiTeiknEtasjar(vis){
+  const el=document.getElementById('aiEtasjar');
+  const tal=new Map();
+  if(kiSteg==='soner'&&kiUtkast)kiUtkast.forEach((arr,f)=>tal.set(f,arr.length));
+  if(kiSteg==='opningar')kiDraftWins.forEach(d=>{
+    const f=floors.find(x=>x.zones.includes(d.z)||(x===curFloor()&&zones.includes(d.z)));
+    if(f)tal.set(f,(tal.get(f)||0)+(d.antal||1));
+  });
+  if(!vis||tal.size<2){el.style.display='none';return;}
+  el.innerHTML='';el.style.display='';
+  floors.filter(f=>tal.has(f)).forEach(f=>{
+    const b=document.createElement('button');
+    b.textContent=arkNamn(f)+' · '+tal.get(f);
+    b.className=f===curFloor()?'on':'';
+    b.onclick=()=>{const i=floors.indexOf(f);if(i>=0&&i!==activeFloor)switchFloor(i);};
+    el.appendChild(b);
+  });
+}
+function kiEtterEtasjebyte(){
+  if(kiSteg==='soner'&&kiUtkast){draftZones=kiUtkast.get(curFloor())||[];kiSoneHist=[];}
+  if(kiSteg)kiKnappar(true);
+  draw();
 }
 function kiOppdaterVal(){
-  const mpp=mppForFloor(curFloor());
+  const bygg=(document.querySelector('input[name="aiOmfang"]:checked')||{}).value==='bygg';
+  const maal=kiMaal(bygg);
   const soner=document.getElementById('aiSoner').checked;
   const opn=document.getElementById('aiOpn');
   document.getElementById('aiDelRow').classList.toggle('off',!soner);
-  opn.disabled=!mpp;
-  if(!mpp)opn.checked=false;
-  const n=zones.length,notar=[];
-  if(!mpp)notar.push('Vindauge og dører krev at etasjen er kalibrert — breidda vert målt i teikninga.');
-  if(soner&&n)notar.push('Etasjen har alt '+n+' sone'+(n===1?'':'r')+'. Nye soner kjem i tillegg.');
-  if(!soner&&opn.checked&&!n)notar.push('Etasjen har ingen soner å finne opningar på.');
+  const kal=maal.filter(f=>mppForFloor(f)),ukal=maal.length-kal.length;
+  opn.disabled=!kal.length;
+  if(!kal.length)opn.checked=false;
+  const n=maal.reduce((s,f)=>s+f.zones.length,0),notar=[];
+  if(!kal.length)notar.push('Vindauge og dører krev kalibrering — breidda vert målt i teikninga.');
+  else if(ukal&&opn.checked)notar.push(ukal+' av etasjane er ikkje kalibrerte og får ikkje vindauge.');
+  if(soner&&n)notar.push((bygg?'Etasjane':'Etasjen')+' har alt '+n+' sone'+(n===1?'':'r')+'. Nye soner kjem i tillegg.');
+  if(!soner&&opn.checked&&!n)notar.push('Det finst ingen soner å finne opningar på.');
+  const fa=kiFasadeArk();
+  if(fa.length&&(opn.checked||document.getElementById('aiHoyder').checked)){
+    const ukalF=fa.filter(a=>!a.mmPerImgPx).length;
+    notar.push(fa.length+' fasadeteikning'+(fa.length===1?'':'ar')+' vert lesne fyrst'
+      +(ukalF?' ('+ukalF+' ukalibrert'+(ukalF===1?'':'e')+' — der vert skalaen henta frå kotene, elles berre påskrivne mål)':'')+'.');
+  }
   document.getElementById('aiNote').textContent=notar.join(' ');
-  aiGo.disabled=!(soner||(opn.checked&&n));
+  aiGo.disabled=!(soner||(opn.checked&&n)||(fa.length&&document.getElementById('aiHoyder').checked));
 }
-document.getElementById('aiSoner').onchange=kiOppdaterVal;
-document.getElementById('aiOpn').onchange=kiOppdaterVal;
+['aiSoner','aiOpn','aiHoyder'].forEach(id=>{document.getElementById(id).onchange=kiOppdaterVal;});
+document.querySelectorAll('input[name="aiOmfang"]').forEach(r=>{r.onchange=kiOppdaterVal;});
 
 document.getElementById('aiBtn').onclick=()=>{
   if(!inPi()){hintText.textContent='KI-oppteikninga går gjennom EntroPi og er berre tilgjengeleg der.';return;}
@@ -10396,6 +10806,14 @@ document.getElementById('aiBtn').onclick=()=>{
   // Ei etasje med soner har truleg fått dei teikna for hand — då er det
   // opningane ein er ute etter.
   document.getElementById('aiSoner').checked=!zones.length;
+  const plan=floors.filter(f=>f.bgImg).length,fa=kiFasadeArk().length;
+  document.getElementById('aiOmfangRow').style.display=(plan>1||fa)?'':'none';
+  document.getElementById('aiOmfangEtg').textContent='Denne etasjen ('+arkNamn(curFloor())+')';
+  document.getElementById('aiOmfangBygg').textContent='Heile bygget — '+plan+' planteikning'+(plan===1?'':'ar')
+    +(fa?', '+fa+' fasadeteikning'+(fa===1?'':'ar'):'');
+  document.querySelector('input[name="aiOmfang"][value="'+(plan>1?'bygg':'etasje')+'"]').checked=true;
+  document.getElementById('aiHoyderRow').style.display=fa?'':'none';
+  document.getElementById('aiHoyder').checked=!!fa;
   aiLog.textContent='';
   kiKnappar(false);
   aiGo.textContent='Start ✦';
@@ -10404,7 +10822,7 @@ document.getElementById('aiBtn').onclick=()=>{
 };
 function kiLukk(){
   kiKoyring++;kiSteg=null;
-  draftZones=[];kiDraftWins=[];
+  draftZones=[];kiDraftWins=[];kiUtkast=null;kiFasadeInfo=null;
   aiOverlay.classList.remove('show','review');
   draw();
 }
@@ -10413,14 +10831,14 @@ document.getElementById('aiClose').onclick=kiLukk;
 // ── Bilete til Claude ──
 // Utsnittet rect (biletpikslar) skalert til maks KI_MAXPX, som JPEG. teikn(g,s)
 // kan teikne oppå (s = skjerm/bilete-skalaen i utsnittet).
-function kiBilete(rect,teikn){
+function kiBilete(img,rect,teikn){
   const s=Math.min(1,KI_MAXPX/Math.max(rect.w,rect.h));
   const c=document.createElement('canvas');
   c.width=Math.max(1,Math.round(rect.w*s));c.height=Math.max(1,Math.round(rect.h*s));
   const g=c.getContext('2d');
   g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);
   g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';
-  g.drawImage(bgImg,rect.x,rect.y,rect.w,rect.h,0,0,c.width,c.height);
+  g.drawImage(img,rect.x,rect.y,rect.w,rect.h,0,0,c.width,c.height);
   if(teikn)teikn(g,s);
   return{mediaType:'image/jpeg',data:c.toDataURL('image/jpeg',0.9).split(',')[1]};
 }
@@ -10526,15 +10944,15 @@ function kiNaerastePaaKant(p,a,b){
 // og vert røysta ut. Hjørna vert så krysset mellom nabokantane.
 let _kiGraa=null;
 // Gråtonekopi av planteikninga, nedskalert til maks 4096 px, med papirnivået.
-function kiGraa(){
-  if(_kiGraa&&_kiGraa.img===bgImg)return _kiGraa;
-  const k=Math.min(1,4096/Math.max(bgImg.width,bgImg.height));
-  const W=Math.max(1,Math.round(bgImg.width*k)),H=Math.max(1,Math.round(bgImg.height*k));
+function kiGraa(img){
+  if(_kiGraa&&_kiGraa.img===img)return _kiGraa;
+  const k=Math.min(1,4096/Math.max(img.width,img.height));
+  const W=Math.max(1,Math.round(img.width*k)),H=Math.max(1,Math.round(img.height*k));
   const c=document.createElement('canvas');c.width=W;c.height=H;
   const x=c.getContext('2d',{willReadFrequently:true});
   x.fillStyle='#fff';x.fillRect(0,0,W,H);
   x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
-  x.drawImage(bgImg,0,0,W,H);
+  x.drawImage(img,0,0,W,H);
   let d;
   try{d=x.getImageData(0,0,W,H).data;}catch(e){return null;}
   const g=new Uint8Array(W*H),hist=new Uint32Array(256);
@@ -10542,7 +10960,7 @@ function kiGraa(){
   // Papiret: det lysaste tiandeparten av arket. Mørkare enn papir − 40 er strek.
   let acc=0,papir=255;
   for(let v=255;v>=0;v--){acc+=hist[v];if(acc>=W*H*0.10){papir=v;break;}}
-  _kiGraa={img:bgImg,k,W,H,g,mork:Math.max(60,papir-40)};
+  _kiGraa={img,k,W,H,g,mork:Math.max(60,papir-40)};
   return _kiGraa;
 }
 // Tilpass kanten a→b (biletpikslar) til innsida av veggen. inn = einingsnormal
@@ -10644,14 +11062,14 @@ function kiDeltKant(a,b,andre,tol){
 }
 // Fasadekantane i alle sonene inn til innsida av veggen. Returnerer talet på
 // kantar som vart tilpassa, og merkjer hjørna som ligg på ein tilpassa kant.
-function kiTilpassFasadar(soner,mpp){
-  const G=kiGraa();
+function kiTilpassFasadar(soner,ark){
+  const G=kiGraa(ark.img),mpp=ark.mpp;
   if(!G)return{kantar:0,av:0};
-  const D=Math.max(bgImg.width,bgImg.height);
+  const D=Math.max(ark.img.width,ark.img.height);
   const M=mpp?{S:2000/mpp,hol:200/mpp,vegg:80/mpp,maxVegg:700/mpp,steg:250/mpp,minKant:800/mpp,deltTol:600/mpp}
              // Ukalibrert: eit ark er typisk 30–80 m breitt i verkelegheita
              :{S:0.04*D,hol:0.005*D,vegg:0.002*D,maxVegg:0.015*D,steg:0.004*D,minKant:0.01*D,deltTol:0.01*D};
-  const finst=zones.filter(z=>(z.pts||[]).length>=3).map(z=>z.pts);
+  const finst=ark.zones.filter(z=>(z.pts||[]).length>=3).map(z=>z.pts);
   let kantar=0,av=0;
   soner.forEach(s=>{
     const pts=s.pts,m=pts.length;
@@ -10686,9 +11104,8 @@ function kiTilpassFasadar(soner,mpp){
 }
 
 // Rettar KI-polygona mot teikninga og mot kvarandre. Returnerer statistikk.
-function kiRettSoner(soner){
-  const D=Math.max(bgImg.width,bgImg.height);
-  const mpp=mppForFloor(curFloor());
+function kiRettSoner(soner,ark){
+  const img=ark.img,D=Math.max(img.width,img.height),mpp=ark.mpp;
   // Søkeradius for veggkrysset: ~1 % av arket, men aldri meir enn ~0,6 m.
   let R=Math.round(D*0.01);
   if(mpp)R=Math.min(R,Math.round(600/mpp));
@@ -10696,17 +11113,17 @@ function kiRettSoner(soner){
   const slaa=mpp?Math.max(3,Math.min(R,400/mpp)):R;   // hjørne nærare enn dette er same hjørne
   let snappa=0,tal=0;
   soner.forEach(s=>{s.pts=kiRyddPolygon(s.pts,Math.max(2,slaa/4));});
-  const fit=kiTilpassFasadar(soner,mpp);
+  const fit=kiTilpassFasadar(soner,ark);
   soner.forEach(s=>{
     s.pts=s.pts.map(p=>{
       tal++;
       if(p._fit){snappa++;return{x:p.x,y:p.y,_s:1};}   // ligg alt på innsida av veggen
-      const r=_linjeKryss(bgImg,p,R);
+      const r=_linjeKryss(img,p,R);
       if(!r)return{x:p.x,y:p.y};
       snappa++;
       // Grovt søk fyrst, så eit fint rundt treffet — det grove vindauget er
       // nedskalert til 81 px og gir berre eit par pikslar nøyaktigheit.
-      const f=_linjeKryss(bgImg,r,Math.max(10,Math.round(R/6)))||r;
+      const f=_linjeKryss(img,r,Math.max(10,Math.round(R/6)))||r;
       return{x:f.x,y:f.y,_s:1};
     });
   });
@@ -10745,51 +11162,74 @@ function kiRettSoner(soner){
   return{snappa,tal,slegne,kantar:fit.kantar,av:fit.av};
 }
 
-async function kiKoyrSoner(){
-  const run=kiKoyring;
-  const rect={x:0,y:0,w:bgImg.width,h:bgImg.height};
-  const del=(document.querySelector('input[name="aiDel"]:checked')||{}).value||'ein';
-  logAi('Steg 1 — soner ('+(del==='bruk'?'delt etter bruk, leigetakar og byggetrinn':'éi per bygningskropp')+')…');
-  logAi('Claude les teikninga. Det tek gjerne eitt til to minutt.');
-  const res=await kiSpor({oppgave:'soner',prompt:kiPromptSoner(del),images:[kiBilete(rect)],
-    schema:kiSkjemaSoner(),maxTokens:16000});
-  if(run!==kiKoyring)return;
-  if(res.analyse)logAi('\nKI: '+res.analyse+'\n');
-  const mpp=mppForFloor(curFloor());
-  const minAreal=mpp?2e6/(mpp*mpp):(bgImg.width*bgImg.height*1e-4);   // 2 m², elles 0,01 % av arket
+// Soneforslaget for eitt ark. Returnerer {drafts, analyse, st, fjerna}.
+async function kiSonerForArk(ark,del){
+  const img=ark.img,rect={x:0,y:0,w:img.width,h:img.height},mpp=ark.mpp;
+  const res=await kiSpor({oppgave:'soner',prompt:kiPromptSoner(del),images:[kiBilete(img,rect)],
+    schema:kiSkjemaSoner(),maxTokens:16000,meta:{etasje:arkNamn(ark.f)}});
+  const minAreal=mpp?2e6/(mpp*mpp):(img.width*img.height*1e-4);   // 2 m², elles 0,01 % av arket
   const soner=(res.soner||[]).map(s=>({namn:String(s.namn||'').trim(),bruk:s.bruk,
     byggeaar:(s.byggeaar>=1800&&s.byggeaar<=2100)?Math.round(s.byggeaar):null,
     pts:(s.pts||[]).map(p=>kiTilBilete(p,rect))})).filter(s=>s.pts.length>=3);
-  const st=kiRettSoner(soner);
-  const areal=pts=>Math.abs(pts.reduce((a,p,i)=>{const q=pts[(i+1)%pts.length];return a+p.x*q.y-q.x*p.y;},0))/2;
-  const gode=soner.filter(s=>s.pts.length>=3&&areal(s.pts)>=minAreal);
-  if(gode.length<soner.length)logAi('⚠ '+(soner.length-gode.length)+' sone(r) vart for små eller degenererte og er tekne bort.');
-  if(!gode.length){
-    logAi('Fann ingen soner.');
+  const st=kiRettSoner(soner,ark);
+  const gode=soner.filter(s=>s.pts.length>=3&&kiAreal(s.pts)>=minAreal);
+  return{analyse:res.analyse||'',st,fjerna:soner.length-gode.length,
+    drafts:gode.map(s=>({name:s.namn||'KI-sone',bruk:s.bruk,byggeaar:s.byggeaar,pts:s.pts}))};
+}
+// Køyr KI-arbeid på ei liste med høgst KI_PARALLELT i gang samstundes.
+async function kiPool(liste,fn){
+  let neste=0;
+  const arb=async()=>{while(neste<liste.length){const x=liste[neste++];await fn(x);}};
+  await Promise.all(Array.from({length:Math.min(KI_PARALLELT,liste.length)},arb));
+}
+async function kiKoyrSoner(maal){
+  const run=kiKoyring;
+  const del=kiInnst.del;
+  logAi('Steg 1 — soner ('+(del==='bruk'?'delt etter bruk, leigetakar og byggetrinn':'éi per bygningskropp')+')'
+    +(maal.length>1?' på '+maal.length+' etasjar':'')+'…');
+  logAi('Claude les teikningane. Det tek gjerne eitt til to minutt.');
+  const utkast=new Map();let feil=0;
+  await kiPool(maal,async f=>{
+    try{
+      const r=await kiSonerForArk(kiArk(f),del);
+      if(run!==kiKoyring)return;
+      utkast.set(f,r.drafts);
+      const mpp=mppForFloor(f),sum=r.drafts.reduce((s,d)=>s+kiAreal(d.pts),0);
+      logAi('\n'+arkNamn(f)+': '+r.drafts.length+' sone'+(r.drafts.length===1?'':'r')
+        +(mpp?', '+(sum*mpp*mpp/1e6).toFixed(0)+' m²':''));
+      if(r.analyse)logAi('  KI: '+r.analyse);
+      r.drafts.forEach(d=>logAi('  ✓ '+d.name+(mpp?' — '+(kiAreal(d.pts)*mpp*mpp/1e6).toFixed(1)+' m²':'')
+        +(d.bruk&&d.bruk!=='Ukjend'?' · '+d.bruk:'')+(d.byggeaar?' · byggeår '+d.byggeaar+' (frå teikninga)':'')));
+      if(r.fjerna)logAi('  ⚠ '+r.fjerna+' sone(r) vart for små eller degenererte og er tekne bort.');
+      if(r.st.av)logAi('  '+r.st.kantar+' av '+r.st.av+' fasadekantar lagde på innsida av veggen'
+        +(r.st.kantar<r.st.av?' (resten står der KI-en sette dei — sjå over dei)':'')+'.');
+    }catch(e){
+      if(run!==kiKoyring)return;
+      feil++;logAi('\n⚠ '+arkNamn(f)+': '+e.message);
+    }
+  });
+  if(run!==kiKoyring)return;
+  // Etasjane i same rekkjefølgje som i prosjektet, utan dei som ikkje fekk noko
+  kiUtkast=new Map(floors.filter(f=>(utkast.get(f)||[]).length).map(f=>[f,utkast.get(f)]));
+  if(!kiUtkast.size){
+    logAi('\nFann ingen soner.');
+    kiUtkast=null;
     kiKnappar(false);aiGo.textContent='Prøv igjen';aiGo.disabled=false;
     return;
   }
-  draftZones=gode.map(s=>({name:s.namn||'KI-sone',bruk:s.bruk,byggeaar:s.byggeaar,pts:s.pts}));
-  kiSoneHist=[];
-  gode.forEach(s=>{
-    const a=mpp?(areal(s.pts)*mpp*mpp/1e6).toFixed(1)+' m²':s.pts.length+' hjørne';
-    logAi('✓ '+(s.namn||'KI-sone')+' — '+a+(s.bruk&&s.bruk!=='Ukjend'?' · '+s.bruk:'')
-      +(s.byggeaar?' · byggeår '+s.byggeaar+' (frå teikninga)':''));
-  });
-  if(st.av)logAi(st.kantar+' av '+st.av+' fasadekantar lagde på innsida av veggen i teikninga'
-    +(st.kantar<st.av?' (resten står der KI-en sette dei — sjå over dei)':'')+'.');
-  logAi(st.snappa+' av '+st.tal+' hjørne ligg på veggen i teikninga'
-    +(st.slegne?', '+st.slegne+' felles hjørne slegne saman':'')+'.');
-  logAi('\nSjå over forslaget på lerretet. Hjørna kan justerast etterpå med ⊹ Rediger.');
-  kiSteg='soner';
-  kiKnappar(true,'✓ Godta '+gode.length+' sone'+(gode.length===1?'':'r'));
+  if(feil)logAi('\n⚠ '+feil+' etasje'+(feil===1?'':'r')+' kunne ikkje analyserast — køyr på nytt for dei.');
+  logAi('\nSjå over forslaget på lerretet'+(kiUtkast.size>1?' — byt etasje med knappane over':'')
+    +'. Hjørna kan justerast etterpå med ⊹ Rediger.');
+  kiSteg='soner';kiSoneHist=[];
+  // Vis ein etasje som har forslag — den aktive om han har det
+  if(!kiUtkast.has(curFloor())){switchFloor(floors.indexOf([...kiUtkast.keys()][0]));}
+  draftZones=kiUtkast.get(curFloor())||[];
+  const n=[...kiUtkast.values()].reduce((s,a)=>s+a.length,0);
+  kiKnappar(true,'✓ Godta '+n+' sone'+(n===1?'':'r'));
   draw();
 }
-function kiGodtaSoner(){
-  const nye=draftZones.filter(d=>d.pts.length>=3);
-  draftZones=[];
-  if(!nye.length)return 0;
-  snapshot();markDirty();
+// Sonene i eitt forslag inn i den AKTIVE etasjen (zones), utan angre-steg.
+function kiLeggInnSoner(nye){
   const tatt=new Set();
   floors.forEach((f,i)=>(i===activeFloor?zones:f.zones).forEach(z=>tatt.add(z.name)));
   let sk=0;
@@ -10808,10 +11248,33 @@ function kiGodtaSoner(){
     zones.push(nz);
     sk+=autoSkilleveggForNySone(nz);
   });
+  return{n:nye.length,sk};
+}
+// Alle etasjane i forslaget som eitt angre-steg. autoSkilleveggForNySone
+// arbeider på den aktive etasjen, så vi går innom kvar etasje og tilbake.
+function kiGodtaSoner(){
+  if(kiUtkast)kiUtkast.set(curFloor(),draftZones);
+  const opp=kiUtkast?[...kiUtkast].map(([f,arr])=>[f,arr.filter(d=>d.pts.length>=3)]).filter(([,a])=>a.length):[];
+  kiSteg=null;draftZones=[];kiUtkast=null;
+  if(!opp.length)return 0;
+  saveFloorState();
+  snapshot();markDirty();
+  const start=curFloor(),vis={sc,offX,offY};
+  let n=0,sk=0;
+  opp.forEach(([f,arr])=>{
+    const i=floors.indexOf(f);
+    if(i<0)return;
+    if(i!==activeFloor)switchFloor(i);
+    const r=kiLeggInnSoner(arr);n+=r.n;sk+=r.sk;
+  });
+  const hm=kiBrukHoyder();
+  if(curFloor()!==start){switchFloor(floors.indexOf(start));sc=vis.sc;offX=vis.offX;offY=vis.offY;}
+  saveFloorState();
   updateResults();renderTable();draw();
-  hintText.textContent=nye.length+' sone'+(nye.length===1?'':'r')+' lagt til frå KI-forslaget.'
-    +(sk?' '+sk+' felles vegg'+(sk===1?'':'ar')+' vart skiljekonstruksjon.':'');
-  return nye.length;
+  hintText.textContent=n+' sone'+(n===1?'':'r')+' lagt til frå KI-forslaget'
+    +(opp.length>1?' på '+opp.length+' etasjar':'')+'.'
+    +(sk?' '+sk+' felles vegg'+(sk===1?'':'ar')+' vart skiljekonstruksjon.':'')+(hm?' '+hm:'');
+  return n;
 }
 
 // ── Slå saman soner i forslaget ──
@@ -10845,7 +11308,10 @@ function kiOppdaterSlaa(){
   b.disabled=n<2;
   b.textContent='⊕ Slå saman valde'+(n>=2?' ('+n+')':'');
   document.getElementById('aiAngreSlaa').disabled=!kiSoneHist.length;
-  document.getElementById('aiAccept').textContent='✓ Godta '+draftZones.length+' sone'+(draftZones.length===1?'':'r');
+  if(kiUtkast)kiUtkast.set(curFloor(),draftZones);
+  const alle=kiUtkast?[...kiUtkast.values()].reduce((s,a)=>s+a.length,0):draftZones.length;
+  document.getElementById('aiAccept').textContent='✓ Godta '+alle+' sone'+(alle===1?'':'r')
+    +(kiUtkast&&kiUtkast.size>1?' på '+kiUtkast.size+' etasjar':'');
 }
 // To polygon til eitt. Er den felles veggen nesten, men ikkje heilt, felles
 // (KI-en har ikkje alltid same hjørne i begge), vert hjørna til den eine lagde
@@ -10898,14 +11364,15 @@ function kiSlaaSamanValde(){
   logAi('⊕ '+med.map(d=>d.name).join(' + ')+' → '+ny.name
     +(aar.size>1?' (ulike byggeår på teikninga — '+(ny.byggeaar||'byggeåret til bygget')+' står)':''));
   if(rest.length)logAi('⚠ '+rest.map(d=>d.name).join(', ')+' deler ingen vegg med dei andre og står for seg.');
-  if(draftZones.length>1)kiTeiknSoneListe();
-  else kiKnappar(true);
+  if(kiUtkast)kiUtkast.set(curFloor(),draftZones);
+  kiKnappar(true);
   draw();
 }
 document.getElementById('aiSlaa').onclick=kiSlaaSamanValde;
 document.getElementById('aiAngreSlaa').onclick=()=>{
   if(!kiSoneHist.length)return;
   draftZones=kiSoneHist.pop();
+  if(kiUtkast)kiUtkast.set(curFloor(),draftZones);
   logAi('↶ Samanslåinga er angra.');
   kiKnappar(true);
   draw();
@@ -10932,14 +11399,175 @@ document.getElementById('aiAngreSlaa').onclick=()=>{
   cv.addEventListener('click',e=>{if(svelg){svelg=false;e.stopImmediatePropagation();e.preventDefault();}},true);
 })();
 
+// ── Fasadeteikningane ──
+// Kvar fasadeteikning vert lesen éin gong: retninga (frå tittelen), golvnivået
+// til kvar etasje og alle opningar med breidd, høgd og brystning. Måla vert
+// rekna frå teikninga med skalaen til arket, eller — på eit ukalibrert ark —
+// frå kotene: to golv med kjend kote gir mm per eining loddrett. Påskrivne
+// mål vert brukte når dei stemmer med det målte (eller når ingenting kan
+// målast). Resultatet går inn i opningsforslaga som tekst per etasje, og gir
+// etasjehøgdene (golv til golv — den øvste etasjen har ikkje noko golv over
+// seg, så ho står urørt).
+const kiSkjemaFasade=()=>{
+  const xy={type:'number'};
+  return{type:'object',additionalProperties:false,required:['fasadar'],properties:{
+    fasadar:{type:'array',items:{type:'object',additionalProperties:false,
+      required:['tittel','retning','etasjar','opningar'],properties:{
+      tittel:{type:'string'},
+      retning:{type:'string',enum:[...DIRS,'Ukjend']},
+      etasjar:{type:'array',items:{type:'object',additionalProperties:false,required:['namn','golvY','koteMm'],
+        properties:{namn:{type:'string'},golvY:xy,koteMm:{type:'integer'}}}},
+      opningar:{type:'array',items:{type:'object',additionalProperties:false,
+        required:['etasje','type','x0','x1','yTopp','yBotn','breddeMm','hoydeMm','brystningMm'],
+        properties:{etasje:{type:'integer'},type:{type:'string',enum:['vindauge','dor']},
+          x0:xy,x1:xy,yTopp:xy,yBotn:xy,
+          breddeMm:{type:'integer'},hoydeMm:{type:'integer'},brystningMm:{type:'integer'}}}}
+    }}}}};
+};
+function kiPromptFasade(){
+  return [
+    'Biletet er ei fasadeteikning (oppriss) av eit bygg. Det kan stå fleire fasadar på same ark — gi kvar for seg.',
+    '',
+    'KOORDINATAR: normaliserte tal 0–1000 for heile biletet — x frå venstre kant, y frå øvre kant.',
+    '',
+    'For kvar fasade:',
+    '- `tittel`: teksten som namngir fasaden (t.d. «Fasade nord», «Fasade mot vest»).',
+    '- `retning`: kva veg fasaden vender, ut frå tittelen. «Ukjend» når tittelen ikkje seier det.',
+    '- `etasjar`: golvnivået til kvar etasje fasaden viser, frå NEDSTE til ØVSTE. `golvY` er y for overkant golv',
+    '  (etasjeskiljet) — sjå etter kotelinjer, stipla etasjeskilje eller der vindaugsrekkjene byrjar. `koteMm` er',
+    '  kota som står skriven ved golvet, i mm (t.d. «+12.600» → 12600, «c +3,60» → 3600), 0 når inga kote står der.',
+    '  `namn` er namnet om det står (t.d. «1. etasje», «U.etg»), elles «Etasje 1», «Etasje 2» … nedanfrå.',
+    '- `opningar`: alle vindauge og ytterdører. `etasje` er indeksen i `etasjar` (0 = nedste). `x0`/`x1` er venstre',
+    '  og høgre kant, `yTopp`/`yBotn` overkant og underkant av opninga. `breddeMm`, `hoydeMm` og `brystningMm`',
+    '  (golv til underkant vindauge) berre når dei står skrivne som mål på teikninga, elles 0.',
+    '',
+    'Ignorer tittelfelt, snitt, planar, detaljar og glasfelt i taket.'
+  ].join('\n');
+}
+function kiEtgNr(namn){
+  const s=String(namn||'').toLowerCase();
+  if(/kjell[ae]r|underetasje|u\.?\s*etg|sokkel/.test(s))return 0;
+  const m=/(\d+)/.exec(s);
+  return m?+m[1]:null;
+}
+// Etasjane på ein fasade (nedanfrå) → hovudetasjane i prosjektet. Etter
+// nummeret i namnet når begge sider har det, elles nedanfrå i rekkjefølgje.
+function kiMappEtasjar(etg){
+  const hov=floors.filter(f=>!erDelplan(f));
+  const nF=etg.map(e=>kiEtgNr(e.namn)),nP=hov.map(f=>kiEtgNr(f.name));
+  if(nF.every(n=>n!=null)&&nP.every(n=>n!=null)&&new Set(nP).size===nP.length)
+    return{map:nF.map(n=>hov[nP.indexOf(n)]||null),sikker:true};
+  return{map:etg.map((e,i)=>hov[i]||null),sikker:etg.length===hov.length};
+}
+async function kiLesFasadar(){
+  const run=kiKoyring,ark=kiFasadeArk();
+  logAi('Fasadane — les '+ark.length+' fasadeteikning'+(ark.length===1?'':'ar')+'…');
+  const info={opn:new Map(),hoyder:new Map(),usikker:false};
+  await kiPool(ark,async a=>{
+    try{
+      const img=a.bgImg,rect={x:0,y:0,w:img.width,h:img.height};
+      const res=await kiSpor({oppgave:'fasade',prompt:kiPromptFasade(),images:[kiBilete(img,rect)],
+        schema:kiSkjemaFasade(),maxTokens:16000,meta:{ark:a.name}});
+      if(run!==kiKoyring)return;
+      (res.fasadar||[]).forEach(fa=>{
+        const etg=(fa.etasjar||[]).map((e,i)=>({...e,i})).sort((x,y)=>y.golvY-x.golvY);  // nedste fyrst
+        const {map,sikker}=kiMappEtasjar(etg);
+        if(!sikker)info.usikker=true;
+        // Loddrett skala i mm per normalisert eining: frå kalibreringa, elles frå kotene
+        let sY=a.mmPerImgPx?img.height*a.mmPerImgPx/1000:null;
+        if(!sY){
+          const s=[];
+          for(let i=0;i+1<etg.length;i++)
+            if(etg[i].koteMm>0&&etg[i+1].koteMm>0&&etg[i].golvY-etg[i+1].golvY>5)
+              s.push((etg[i+1].koteMm-etg[i].koteMm)/(etg[i].golvY-etg[i+1].golvY));
+          if(s.length)sY=s.sort((x,y)=>x-y)[Math.floor(s.length/2)];
+        }
+        const sX=sY?sY*img.width/img.height:null;   // kvadratiske pikslar
+        for(let i=0;i+1<etg.length;i++){
+          const f=map[i];if(!f)continue;
+          let hM=null;
+          if(etg[i].koteMm>0&&etg[i+1].koteMm>0)hM=(etg[i+1].koteMm-etg[i].koteMm)/1000;
+          else if(sY)hM=(etg[i].golvY-etg[i+1].golvY)*sY/1000;
+          if(hM>=2.2&&hM<=8){if(!info.hoyder.has(f))info.hoyder.set(f,[]);info.hoyder.get(f).push(hM);}
+        }
+        // Påskrive mål er eksakt, men vert berre teke når det stemmer med det
+        // målte — elles har KI-en lese eit anna mål enn det som høyrer til.
+        const vel=(tekst,maalt)=>maalt?((tekst>0&&Math.abs(tekst-maalt)<=0.25*maalt)?tekst:maalt):(tekst>0?tekst:0);
+        let tel=0;
+        (fa.opningar||[]).forEach(o=>{
+          const ei=etg.findIndex(e=>e.i===o.etasje),f=ei>=0?map[ei]:null;
+          if(!f)return;
+          const type=o.type==='dor'?'dor':'vindauge';
+          const b=vel(o.breddeMm,sX?Math.abs(o.x1-o.x0)*sX:0);
+          const hh=vel(o.hoydeMm,sY?Math.abs(o.yBotn-o.yTopp)*sY:0);
+          const br=type==='dor'?0:vel(o.brystningMm,sY?Math.max(0,(etg[ei].golvY-o.yBotn)*sY):0);
+          if(!(b>=200&&b<=8000)||!(hh>=300&&hh<=6000))return;
+          if(!info.opn.has(f))info.opn.set(f,[]);
+          info.opn.get(f).push({retning:fa.retning,type,b,h:hh,br});
+          tel++;
+        });
+        logAi('  '+(fa.tittel||a.name)+' ('+fa.retning+'): '+tel+' opningar med mål, '+etg.length+' etasjenivå'
+          +(sY?'':' — utan skala eller koter, berre påskrivne mål'));
+      });
+    }catch(e){if(run===kiKoyring)logAi('  ⚠ '+a.name+': '+e.message);}
+  });
+  if(run!==kiKoyring)return null;
+  if(info.usikker)logAi('  ⚠ Etasjane på fasadane let seg ikkje kople sikkert til etasjane i prosjektet — dei er kopla nedanfrå.');
+  const hoyder=kiHoyderFraFasade(info);
+  if(hoyder.length)logAi('  Etasjehøgder: '+hoyder.map(x=>x.f.name+' '+x.m.toFixed(2)+' m'
+    +(Math.abs(x.no-x.m)>=0.05?' (no '+x.no.toFixed(2)+')':'')).join(', ')
+    +(kiInnst.hoyder?' — vert lagde inn når du godtek.':' (ikkje valt)'));
+  logAi('');
+  return info;
+}
+// Medianen av etasjehøgdene fasadane gir, per hovudetasje
+function kiHoyderFraFasade(info){
+  if(!info)return[];
+  return floors.filter(f=>info.hoyder.has(f)).map(f=>{
+    const s=info.hoyder.get(f).slice().sort((a,b)=>a-b);
+    return{f,m:Math.round(s[Math.floor(s.length/2)]*100)/100,no:f.defaultHoyde??3};
+  });
+}
+// Legg etasjehøgdene inn. Éin gong per køyring, innanfor angre-steget til
+// den fyrste «Godta». Returnerer ei setning til hintlinja.
+function kiBrukHoyder(){
+  if(kiHoyderBrukt||!kiInnst.hoyder)return'';
+  kiHoyderBrukt=true;
+  const endra=kiHoyderFraFasade(kiFasadeInfo).filter(x=>Math.abs(x.no-x.m)>=0.05);
+  endra.forEach(x=>{
+    etasjeArk(x.f).forEach(a=>{a.defaultHoyde=x.m;});   // delplanane deler høgda
+    if(hovudEtasje(curFloor())===x.f)fhI.value=x.m;
+  });
+  return endra.length?'Etasjehøgd frå fasadane: '+endra.map(x=>x.f.name+' '+x.m.toFixed(2)+' m').join(', ')+'.':'';
+}
+// Opningane fasadane viser i etasjen til f, som tekst til opningsforslaget
+function kiFasadeTekst(f){
+  const l=kiFasadeInfo&&kiFasadeInfo.opn.get(hovudEtasje(f));
+  if(!l||!l.length)return'';
+  const r50=v=>Math.round(v/50)*50,per=new Map();
+  l.forEach(o=>{
+    if(!per.has(o.retning))per.set(o.retning,new Map());
+    const k=o.type+'|'+r50(o.b)+'|'+r50(o.h)+'|'+r50(o.br),m=per.get(o.retning);
+    m.set(k,(m.get(k)||0)+1);
+  });
+  const ut=[];
+  per.forEach((m,ret)=>ut.push('  Fasade '+ret+': '+[...m].map(([k,n])=>{
+    const [t,b,hh,br]=k.split('|');
+    return n+' × '+(t==='dor'?'dør':'vindauge')+' '+b+'×'+hh+(t==='dor'?'':', brystning '+br);
+  }).join('; ')));
+  return ut.join('\n');
+}
+
 // ── Steg 2: vindauge og dører ──
 const KI_SKJEMA_OPN={
   type:'object',additionalProperties:false,required:['opningar'],
   properties:{
     opningar:{type:'array',items:{
-      type:'object',additionalProperties:false,required:['vegg','type','a','b','merke'],
+      type:'object',additionalProperties:false,required:['vegg','type','a','b','merke','hoydeMm','brystningMm'],
       properties:{
         vegg:{type:'integer'},
+        hoydeMm:{type:'integer'},
+        brystningMm:{type:'integer'},
         type:{type:'string',enum:['vindauge','dor']},
         a:{type:'object',additionalProperties:false,required:['x','y'],properties:{x:{type:'number'},y:{type:'number'}}},
         b:{type:'object',additionalProperties:false,required:['x','y'],properties:{x:{type:'number'},y:{type:'number'}}},
@@ -10947,7 +11575,7 @@ const KI_SKJEMA_OPN={
       }}}
   }
 };
-function kiPromptOpn(vegger){
+function kiPromptOpn(vegger,fTekst){
   return [
     'Bilete 1 er eit utsnitt av ei planteikning. Bilete 2 er det same utsnittet, der ei energisone er teikna inn med raud',
     'strek og fasadeveggane hennar er nummererte i raude sirklar.',
@@ -10960,8 +11588,15 @@ function kiPromptOpn(vegger){
     'i normaliserte koordinatar 0–1000 for utsnittet (x frå venstre, y frå toppen). Endepunkta skal liggje på veggen.',
     '`merke` er vindaugsmerkinga om teikninga har ho (t.d. «10x12», som tyder 1000×1200 mm), elles tom.',
     '',
-    'Dei nummererte veggane, med endepunkt i same koordinatar:',
-    ...vegger.map(v=>'  vegg '+v.nr+': ('+v.a.x+', '+v.a.y+') → ('+v.b.x+', '+v.b.y+')')
+    ...(fTekst?[
+      'FASADETEIKNINGANE viser desse opningane i denne etasjen (breidd × høgd og brystning i mm):',
+      fTekst,
+      'Gi `hoydeMm` og `brystningMm` for kvar opning du finn, frå den opninga på fasadeteikninga som høyrer til —',
+      'same fasaderetning som veggen og om lag same breidd. 0 når du ikkje finn noko som passar.',
+      ''
+    ]:['`hoydeMm` og `brystningMm`: 0 (det finst ingen fasadeteikningar).','']),
+    'Dei nummererte veggane, med retninga fasaden vender og endepunkt i same koordinatar:',
+    ...vegger.map(v=>'  vegg '+v.nr+' (mot '+v.dir+'): ('+v.a.x+', '+v.a.y+') → ('+v.b.x+', '+v.b.y+')')
   ].join('\n');
 }
 function kiInniPolygon(p,pts){
@@ -10982,16 +11617,17 @@ function kiGrupperVindauge(liste,segs,mpp){
     const c=(f.t0+f.t1)/2;
     if(f.type!=='vindauge'){ut.push(Object.assign(f,{antal:1,spans:[{t0:f.t0,t1:f.t1}]}));return;}
     const g=grupper.find(g=>g.segIdx===f.segIdx&&Math.abs(g.hoyMm-f.hoyMm)<=50
+      &&Math.abs((g.brystningMm??-999)-(f.brystningMm??-999))<=50
       &&Math.abs(g.sum/g.n-f.breddeMm)<=Math.max(100,0.1*g.sum/g.n));
-    if(g){g.n++;g.sum+=f.breddeMm;g.c.push(c);g.fraMerke=g.fraMerke||f.fraMerke;}
-    else grupper.push({z:f.z,segIdx:f.segIdx,dir:f.dir,type:'vindauge',hoyMm:f.hoyMm,
-      n:1,sum:f.breddeMm,c:[c],fraMerke:f.fraMerke});
+    if(g){g.n++;g.sum+=f.breddeMm;g.c.push(c);g.fraMerke=g.fraMerke||f.fraMerke;g.fraFasade=g.fraFasade||f.fraFasade;}
+    else grupper.push({z:f.z,segIdx:f.segIdx,dir:f.dir,type:'vindauge',hoyMm:f.hoyMm,brystningMm:f.brystningMm,
+      n:1,sum:f.breddeMm,c:[c],fraMerke:f.fraMerke,fraFasade:f.fraFasade});
   });
   grupper.forEach(g=>{
     const bredde=Math.round(g.sum/g.n/10)*10,segLen=segs[g.segIdx].lenPx,wPx=bredde/mpp;
     const posT=g.c.slice().sort((a,b)=>a-b);
     const w={z:g.z,segIdx:g.segIdx,dir:g.dir,type:'vindauge',breddeMm:bredde,hoyMm:g.hoyMm,
-      antal:g.n,posT:g.n>1?posT:null,fraMerke:g.fraMerke};
+      brystningMm:g.brystningMm,antal:g.n,posT:g.n>1?posT:null,fraMerke:g.fraMerke,fraFasade:g.fraFasade};
     const anker=fitSpanT(posT.reduce((s,t)=>s+t,0)/posT.length,wPx,segLen);
     w.t0=anker.t0;w.t1=anker.t1;
     w.spans=posT.map(t=>fitSpanT(t,wPx,segLen));
@@ -11000,8 +11636,8 @@ function kiGrupperVindauge(liste,segs,mpp){
   return ut;
 }
 // Opningane i éi sone. Returnerer {forslag, avvist}.
-async function kiOpningarForSone(z){
-  const mpp=mppForZone(z);
+async function kiOpningarForSone(z,ark,fTekst){
+  const mpp=ark.mpp,img=ark.img;
   const segs=calcSegments(z.pts,null,mpp)||[];
   const sk=z.skillevegg||new Set();
   const fasade=segs.filter(s=>!sk.has(s.idx)&&s.lenM>=0.5);
@@ -11010,10 +11646,10 @@ async function kiOpningarForSone(z){
   const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
   const marg=Math.max(0.08*Math.max(x1-x0,y1-y0),1500/mpp);
   const rx=Math.max(0,x0-marg),ry=Math.max(0,y0-marg);
-  const rect={x:rx,y:ry,w:Math.min(bgImg.width,x1+marg)-rx,h:Math.min(bgImg.height,y1+marg)-ry};
-  const vegger=fasade.map(s=>({nr:s.idx+1,a:kiTilNorm(s.p1,rect),b:kiTilNorm(s.p2,rect)}));
-  const rein=kiBilete(rect);
-  const merka=kiBilete(rect,(g,s)=>{
+  const rect={x:rx,y:ry,w:Math.min(img.width,x1+marg)-rx,h:Math.min(img.height,y1+marg)-ry};
+  const vegger=fasade.map(s=>({nr:s.idx+1,dir:s.dir,a:kiTilNorm(s.p1,rect),b:kiTilNorm(s.p2,rect)}));
+  const rein=kiBilete(img,rect);
+  const merka=kiBilete(img,rect,(g,s)=>{
     const P=p=>({x:(p.x-rect.x)*s,y:(p.y-rect.y)*s});
     g.beginPath();
     z.pts.forEach((p,i)=>{const q=P(p);i?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y);});
@@ -11031,8 +11667,8 @@ async function kiOpningarForSone(z){
       g.fillText(String(sg.idx+1),c.x,c.y+1);
     });
   });
-  const res=await kiSpor({oppgave:'opningar',prompt:kiPromptOpn(vegger),images:[rein,merka],
-    schema:KI_SKJEMA_OPN,maxTokens:16000,meta:{sone:z.name,vegger}});
+  const res=await kiSpor({oppgave:'opningar',prompt:kiPromptOpn(vegger,fTekst),images:[rein,merka],
+    schema:KI_SKJEMA_OPN,maxTokens:16000,meta:{sone:z.name,etasje:arkNamn(ark.f),vegger,fasade:!!fTekst}});
   const tolPx=Math.max(800/mpp,0.03*Math.max(rect.w,rect.h));
   const forslag=[];let avvist=0;
   (res.opningar||[]).forEach(o=>{
@@ -11053,8 +11689,15 @@ async function kiOpningarForSone(z){
       const bm=+m[1]*100,hm=+m[2]*100;
       if(bm>0&&Math.abs(bm-maaltMm)<=0.3*maaltMm){bredde=bm;hoyde=hm;fraMerke=true;}
     }
+    // Høgd og brystning frå fasadeteikninga, når KI-en fann den opninga der
+    let brystning=null,fraFasade=false;
+    if(o.hoydeMm>=300&&o.hoydeMm<=6000){
+      hoyde=Math.round(o.hoydeMm/10)*10;fraFasade=true;
+      if(type!=='dor'&&o.brystningMm>=0&&o.brystningMm<=3000)brystning=Math.round(o.brystningMm/10)*10;
+    }
     const span=fitSpanT((t0+t1)/2,bredde/mpp,sg.lenPx);
-    forslag.push({z,segIdx:sg.idx,dir:sg.dir,t0:span.t0,t1:span.t1,type,breddeMm:bredde,hoyMm:hoyde,fraMerke});
+    forslag.push({z,segIdx:sg.idx,dir:sg.dir,t0:span.t0,t1:span.t1,type,breddeMm:bredde,hoyMm:hoyde,
+      brystningMm:brystning,fraMerke,fraFasade});
   });
   // Same opning to gonger, eller oppå eit vindauge som alt står der
   const finst=(z.windows||[]).filter(w=>w.segIdx!=null).map(w=>{
@@ -11070,31 +11713,32 @@ async function kiOpningarForSone(z){
   });
   return{forslag:kiGrupperVindauge(ut,segs,mpp),avvist};
 }
-async function kiKoyrOpningar(){
+async function kiKoyrOpningar(maal){
   const run=kiKoyring;
   saveFloorState();
-  const liste=zones.filter(z=>!z.skjult&&(z.pts||[]).length>=3);
-  logAi('Steg 2 — vindauge og dører på '+liste.length+' sone'+(liste.length===1?'':'r')+'…');
-  const forslag=[];let avvist=0,feil=0,ferdige=0;
-  let neste=0;
-  const arbeidar=async()=>{
-    while(neste<liste.length){
-      const z=liste[neste++];
-      try{
-        const r=await kiOpningarForSone(z);
-        if(run!==kiKoyring)return;
-        forslag.push(...r.forslag);avvist+=r.avvist;
-        const nd=r.forslag.filter(f=>f.type==='dor').length;
-        logAi('✓ '+z.name+': '+r.forslag.filter(f=>f.type==='vindauge').reduce((s,f)=>s+(f.antal||1),0)+' vindauge, '
-          +nd+(nd===1?' dør':' dører'));
-      }catch(e){
-        if(run!==kiKoyring)return;
-        feil++;logAi('⚠ '+z.name+': '+e.message);
-      }
-      ferdige++;
+  const utan=maal.filter(f=>!mppForFloor(f));
+  const liste=maal.filter(f=>mppForFloor(f)).flatMap(f=>{
+    const ark=kiArk(f),fTekst=kiFasadeTekst(f);
+    return f.zones.filter(z=>!z.skjult&&(z.pts||[]).length>=3).map(z=>({z,ark,fTekst}));
+  });
+  logAi('Steg 2 — vindauge og dører på '+liste.length+' sone'+(liste.length===1?'':'r')
+    +(maal.length>1?' i '+(maal.length-utan.length)+' etasjar':'')+'…');
+  if(utan.length)logAi('ℹ '+utan.map(arkNamn).join(', ')+' er ikkje kalibrert'+(utan.length===1?'':'e')+' og vert hoppa over.');
+  const forslag=[];let avvist=0,feil=0;
+  await kiPool(liste,async({z,ark,fTekst})=>{
+    try{
+      const r=await kiOpningarForSone(z,ark,fTekst);
+      if(run!==kiKoyring)return;
+      forslag.push(...r.forslag);avvist+=r.avvist;
+      const nd=r.forslag.filter(f=>f.type==='dor').length;
+      logAi('✓ '+(maal.length>1?arkNamn(ark.f)+' · ':'')+z.name+': '
+        +r.forslag.filter(f=>f.type==='vindauge').reduce((s,f)=>s+(f.antal||1),0)+' vindauge, '
+        +nd+(nd===1?' dør':' dører'));
+    }catch(e){
+      if(run!==kiKoyring)return;
+      feil++;logAi('⚠ '+z.name+': '+e.message);
     }
-  };
-  await Promise.all(Array.from({length:Math.min(KI_PARALLELT,liste.length)},arbeidar));
+  });
   if(run!==kiKoyring)return;
   if(avvist)logAi('ℹ '+avvist+' opning'+(avvist===1?'':'ar')+' låg ikkje på ein fasadevegg, var for smal eller fanst frå før, og er hoppa over.');
   if(feil)logAi('⚠ '+feil+' sone'+(feil===1?'':'r')+' kunne ikkje analyserast — køyr på nytt, eller teikn opningane der for hand.');
@@ -11103,11 +11747,13 @@ async function kiKoyrOpningar(){
     kiKnappar(false);aiGo.textContent='Prøv igjen';aiGo.disabled=false;
     return;
   }
-  const merka=forslag.filter(f=>f.fraMerke).length;
   const stk=forslag.reduce((s,f)=>s+(f.antal||1),0),grupper=forslag.filter(f=>f.antal>1).length;
-  logAi('\n'+stk+' opningar funne'+(grupper?', samla i '+forslag.length+' element ('+grupper+' grupper av like vindauge)':'')
-    +(merka?', '+merka+' med mål frå vindaugsmerkinga':'')+'.'
-    +' Høgda er '+(merka?'elles ':'')+'standard (vindauge 1,2 m, dør 2,1 m) — sjå over i sonekorta.');
+  const st=k=>forslag.filter(f=>f[k]).reduce((s,f)=>s+(f.antal||1),0);
+  const fas=st('fraFasade'),merka=st('fraMerke');
+  logAi('\n'+stk+' opningar funne'+(grupper?', samla i '+forslag.length+' element ('+grupper+' grupper av like vindauge)':'')+'.');
+  if(fas)logAi('Høgd'+(forslag.some(f=>f.fraFasade&&f.brystningMm!=null)?' og brystning':'')+' frå fasadeteikningane på '+fas+' av '+stk+'.');
+  if(merka)logAi(merka+' med mål frå vindaugsmerkinga i planen.');
+  if(fas+merka<stk)logAi('Resten har standardhøgd (vindauge 1,2 m, dør 2,1 m) — sjå over i sonekorta.');
   kiDraftWins=forslag;
   kiSteg='opningar';
   kiKnappar(true,'✓ Godta '+stk+' opningar');
@@ -11119,7 +11765,9 @@ function kiGodtaOpningar(){
   const nye=kiDraftWins.filter(d=>alle.has(d.z)&&d.z.pts.length>d.segIdx);
   kiDraftWins=[];
   if(!nye.length)return 0;
+  saveFloorState();
   snapshot();markDirty();
+  const hm=kiBrukHoyder();
   nye.forEach(d=>{
     const z=d.z;z.windows=z.windows||[];
     const typeL=d.type==='dor'?'Dør':'Vindauge';
@@ -11127,23 +11775,38 @@ function kiGodtaOpningar(){
     const n=d.antal||1;
     // posT er ein ny array — forslaget og vindauget skal ikkje dele han
     z.windows.push({segIdx:d.segIdx,dir:d.dir,t0:d.t0,t1:d.t1,breddeMm:d.breddeMm,hoyMm:d.hoyMm,
-      antal:n,type:d.type,name:typeL+' '+nr,brystningMm:null,posT:n>1&&d.posT?d.posT.slice():null});
+      antal:n,type:d.type,name:typeL+' '+nr,brystningMm:d.brystningMm??null,posT:n>1&&d.posT?d.posT.slice():null});
   });
   updateResults();renderTable();draw();
   const stk=nye.reduce((s,d)=>s+(d.antal||1),0);
-  hintText.textContent=stk+' opningar ('+nye.length+' element) lagt til frå KI-forslaget. Sjå over høgdene i sonekorta.';
+  hintText.textContent=stk+' opningar ('+nye.length+' element) lagt til frå KI-forslaget. Sjå over høgdene i sonekorta.'+(hm?' '+hm:'');
   return nye.length;
 }
 
 aiGo.onclick=async()=>{
-  const soner=document.getElementById('aiSoner').checked;
-  kiVidareTilOpningar=document.getElementById('aiOpn').checked&&!document.getElementById('aiOpn').disabled;
+  const opnEl=document.getElementById('aiOpn');
+  kiInnst={
+    bygg:(document.querySelector('input[name="aiOmfang"]:checked')||{}).value==='bygg',
+    soner:document.getElementById('aiSoner').checked,
+    del:(document.querySelector('input[name="aiDel"]:checked')||{}).value||'ein',
+    opn:opnEl.checked&&!opnEl.disabled,
+    hoyder:document.getElementById('aiHoyder').checked&&!!kiFasadeArk().length
+  };
+  kiVidareTilOpningar=kiInnst.opn;kiHoyderBrukt=false;kiFasadeInfo=null;
   aiGo.disabled=true;aiGo.textContent='Arbeider…';aiLog.textContent='';
   document.getElementById('aiClose').textContent='Avbryt';
   const run=++kiKoyring;
   try{
-    if(soner)await kiKoyrSoner();
-    else await kiKoyrOpningar();
+    saveFloorState();
+    const maal=kiMaal(kiInnst.bygg);
+    // Fasadane fyrst: dei gir høgd og brystning til opningane og etasjehøgdene
+    if(kiFasadeArk().length&&(kiInnst.opn||kiInnst.hoyder)){
+      kiFasadeInfo=await kiLesFasadar();
+      if(run!==kiKoyring)return;
+    }
+    if(kiInnst.soner)await kiKoyrSoner(maal);
+    else if(kiInnst.opn)await kiKoyrOpningar(maal);
+    else kiVisHoyder();
   }catch(e){
     if(run!==kiKoyring)return;
     logAi('Feil: '+e.message);
@@ -11151,17 +11814,27 @@ aiGo.onclick=async()=>{
   }
   document.getElementById('aiClose').textContent='Lukk';
 };
+// Berre etasjehøgder: eit eige lite forslag å godta
+function kiVisHoyder(){
+  const endra=kiHoyderFraFasade(kiFasadeInfo).filter(x=>Math.abs(x.no-x.m)>=0.05);
+  if(!endra.length){
+    logAi('Fasadane gav ingen etasjehøgder som skil seg frå dei som står.');
+    kiKnappar(false);aiGo.disabled=false;aiGo.textContent='Prøv igjen';
+    return;
+  }
+  kiSteg='hoyder';
+  kiKnappar(true,'✓ Godta etasjehøgdene');
+}
 document.getElementById('aiAccept').onclick=async()=>{
   if(kiSteg==='soner'){
     const n=kiGodtaSoner();
-    kiSteg=null;
     // Sonene er godtekne — «Prøv igjen» etter dette skal gjelde opningane
     document.getElementById('aiSoner').checked=false;
     if(n&&kiVidareTilOpningar){
       kiKnappar(false);aiGo.disabled=true;aiGo.textContent='Arbeider…';
       aiLog.textContent='';
       const run=++kiKoyring;
-      try{await kiKoyrOpningar();}
+      try{await kiKoyrOpningar(kiMaal(kiInnst.bygg));}
       catch(e){if(run===kiKoyring){logAi('Feil: '+e.message);aiGo.disabled=false;aiGo.textContent='Prøv igjen';}}
       return;
     }
@@ -11169,10 +11842,16 @@ document.getElementById('aiAccept').onclick=async()=>{
     return;
   }
   if(kiSteg==='opningar')kiGodtaOpningar();
+  if(kiSteg==='hoyder'){
+    saveFloorState();snapshot();markDirty();
+    const t=kiBrukHoyder();
+    updateResults();renderTable();draw();
+    hintText.textContent=t||'Ingen etasjehøgder endra.';
+  }
   kiLukk();
 };
 document.getElementById('aiReject').onclick=()=>{
-  draftZones=[];kiDraftWins=[];kiSteg=null;draw();
+  draftZones=[];kiDraftWins=[];kiUtkast=null;kiSteg=null;draw();
   logAi('Forkasta.');
   kiKnappar(false);aiGo.disabled=false;aiGo.textContent='Prøv igjen';
 };
@@ -11999,6 +12678,8 @@ async function showFloorContextMenu(clientX,clientY,f){
     }
     const sep2=document.createElement('div');sep2.className='ctx-menu-sep';menu.appendChild(sep2);
   }
+  if(!iFasade()&&floors.length>1)
+    menu.appendChild(mkItem('🗑','Slett fleire etasjar…','Kryss av og slett i eitt — kan angrast',()=>slettEtasjarDialog()));
   menu.appendChild(mkItem('⧉','Kopier etasje','Til klippbordet — kan hentast inn i eit anna prosjekt',async()=>{
     hintText.textContent='Kopierer «'+f.name+'»…';
     try{

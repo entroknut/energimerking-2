@@ -1090,6 +1090,35 @@ Invariantar:
 - Import/klippbord: `delAv` og `plassAnker.til` vert omrekna til nye id-ar;
   kjem ikkje hovudetasjen med, vert arket ei eiga etasje.
 
+## Masseimport og sletting av etasjar
+
+Fleire filer, eller ei PDF med fleire sider, går til `masseImport` (frå «Last
+opp», slepp-sona og «+ Etasje → Legg inn mange teikningar»). Éi fil som er
+eit bilete eller ei einsida PDF går som før til den aktive etasjen
+(`lastInnFiler` avgjer). Éi fleirsidig PDF får knappen «Berre side 1 her»
+for den gamle oppførselen.
+
+- Ein dialog viser kvar side med miniatyr, **type** (etasje / delplan /
+  fasade / hopp over) og **namn**, gjetta av `masseGjett` frå PDF-teksten
+  (`getTextContent`) eller filnamnet: «fasade/oppriss» → fasadeark, snitt og
+  situasjonsplan → hopp over, «2. etasje»/«2 etg»/«kjeller» → namn og
+  nummer. Etasjane vert sorterte nedanfrå; same etasjenamn to gonger ⇒ den
+  andre vert delplan («Del n»). Brukaren rettar før noko vert lagt inn.
+- Alt vert lagt inn som **eitt** `snapshot()`. Eit tomt startprosjekt vert
+  fjerna. Når alle hovudetasjane har nummer i namnet (`kiEtgNr`), vert dei
+  nye sorterte inn på rett plass i stabelen.
+- **Kalibrering:** ein global skala gjeld berre ark med same pikseltettleik
+  (px per mm papir) som referansen. Ark med annan tettleik får `ownCal=true`,
+  med målestokken føreslått når referansen har ein vanleg målestokk
+  (`_arkMaalestokk`) — same regel som delplanar. Bilete utan papirformat
+  brukar den globale.
+- Over 6 ark: PDF-sidene vert rendra med halvt pikselbudsjett (24 Mpx,
+  `loadPdfPage_with(doc,n,maalPx)`), elles vert det fleire GB i minnet.
+- **Sletting:** `slettArk(f)` + `etterSletting()` er den eine vegen — ✕ på
+  fana og «Slett fleire etasjar…» (høgreklikk på fana) brukar begge. Ein
+  delplan som overlever hovudteikninga tek over etasjen og namnet. Vert alle
+  sletta, står ei tom «Etasje 1» att.
+
 ## Skjulte soner
 
 `z.skjult` tek sona ut av **visinga**: planteikninga (inkludert ghost-laget frå
@@ -1248,6 +1277,25 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
   igjen. Soner som ikkje deler vegg vert ikkje slegne saman — det vert meldt.
   `kiSoneHist` gir «Angre». Alt skjer i `draftZones`; fyrst «Godta» legg
   sonene inn (eitt angre-steg som før).
+- **Heile bygget** (omfang i dialogen): alle ark med planteikning i éi
+  køyring. Stega les ALDRI lerret-globalane for anna enn den aktive etasjen —
+  alt går gjennom `kiArk(f)` = `{f,img,mpp,zones}` (etter `saveFloorState()`).
+  Soneforslaget ligg per etasje i `kiUtkast` (Map etasje → forslag);
+  `draftZones` er forslaget for den aktive, og `kiEtterEtasjebyte()` (kalla
+  frå `switchFloor`) hentar det fram. Skriv alltid tilbake til `kiUtkast`
+  når `draftZones` vert bytt ut (samanslåing, angre). «Godta» går innom kvar
+  etasje (autoSkilleveggForNySone arbeider på den aktive) under ÉITT
+  `snapshot()`, og legg tilbake visinga til slutt.
+- **Fasadeteikningane** (`fasadar[]`) vert lesne fyrst (`kiLesFasadar`,
+  oppgåve `fasade`): retning frå tittelen, golvnivå (+ koter) og opningar.
+  Mål frå arket sin skala, elles frå kotene (mm per eining loddrett frå to
+  kjende golv), elles påskrivne mål. Etasjane vert kopla til hovudetasjane
+  etter nummeret i namnet, elles nedanfrå (meldt som usikker).
+  Gir (1) tekst per etasje inn i opningsprompten (`kiFasadeTekst`), og
+  KI-en svarar `hoydeMm`/`brystningMm` per opning; (2) etasjehøgder golv til
+  golv (median), lagde inn ved fyrste «Godta» (`kiBrukHoyder`, éin gong per
+  køyring, heile delplangruppa). Øvste etasje har ikkje golv over seg og
+  står urørt.
 - Krev kalibrering for opningane (breiddemålet). Den gamle varianten med
   API-nøkkel i nettlesaren er fjerna.
 

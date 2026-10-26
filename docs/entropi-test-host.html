@@ -152,15 +152,26 @@ async function kiMock(d){
       {namn:'Tilbygg 1997',bruk:'Ukjend',byggeaar:1997,pts:[{x:503,y:252},{x:800,y:250},{x:800,y:470},{x:500,y:472}]},
       {namn:'Lager',bruk:'Ukjend',byggeaar:0,pts:[{x:500,y:476},{x:800,y:474},{x:800,y:700},{x:498,y:701}]}
     ]};
+  // Fasadeteikning: to etasjar med koter (3,6 m golv til golv), fire like
+  // vindauge og ei dør i 1. etasje. Koordinatane passar eit kvadratisk ark.
+  if(d.oppgave==='fasade')return{fasadar:[{tittel:'Fasade nord',retning:'Nord',
+    etasjar:[{namn:'1. etasje',golvY:800,koteMm:1000},{namn:'2. etasje',golvY:500,koteMm:4600}],
+    opningar:[
+      ...[100,300,500,700].map(x=>({etasje:0,type:'vindauge',x0:x,x1:x+100,yTopp:600,yBotn:725,breddeMm:0,hoydeMm:0,brystningMm:0})),
+      {etasje:0,type:'dor',x0:850,x1:930,yTopp:625,yBotn:800,breddeMm:0,hoydeMm:0,brystningMm:0}
+    ]}]};
   // Tre like vindauge på kvar nummerert vegg (vert éi gruppe ×3), eitt
-  // breiare på den fyrste (eige element), og ei dør der.
+  // breiare på den fyrste (eige element), og ei dør der. Med fasadeteikningar
+  // i prompten: høgd og brystning derfrå, som Claude ville gitt.
+  const fasade=/FASADETEIKNINGANE/.test(d.prompt);
+  const hb=type=>fasade?(type==='dor'?{hoydeMm:2100,brystningMm:0}:{hoydeMm:1500,brystningMm:900}):{hoydeMm:0,brystningMm:0};
   const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
   const opningar=[];
   ((d.meta&&d.meta.vegger)||[]).forEach((v,i)=>{
-    [0.3,0.5,0.7].forEach(t=>opningar.push({vegg:v.nr,type:'vindauge',a:lerp(v.a,v.b,t-0.05),b:lerp(v.a,v.b,t+0.05),merke:''}));
+    [0.3,0.5,0.7].forEach(t=>opningar.push({vegg:v.nr,type:'vindauge',a:lerp(v.a,v.b,t-0.05),b:lerp(v.a,v.b,t+0.05),merke:'',...hb('vindauge')}));
     if(i===0){
-      opningar.push({vegg:v.nr,type:'vindauge',a:lerp(v.a,v.b,0.8),b:lerp(v.a,v.b,0.95),merke:''});
-      opningar.push({vegg:v.nr,type:'dor',a:lerp(v.a,v.b,0.05),b:lerp(v.a,v.b,0.15),merke:''});
+      opningar.push({vegg:v.nr,type:'vindauge',a:lerp(v.a,v.b,0.8),b:lerp(v.a,v.b,0.95),merke:'',...hb('vindauge')});
+      opningar.push({vegg:v.nr,type:'dor',a:lerp(v.a,v.b,0.05),b:lerp(v.a,v.b,0.15),merke:'',...hb('dor')});
     }
   });
   return{opningar};
