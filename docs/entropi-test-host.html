@@ -152,11 +152,6 @@ async function kiMock(d){
       {namn:'Tilbygg 1997',bruk:'Ukjend',byggeaar:1997,pts:[{x:503,y:252},{x:800,y:250},{x:800,y:470},{x:500,y:472}]},
       {namn:'Lager',bruk:'Ukjend',byggeaar:0,pts:[{x:500,y:476},{x:800,y:474},{x:800,y:700},{x:498,y:701}]}
     ]};
-  // Kalibrering: 1:100 i tittelfeltet og to mål over ytterveggane på
-  // testplanen (2000×1400 px, 10 mm/px — sjå docs om testteikninga).
-  if(d.oppgave==='skala')return{maalestokk:100,maal:[
-    {a:{x:180,y:200},b:{x:820,y:200},tekst:'12.8',lengdeMm:12800},
-    {a:{x:150,y:229},b:{x:150,y:721},tekst:'6900',lengdeMm:6900}]};
   // Fasadeteikning: to etasjar med koter (3,6 m golv til golv), fire like
   // vindauge og ei dør i 1. etasje. Koordinatane passar eit kvadratisk ark.
   if(d.oppgave==='fasade')return{fasadar:[{tittel:'Fasade nord',retning:'Nord',

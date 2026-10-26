@@ -1289,18 +1289,16 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
   tvers av etasjane. Soner utan kjend kategori vert ikkje kopla — utan
   `bygkat` reknar programmet dei som kontor, og ei kopling på det grunnlaget
   ville vore ei gjetting.
-- **Kalibrering frå teikninga** (`kiKalibrer`, fyrste steg, oppgåve
-  `skala`): berre ark UTAN skala — ein skala brukaren har sett, vert aldri
-  rørt. KI-en les målestokken i tittelfeltet og opptil tre lange målsette mål
-  (endepunkt + lengd i mm). Målestokk × papirformat (PDF eksakt, bilete frå
-  DPI) gir skalaen; medianen av måla kontrollerer. Innanfor 3 % ⇒
-  målestokken, «stadfesta». Større avvik ⇒ måla vinn og det vert åtvara
-  (forhold √2/2 ⇒ «skalert ved utskrift»). Utan papirformat ⇒ måla åleine
-  (sprik > 5 % ⇒ åtvaring). Planark: det fyrste set den globale, dei andre
-  deler han innanfor 1 %, elles `ownCal`. Fasadeark får eigen skala. Lagt inn
-  med ein gong som eitt angre-steg (`snapshot` + `_snapshotMpp` /
-  `_reskalerAlleEtasjar`), så resten av skannet reknar med han. Kan køyrast
-  åleine.
+- **Kalibrering er eit krav.** Dialogen stoppar «Start» og viser ein raud
+  boks med «Kalibrer no» når eit ark i køyringa manglar skala. Ei
+  KI-kalibrering (målestokk i tittelfeltet + målsette mål) vart bygd i
+  v5.11.0 og fjerna i v5.11.1: ho trefte ikkje godt nok på ekte teikningar.
+  Ikkje bygg ho inn att utan å ha testa på ekte teikningar fyrst.
+- **Forslaget er farga etter kategori** (`kiKatFarge`), med namn, kategori
+  og byggeår i lappen. Musa over «⊕ Same kategori» viser kva som vil verte
+  slege saman (`kiForhand` — tørrlaup av `kiSlaaSamanKategori`, som òg gir
+  `grupper`), og knappen viser talet. Ei nettopp samanslegen sone blinkar
+  (`kiBlink`).
 - **Heile bygget** (omfang i dialogen): alle ark med planteikning i éi
   køyring. Stega les ALDRI lerret-globalane for anna enn den aktive etasjen —
   alt går gjennom `kiArk(f)` = `{f,img,mpp,zones}` (etter `saveFloorState()`).

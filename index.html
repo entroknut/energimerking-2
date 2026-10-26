@@ -423,6 +423,8 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .ai-sub2.off{opacity:.45;pointer-events:none}
 .ai-note{font-size:11.5px;color:#b45309;line-height:1.5;padding:2px 0 0 22px}
 .ai-note:empty{display:none}
+.ai-kalkrav{margin:8px 0 0;padding:10px 12px;border:1px solid #fca5a5;background:#fef2f2;border-radius:var(--r);font-size:12.5px;color:#991b1b;line-height:1.5}
+.ai-kalkrav .ai-go{margin-top:8px;padding:5px 14px;font-size:12.5px}
 #aiLog:empty{display:none}
 /* Under gjennomsynet av forslaget må lerretet vere fritt: ruta flyttar seg
    opp i hjørnet, utan slør, så ein kan zoome og panorere over forslaget. */
@@ -726,7 +728,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.11.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.11.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -1044,7 +1046,6 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
             <label class="ai-opt"><input type="radio" name="aiOmfang" value="bygg"> <span id="aiOmfangBygg">Heile bygget</span></label>
             <div class="ai-skil"></div>
           </div>
-          <label class="ai-opt" id="aiKalRow"><input type="checkbox" id="aiKal" checked> <span id="aiKalTekst">Kalibrer frå teikninga (målestokk og mål)</span></label>
           <label class="ai-opt"><input type="checkbox" id="aiSoner" checked> Teikn soner</label>
           <div class="ai-sub2" id="aiDelRow">
             <label class="ai-opt"><input type="radio" name="aiDel" value="ein" checked> Éi sone per bygningskropp</label>
@@ -1055,6 +1056,10 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
           <label class="ai-opt"><input type="checkbox" id="aiOpn" checked> Finn vindauge og dører på fasadane</label>
           <label class="ai-opt" id="aiHoyderRow"><input type="checkbox" id="aiHoyder" checked> Etasjehøgder frå fasadeteikningane</label>
           <div class="ai-note" id="aiNote"></div>
+          <div class="ai-kalkrav" id="aiKalKrav" style="display:none">
+            <div id="aiKalKravTekst"></div>
+            <button class="ai-go" id="aiKalNo">Kalibrer no</button>
+          </div>
         </div>
         <div id="aiLog"></div>
         <div id="aiEtasjar" class="ai-etg" style="display:none"></div>
@@ -5144,28 +5149,40 @@ function draw(){
     });
   });
 
-  // Draft zones
+  // Draft zones — KI-forslaget: farge etter kategori, så ein ser kva som høyrer
+  // saman. Valt = heil, tjukk strek. Førehandsvising av «Same kategori» =
+  // svart stipla kant og lapp. Nettopp slegen saman = kort blink.
   draftZones.forEach(z=>{
     if(z.pts.length<2)return;
-    ctx.beginPath();
-    const pd0=i2s(z.pts[0].x,z.pts[0].y);ctx.moveTo(pd0.x,pd0.y);
-    z.pts.forEach((p,i)=>{if(i>0){const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);}});
-    // Valt for samanslåing (KI-forslaget): blå, heil strek
-    const _dv=z._valt,_dh=z._hover;
-    ctx.closePath();ctx.fillStyle=_dv?'rgba(37,99,235,.18)':_dh?'rgba(217,119,6,.18)':'rgba(217,119,6,.08)';ctx.fill();
-    ctx.strokeStyle=_dv?'#2563eb':'#d97706';ctx.lineWidth=_dv||_dh?3:2;
+    const _f=(typeof kiKatFarge==='function')?kiKatFarge(z.bruk):'#d97706';
+    const _dv=z._valt,_dh=z._hover,_fh=z._forhand!=null;
+    const _bl=z._blink?Math.max(0,1-(performance.now()-z._blink)/1600):0;
+    const sti=()=>{ctx.beginPath();const p0=i2s(z.pts[0].x,z.pts[0].y);ctx.moveTo(p0.x,p0.y);
+      z.pts.forEach((p,i)=>{if(i>0){const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);}});ctx.closePath();};
+    sti();
+    ctx.globalAlpha=_dv||_dh||_fh?0.32:0.16;ctx.fillStyle=_f;ctx.fill();ctx.globalAlpha=1;
+    if(_bl>0){ctx.strokeStyle='rgba(16,185,129,'+(0.9*_bl)+')';ctx.lineWidth=10;ctx.stroke();}
+    if(_fh){ctx.strokeStyle='#111827';ctx.lineWidth=3.5;ctx.setLineDash([10,5]);ctx.stroke();ctx.setLineDash([]);}
+    ctx.strokeStyle=_f;ctx.lineWidth=_dv?4:_dh?3:2;
     if(!_dv)ctx.setLineDash([8,4]);
     ctx.stroke();ctx.setLineDash([]);
     z.pts.forEach(p=>{
       const pp=i2s(p.x,p.y);
-      ctx.beginPath();ctx.arc(pp.x,pp.y,5,0,Math.PI*2);
-      ctx.fillStyle=_dv?'#2563eb':'#d97706';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.beginPath();ctx.arc(pp.x,pp.y,_dv?5:4,0,Math.PI*2);
+      ctx.fillStyle=_f;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
     });
-    const cxD=z.pts.reduce((s,p)=>s+p.x,0)/z.pts.length;
-    const cyD=z.pts.reduce((s,p)=>s+p.y,0)/z.pts.length;
-    const cpD=i2s(cxD,cyD);
-    ctx.font='bold 11px Inter,sans-serif';ctx.fillStyle='#92400e';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(z.name+' (forslag)',cpD.x,cpD.y);
+    const mp=(typeof flateMerkepunkt==='function')?flateMerkepunkt(z.pts):{
+      x:z.pts.reduce((s,p)=>s+p.x,0)/z.pts.length,y:z.pts.reduce((s,p)=>s+p.y,0)/z.pts.length};
+    const cpD=i2s(mp.x,mp.y);
+    const l1=(_dv?'✓ ':'')+z.name,l2=(z.bruk&&z.bruk!=='Ukjend'?z.bruk:'ukjend kategori')
+      +(z.byggeaar?' · '+z.byggeaar:'')+(_fh?' · vert slegen saman':'');
+    ctx.font='bold 12px Inter,sans-serif';
+    const tw=Math.max(ctx.measureText(l1).width,(ctx.font='11px Inter,sans-serif',ctx.measureText(l2).width))+14;
+    ctx.fillStyle='rgba(255,255,255,.93)';ctx.beginPath();ctx.roundRect(cpD.x-tw/2,cpD.y-17,tw,34,6);ctx.fill();
+    ctx.strokeStyle=_f;ctx.lineWidth=_dv?2:1;ctx.stroke();
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font='bold 12px Inter,sans-serif';ctx.fillStyle='#111827';ctx.fillText(l1,cpD.x,cpD.y-7);
+    ctx.font='11px Inter,sans-serif';ctx.fillStyle=_fh?'#111827':_f;ctx.fillText(l2,cpD.x,cpD.y+8);
   });
 
   // KI-forslag til vindauge og dører (sjå «2e. KI-oppteikning»)
@@ -10816,30 +10833,32 @@ function kiOppdaterVal(){
   const soner=document.getElementById('aiSoner').checked;
   const opn=document.getElementById('aiOpn');
   document.getElementById('aiDelRow').classList.toggle('off',!soner);
-  const kal=maal.filter(f=>mppForFloor(f)),ukal=maal.length-kal.length;
-  const fa0=kiFasadeArk().filter(a=>!a.mmPerImgPx).length;
-  document.getElementById('aiKalRow').style.display=(ukal||fa0)?'':'none';
-  const kiKal=(ukal||fa0)&&document.getElementById('aiKal').checked;
-  document.getElementById('aiKalTekst').textContent='Kalibrer '+(ukal+fa0)+' ark utan skala frå teikninga (målestokk og mål)';
-  // Kalibrerer KI-en fyrst, kan opningane vere med sjølv om ingenting har skala no
-  opn.disabled=!kal.length&&!kiKal;
-  if(opn.disabled)opn.checked=false;
+  // Skalaen må vere sett for hand fyrst. KI-en treng han for å leggje
+  // sonekantane på innsida av veggen og måle vindauga — og ei kalibrering KI-en
+  // gjorde sjølv var ikkje til å stole på (prøvd i v5.11.0, fjerna att).
+  const utan=maal.filter(f=>!mppForFloor(f));
+  const krav=document.getElementById('aiKalKrav');
+  krav.style.display=utan.length?'':'none';
+  if(utan.length){
+    document.getElementById('aiKalKravTekst').textContent='Kalibrer fyrst. '
+      +(utan.length===1?arkNamn(utan[0])+' har':utan.map(arkNamn).join(', ')+' har')
+      +' ikkje skala. KI-oppteikninga treng skalaen for å leggje sonekantane på innsida av veggen og måle vindauga.'
+      +(utan.includes(curFloor())?'':' Byt til etasjen og kalibrer der, eller vel «Denne etasjen».');
+    document.getElementById('aiKalNo').style.display=utan.includes(curFloor())?'':'none';
+  }
   const n=maal.reduce((s,f)=>s+f.zones.length,0),notar=[];
-  if(!kal.length&&!kiKal)notar.push('Vindauge og dører krev kalibrering — breidda vert målt i teikninga.');
-  else if(ukal&&opn.checked&&!kiKal)notar.push(ukal+' av etasjane er ikkje kalibrerte og får ikkje vindauge.');
-  else if(ukal&&opn.checked)notar.push('Etasjar KI-en ikkje klarer å kalibrere, får ikkje vindauge.');
   if(soner&&n)notar.push((bygg?'Etasjane':'Etasjen')+' har alt '+n+' sone'+(n===1?'':'r')+'. Nye soner kjem i tillegg.');
   if(!soner&&opn.checked&&!n)notar.push('Det finst ingen soner å finne opningar på.');
   const fa=kiFasadeArk();
   if(fa.length&&(opn.checked||document.getElementById('aiHoyder').checked)){
     const ukalF=fa.filter(a=>!a.mmPerImgPx).length;
     notar.push(fa.length+' fasadeteikning'+(fa.length===1?'':'ar')+' vert lesne fyrst'
-      +(ukalF?' ('+ukalF+' ukalibrert'+(ukalF===1?'':'e')+' — der vert skalaen henta frå kotene, elles berre påskrivne mål)':'')+'.');
+      +(ukalF?' ('+ukalF+' ukalibrert'+(ukalF===1?'':'e')+' — kalibrer dei for sikrare mål; elles vert skalaen henta frå kotene)':'')+'.');
   }
   document.getElementById('aiNote').textContent=notar.join(' ');
-  aiGo.disabled=!(soner||(opn.checked&&n)||(fa.length&&document.getElementById('aiHoyder').checked)||kiKal);
+  aiGo.disabled=!!utan.length||!(soner||(opn.checked&&n)||(fa.length&&document.getElementById('aiHoyder').checked));
 }
-['aiSoner','aiOpn','aiHoyder','aiKal'].forEach(id=>{document.getElementById(id).onchange=kiOppdaterVal;});
+['aiSoner','aiOpn','aiHoyder'].forEach(id=>{document.getElementById(id).onchange=kiOppdaterVal;});
 document.querySelectorAll('input[name="aiOmfang"]').forEach(r=>{r.onchange=kiOppdaterVal;});
 
 document.getElementById('aiBtn').onclick=()=>{
@@ -10871,6 +10890,8 @@ function kiLukk(){
   draw();
 }
 document.getElementById('aiClose').onclick=kiLukk;
+// «Kalibrer no»: lukk KI-ruta og opne kalibreringa på den aktive etasjen
+document.getElementById('aiKalNo').onclick=()=>{kiLukk();calBtn.click();};
 
 // ── Bilete til Claude ──
 // Utsnittet rect (biletpikslar) skalert til maks KI_MAXPX, som JPEG. teikn(g,s)
@@ -11351,6 +11372,19 @@ function kiKopleKategoriar(laga){
   return n;
 }
 
+// Farge per bygningskategori i forslaget — så ein ser kva som høyrer saman
+const KI_KAT_FARGAR=['#2563eb','#d97706','#059669','#db2777','#7c3aed','#0891b2','#ca8a04',
+  '#dc2626','#4f46e5','#65a30d','#c2410c','#0d9488','#9333ea'];
+function kiKatFarge(bruk){
+  const i=Object.keys(BYGKAT_SXI).indexOf(bruk);
+  return i<0?'#6b7280':KI_KAT_FARGAR[i%KI_KAT_FARGAR.length];
+}
+// Kort blink rundt ei sone som nettopp vart slegen saman
+function kiBlink(d){
+  d._blink=performance.now();
+  [0,150,300,450,600,750,900,1050,1200,1350,1500,1650].forEach(t=>setTimeout(draw,t));
+}
+
 // ── Slå saman soner i forslaget ──
 // KI-en deler gjerne finare enn ein vil ha det. Under gjennomsynet kan
 // brukaren krysse av soner (i lista eller ved å klikke i teikninga) og slå
@@ -11370,16 +11404,18 @@ function kiTeiknSoneListe(){
     r.className='ai-srad'+(d._valt?' valt':'');
     const cb=document.createElement('input');cb.type='checkbox';cb.checked=!!d._valt;
     cb.onchange=()=>{d._valt=cb.checked;r.classList.toggle('valt',cb.checked);kiOppdaterSlaa();draw();};
+    const prikk=document.createElement('span');
+    prikk.style.cssText='width:10px;height:10px;border-radius:50%;flex-shrink:0;background:'+kiKatFarge(d.bruk);
     const nm=document.createElement('span');nm.className='nm';nm.textContent=d.name;
     // Kategorien kan rettast her — «⊕ Same kategori» slår saman etter han
     const kat=document.createElement('select');
     [...Object.keys(BYGKAT_SXI),'Ukjend'].forEach(k=>{const o=document.createElement('option');o.value=k;
       o.textContent=k==='Ukjend'?'(ukjend)':k;if(k===(d.bruk||'Ukjend'))o.selected=true;kat.appendChild(o);});
     kat.onclick=e=>e.preventDefault();   // label-klikk skal ikkje krysse av raden
-    kat.onchange=()=>{d.bruk=kat.value;};
+    kat.onchange=()=>{d.bruk=kat.value;prikk.style.background=kiKatFarge(d.bruk);kiOppdaterSlaa();draw();};
     const ar=document.createElement('span');ar.className='ar';
     ar.textContent=mpp?(kiAreal(d.pts)*mpp*mpp/1e6).toFixed(1)+' m²':'';
-    r.append(cb,nm,kat,ar);
+    r.append(cb,prikk,nm,kat,ar);
     r.onmouseenter=()=>{d._hover=true;draw();};
     r.onmouseleave=()=>{d._hover=false;draw();};
     el.appendChild(r);
@@ -11392,6 +11428,11 @@ function kiOppdaterSlaa(){
   b.textContent='⊕ Slå saman'+(n>=2?' ('+n+')':'');
   document.getElementById('aiAngreSlaa').disabled=!kiHist(curFloor()).length;
   if(kiUtkast)kiUtkast.set(curFloor(),draftZones);
+  // Kor mange samanslåingar «Same kategori» ville gjort i alle etasjane
+  let kn=0;
+  if(kiUtkast)kiUtkast.forEach((arr,f)=>{kn+=kiSlaaSamanKategori(arr,mppForFloor(f),f.bgImg||bgImg).linjer.length;});
+  const kb=document.getElementById('aiSlaaKatBtn');
+  kb.textContent='⊕ Same kategori'+(kn?' ('+kn+')':'');kb.disabled=!kn;
   const alle=kiUtkast?[...kiUtkast.values()].reduce((s,a)=>s+a.length,0):draftZones.length;
   document.getElementById('aiAccept').textContent='✓ Godta '+alle+' sone'+(alle===1?'':'r')
     +(kiUtkast&&kiUtkast.size>1?' på '+kiUtkast.size+' etasjar':'');
@@ -11443,6 +11484,7 @@ function kiSlaaSamanValde(){
   const plass=draftZones.indexOf(valde[0]);
   draftZones=draftZones.filter(d=>!med.includes(d));
   draftZones.splice(Math.min(plass,draftZones.length),0,ny);
+  kiBlink(ny);
   const aar=new Set(med.map(d=>d.byggeaar||0));
   logAi('⊕ '+med.map(d=>d.name).join(' + ')+' → '+ny.name
     +(aar.size>1?' (ulike byggeår på teikninga — '+(ny.byggeaar||'byggeåret til bygget')+' står)':''));
@@ -11461,7 +11503,7 @@ const kiKatNokkel=d=>/uisolert|kald\b|kaldt/i.test(d.name||'')?null:(d.bruk||'Uk
 // {arr, linjer}. Soner som ikkje deler vegg, står for seg — dei kan koplast.
 function kiSlaaSamanKategori(arr,mpp,img){
   const tol=mpp?400/mpp:0.005*Math.max(img.width,img.height);
-  let ut=arr.slice(),endra=true;const linjer=[];
+  let ut=arr.map(d=>({...d,_med:[d]})),endra=true;const linjer=[];
   while(endra){
     endra=false;
     outer:for(let i=0;i<ut.length;i++){
@@ -11472,14 +11514,18 @@ function kiSlaaSamanKategori(arr,mpp,img){
         if(!r)continue;
         const [st,li]=kiAreal(ut[i].pts)>=kiAreal(ut[j].pts)?[ut[i],ut[j]]:[ut[j],ut[i]];
         linjer.push(st.name+' + '+li.name+(st.bruk&&st.bruk!=='Ukjend'?' ('+st.bruk+')':''));
-        const ny={...st,pts:kiRyddPolygon(r,1).map(q=>({x:q.x,y:q.y})),_valt:false,_hover:false};
+        const ny={...st,pts:kiRyddPolygon(r,1).map(q=>({x:q.x,y:q.y})),_valt:false,_hover:false,
+          _med:[...ut[i]._med,...ut[j]._med]};
         ut=ut.filter(d=>d!==ut[i]&&d!==ut[j]);
         ut.splice(Math.min(i,ut.length),0,ny);
         endra=true;break outer;
       }
     }
   }
-  return{arr:ut,linjer};
+  // grupper: originalane som gjekk inn i kvar samanslegen sone (førehandsvisinga)
+  const grupper=ut.filter(d=>d._med.length>1).map(d=>d._med);
+  ut.forEach(d=>{if(d._med.length>1)d._blink=performance.now();delete d._med;});
+  return{arr:ut,linjer,grupper};
 }
 // Alle etasjane i forslaget. Kvar etasje får eit angre-steg.
 // stille: kalla rett etter skannet, før forslaget er vist — då er draftZones
@@ -11493,6 +11539,7 @@ function kiSlaaSamanKategoriAlle(stille){
     if(!r.linjer.length)return;
     kiHist(f).push(kiKopiUtkast(arr));
     kiUtkast.set(f,r.arr);
+    if(f===curFloor())r.arr.filter(d=>d._blink).forEach(kiBlink);
     n+=r.linjer.length;
     logAi('⊕ '+(kiUtkast.size>1?arkNamn(f)+': ':'')+r.linjer.join(', '));
   });
@@ -11502,9 +11549,22 @@ function kiSlaaSamanKategoriAlle(stille){
   return n;
 }
 document.getElementById('aiSlaaKatBtn').onclick=()=>{
+  kiForhand(false);
   kiSlaaSamanKategoriAlle(false);
   kiKnappar(true);draw();
 };
+// Musa over «⊕ Same kategori»: vis kva sonene i denne etasjen som vil verte
+// slegne saman, før ein trykkjer. Eit tørrlaup — forslaget vert ikkje endra.
+function kiForhand(vis){
+  draftZones.forEach(d=>{delete d._forhand;});
+  if(vis&&kiUtkast){
+    const r=kiSlaaSamanKategori(draftZones,mppForFloor(curFloor()),bgImg);
+    r.grupper.forEach((g,i)=>g.forEach(d=>{d._forhand=i;}));
+  }
+  draw();
+}
+document.getElementById('aiSlaaKatBtn').onmouseenter=()=>kiForhand(true);
+document.getElementById('aiSlaaKatBtn').onmouseleave=()=>kiForhand(false);
 document.getElementById('aiAngreSlaa').onclick=()=>{
   const hist=kiHist(curFloor());
   if(!hist.length)return;
@@ -11535,105 +11595,6 @@ document.getElementById('aiAngreSlaa').onclick=()=>{
   // Klikket har valt ei forslagssone — det skal ikkje òg opne sona under
   cv.addEventListener('click',e=>{if(svelg){svelg=false;e.stopImmediatePropagation();e.preventDefault();}},true);
 })();
-
-// ── Kalibrering frå teikninga ──
-// Fyrste steg for ark utan skala. KI-en les målestokken i tittelfeltet og
-// peikar ut nokre lange målsette mål. Målestokken + papirformatet (eksakt
-// for PDF, frå DPI for bilete) gir skalaen; måla kontrollerer han. Stemmer
-// dei ikkje, er teikninga truleg skalert ved utskrift (ei A1-teikning lagra
-// som A3) — då vinn måla, og det vert meldt. Utan papirformat er måla
-// einaste kjelda. Ein skala brukaren har sett sjølv, vert aldri rørt.
-const KI_KAL_AVVIK=0.03;   // målestokk og mål må stemme innanfor 3 %
-const kiSkjemaSkala=()=>({type:'object',additionalProperties:false,required:['maalestokk','maal'],properties:{
-  maalestokk:{type:'integer'},
-  maal:{type:'array',items:{type:'object',additionalProperties:false,required:['a','b','tekst','lengdeMm'],properties:{
-    a:{type:'object',additionalProperties:false,required:['x','y'],properties:{x:{type:'number'},y:{type:'number'}}},
-    b:{type:'object',additionalProperties:false,required:['x','y'],properties:{x:{type:'number'},y:{type:'number'}}},
-    tekst:{type:'string'},lengdeMm:{type:'integer'}}}}
-}});
-function kiPromptSkala(){
-  return [
-    'Biletet er ei arkitektteikning (plan eller fasade). Finn det som trengst for å kalibrere skalaen.',
-    '',
-    'KOORDINATAR: normaliserte tal 0–1000 for heile biletet — x frå venstre kant, y frå øvre kant.',
-    '',
-    '1. `maalestokk`: målestokken for hovudteikninga slik han står i tittelfeltet eller under teikninga',
-    '   (t.d. «1:100», «M 1:50», «Målestokk 1:200» → 100, 50, 200). 0 når han ikkje står.',
-    '2. `maal`: opptil tre av dei LENGSTE målsette måla på hovudteikninga — målsetjingslinjer med tal, helst',
-    '   vassrette eller loddrette og over heile bygget. For kvart: `a` og `b` er dei to endepunkta målet gjeld',
-    '   (der målstreken eller hjelpelinja kryssar mållinja). `tekst` er talet slik det står. `lengdeMm` er',
-    '   lengda i millimeter: «34.5» eller «34,5» i meter → 34500, «34500» i millimeter → 34500. Vel eininga',
-    '   ut frå kva som er rimeleg for bygget.',
-    '',
-    'Ta ikkje med mål frå detaljar, snitt eller situasjonsplan, og ikkje koter eller høgder.'
-  ].join('\n');
-}
-// Skalaen (mm per biletpiksel) for eitt ark. Returnerer {mpp, tekst, aatvar}
-// eller {mpp:null, tekst} når teikninga ikkje gav noko å rekne på.
-async function kiSkalaForArk(a){
-  const img=a.bgImg,rect={x:0,y:0,w:img.width,h:img.height};
-  const res=await kiSpor({oppgave:'skala',prompt:kiPromptSkala(),images:[kiBilete(img,rect)],
-    schema:kiSkjemaSkala(),maxTokens:8000,meta:{ark:a.name}});
-  const ms=res.maalestokk>=1&&res.maalestokk<=5000?res.maalestokk:0;
-  const mppA=ms&&a.paperWMm?a.paperWMm/img.width*ms:null;
-  // Kvart mål gir sin skala; medianen tolar at KI-en har lese eitt feil
-  const frMaal=(res.maal||[]).map(m=>{
-    const pa=kiTilBilete(m.a,rect),pb=kiTilBilete(m.b,rect),px=Math.hypot(pb.x-pa.x,pb.y-pa.y);
-    return(m.lengdeMm>=500&&px>=0.1*Math.max(img.width,img.height))?{mpp:m.lengdeMm/px,m}:null;
-  }).filter(Boolean).sort((x,y)=>x.mpp-y.mpp);
-  const mppD=frMaal.length?frMaal[Math.floor(frMaal.length/2)].mpp:null;
-  const spreidd=frMaal.length>1&&(frMaal[frMaal.length-1].mpp/frMaal[0].mpp-1)>0.05;
-  const maalTekst=frMaal.length?(frMaal.length===1?'målet '+frMaal[0].m.tekst:frMaal.length+' mål'):'';
-  if(mppA&&mppD){
-    const avvik=Math.abs(mppA/mppD-1);
-    if(avvik<=KI_KAL_AVVIK)return{mpp:mppA,tekst:'1:'+ms+' frå tittelfeltet, stadfesta av '+maalTekst+' ('+(avvik*100).toFixed(1)+' % avvik)'};
-    const r=mppD/mppA,utskrift=[Math.SQRT2,2,1/Math.SQRT2,0.5].some(f=>Math.abs(r/f-1)<0.04);
-    return{mpp:mppD,aatvar:true,tekst:'målt frå '+maalTekst+'; målestokken 1:'+ms+' stemmer ikkje ('
-      +(avvik*100).toFixed(0)+' % avvik'+(utskrift?' — teikninga ser ut til å vere skalert ved utskrift':'')+')'};
-  }
-  if(mppA)return{mpp:mppA,tekst:'1:'+ms+' frå tittelfeltet (ingen mål å kontrollere mot)'};
-  if(mppD)return{mpp:mppD,aatvar:spreidd,tekst:'målt frå '+maalTekst+(ms&&!a.paperWMm?' (1:'+ms+' står, men papirformatet er ukjent)':'')
-    +(spreidd?' — måla sprikjer meir enn 5 %, kontroller med eit kontrollmål':' — kontroller gjerne med eit kontrollmål')};
-  return{mpp:null,tekst:ms?'1:'+ms+' står, men papirformatet er ukjent og ingen mål vart funne':'fann verken målestokk eller mål'};
-}
-// Kalibrer dei arka som manglar skala. Éitt angre-steg; skalaen vert lagd inn
-// med ein gong, så resten av skannet reknar med han.
-async function kiKalibrer(maal,medFasadar){
-  const run=kiKoyring;
-  const plan=maal.filter(f=>f.bgImg&&!mppForFloor(f));
-  const fas=medFasadar?kiFasadeArk().filter(a=>!a.mmPerImgPx):[];
-  if(!plan.length&&!fas.length)return;
-  logAi('Kalibrering — '+(plan.length+fas.length)+' ark utan skala…');
-  const svar=new Map();
-  await kiPool([...plan,...fas],async a=>{
-    try{const r=await kiSkalaForArk(a);if(run===kiKoyring)svar.set(a,r);}
-    catch(e){if(run===kiKoyring)svar.set(a,{mpp:null,tekst:e.message});}
-  });
-  if(run!==kiKoyring)return;
-  if(![...svar.values()].some(r=>r.mpp)){
-    [...svar].forEach(([a,r])=>logAi('  ⚠ '+(plan.includes(a)?arkNamn(a):a.name)+': '+r.tekst));
-    logAi('');return;
-  }
-  saveFloorState();
-  snapshot();markDirty();
-  const gammal=_snapshotMpp();
-  // Planark: det fyrste utan eigen skala set den globale; dei andre deler han
-  // når dei ligg innanfor 1 %, elles får dei eigen — same regel som masseimporten.
-  plan.forEach(f=>{
-    const r=svar.get(f);
-    if(!r||!r.mpp)return;
-    if(f.ownCal)f.mmPerImgPx=r.mpp;
-    else if(globalMmPerImgPx==null)globalMmPerImgPx=r.mpp;
-    else if(Math.abs(r.mpp/globalMmPerImgPx-1)>0.01){f.ownCal=true;f.mmPerImgPx=r.mpp;}
-  });
-  fas.forEach(a=>{const r=svar.get(a);if(r&&r.mpp)a.mmPerImgPx=r.mpp;});
-  _reskalerAlleEtasjar(gammal);
-  syncFloorState();
-  [...svar].forEach(([a,r])=>logAi('  '+(r.mpp?(r.aatvar?'⚠ ':'✓ '):'⚠ ')
-    +(plan.includes(a)?arkNamn(a):a.name)+': '+r.tekst));
-  logAi('  Skalaen er lagd inn (Ctrl+Z angrar).\n');
-  updateResults();renderTable();draw();
-}
 
 // ── Fasadeteikningane ──
 // Kvar fasadeteikning vert lesen éin gong: retninga (frå tittelen), golvnivået
@@ -12028,8 +11989,7 @@ aiGo.onclick=async()=>{
     slaaKat:document.getElementById('aiSlaaKat').checked,
     kople:document.getElementById('aiKople').checked,
     opn:opnEl.checked&&!opnEl.disabled,
-    hoyder:document.getElementById('aiHoyder').checked&&!!kiFasadeArk().length,
-    kal:document.getElementById('aiKal').checked&&document.getElementById('aiKalRow').style.display!=='none'
+    hoyder:document.getElementById('aiHoyder').checked&&!!kiFasadeArk().length
   };
   kiVidareTilOpningar=kiInnst.opn;kiHoyderBrukt=false;kiFasadeInfo=null;
   aiGo.disabled=true;aiGo.textContent='Arbeider…';aiLog.textContent='';
@@ -12038,11 +11998,6 @@ aiGo.onclick=async()=>{
   try{
     saveFloorState();
     const maal=kiMaal(kiInnst.bygg);
-    // Skalaen fyrst — alt anna reknar med han
-    if(kiInnst.kal){
-      await kiKalibrer(maal,kiInnst.opn||kiInnst.hoyder);
-      if(run!==kiKoyring)return;
-    }
     // Fasadane fyrst: dei gir høgd og brystning til opningane og etasjehøgdene
     if(kiFasadeArk().length&&(kiInnst.opn||kiInnst.hoyder)){
       kiFasadeInfo=await kiLesFasadar();
@@ -12050,8 +12005,7 @@ aiGo.onclick=async()=>{
     }
     if(kiInnst.soner)await kiKoyrSoner(maal);
     else if(kiInnst.opn)await kiKoyrOpningar(maal);
-    else if(kiInnst.hoyder)kiVisHoyder();
-    else{kiKnappar(false);aiGo.disabled=false;aiGo.textContent='Køyr på nytt';}   // berre kalibrering
+    else kiVisHoyder();
   }catch(e){
     if(run!==kiKoyring)return;
     logAi('Feil: '+e.message);
