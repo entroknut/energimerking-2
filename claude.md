@@ -1240,6 +1240,14 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
   slår `piBygg.byggeaar`, og `kiGrupperVindauge` samlar vindauge med same
   høgd og breidd (±10 %, min 10 cm) på same segment til `antal`+`posT`.
   Dører vert aldri grupperte.
+- **Slå saman i forslaget:** under gjennomsynet av soneforslaget kan
+  soner krysast av (lista i ruta, eller klikk i teikninga — eit klikk, ikkje
+  ei panorering) og slåast saman med `kiSlaaSamanValde`. Den største gir
+  namn/bruk/byggeår. `kiSlaaSamanTo` prøver `_slaaSamanPolygon` (arealsjekk)
+  fyrst, og legg elles hjørna inntil kvarandre innanfor 0,4 m og prøver
+  igjen. Soner som ikkje deler vegg vert ikkje slegne saman — det vert meldt.
+  `kiSoneHist` gir «Angre». Alt skjer i `draftZones`; fyrst «Godta» legg
+  sonene inn (eitt angre-steg som før).
 - Krev kalibrering for opningane (breiddemålet). Den gamle varianten med
   API-nøkkel i nettlesaren er fjerna.
 

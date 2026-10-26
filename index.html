@@ -397,6 +397,19 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 #aiOverlay.review{background:none;backdrop-filter:none;pointer-events:none;align-items:flex-start;justify-content:flex-end;padding:12px}
 #aiOverlay.review #aiPanel{pointer-events:auto;width:340px}
 #aiOverlay.review .aisub,#aiOverlay.review #aiOpts{display:none}
+#aiOverlay.review #aiLog{max-height:110px}
+#aiSoneVal{margin-bottom:12px}
+.ai-valhint{font-size:11.5px;color:var(--text2);margin-bottom:6px;line-height:1.5}
+#aiSoneListe{max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+.ai-srad{display:flex;align-items:center;gap:8px;padding:5px 8px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border)}
+.ai-srad:last-child{border-bottom:none}
+.ai-srad:hover{background:var(--surface2)}
+.ai-srad.valt{background:rgba(37,99,235,.08)}
+.ai-srad .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.ai-srad .ar{color:var(--text3);font-size:11.5px;white-space:nowrap}
+.ai-valbtns{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
+.ai-valbtns button{padding:5px 10px;font-size:12px}
+.ai-valbtns button:disabled{opacity:.45;cursor:default}
 
 /* ── Tekniske system frå EntroPi (beta) ── */
 /* Eige vindauge, ikkje ein .dialog-overlay: dei ligg inne i #cwrap og dekkjer
@@ -675,7 +688,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.9.1</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.9.2</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -997,6 +1010,14 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
           <div class="ai-note" id="aiNote"></div>
         </div>
         <div id="aiLog"></div>
+        <div id="aiSoneVal" style="display:none">
+          <div class="ai-valhint">Kryss av, eller klikk på sonene i teikninga, for å slå dei saman.</div>
+          <div id="aiSoneListe"></div>
+          <div class="ai-valbtns">
+            <button class="ai-skip" id="aiAngreSlaa" disabled>↶ Angre</button>
+            <button class="ai-skip" id="aiSlaa" disabled>⊕ Slå saman valde</button>
+          </div>
+        </div>
         <div class="aibtns" id="aiMainBtns">
           <button class="ai-skip" id="aiClose">Lukk</button>
           <button class="ai-go" id="aiGo">Start ✦</button>
@@ -4736,12 +4757,16 @@ function draw(){
     ctx.beginPath();
     const pd0=i2s(z.pts[0].x,z.pts[0].y);ctx.moveTo(pd0.x,pd0.y);
     z.pts.forEach((p,i)=>{if(i>0){const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);}});
-    ctx.closePath();ctx.fillStyle='rgba(217,119,6,.08)';ctx.fill();
-    ctx.strokeStyle='#d97706';ctx.lineWidth=2;ctx.setLineDash([8,4]);ctx.stroke();ctx.setLineDash([]);
+    // Valt for samanslåing (KI-forslaget): blå, heil strek
+    const _dv=z._valt,_dh=z._hover;
+    ctx.closePath();ctx.fillStyle=_dv?'rgba(37,99,235,.18)':_dh?'rgba(217,119,6,.18)':'rgba(217,119,6,.08)';ctx.fill();
+    ctx.strokeStyle=_dv?'#2563eb':'#d97706';ctx.lineWidth=_dv||_dh?3:2;
+    if(!_dv)ctx.setLineDash([8,4]);
+    ctx.stroke();ctx.setLineDash([]);
     z.pts.forEach(p=>{
       const pp=i2s(p.x,p.y);
       ctx.beginPath();ctx.arc(pp.x,pp.y,5,0,Math.PI*2);
-      ctx.fillStyle='#d97706';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.fillStyle=_dv?'#2563eb':'#d97706';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
     });
     const cxD=z.pts.reduce((s,p)=>s+p.x,0)/z.pts.length;
     const cyD=z.pts.reduce((s,p)=>s+p.y,0)/z.pts.length;
@@ -10341,6 +10366,10 @@ function kiKnappar(stadfest,tekst){
   document.getElementById('aiConfirmBtns').style.display=stadfest?'flex':'none';
   if(tekst)document.getElementById('aiAccept').textContent=tekst;
   aiOverlay.classList.toggle('review',!!stadfest);
+  // Samanslåing av soner i forslaget — berre når det er fleire å slå saman
+  const val=!!stadfest&&kiSteg==='soner'&&draftZones.length>1;
+  document.getElementById('aiSoneVal').style.display=val?'':'none';
+  if(val)kiTeiknSoneListe();
 }
 function kiOppdaterVal(){
   const mpp=mppForFloor(curFloor());
@@ -10741,6 +10770,7 @@ async function kiKoyrSoner(){
     return;
   }
   draftZones=gode.map(s=>({name:s.namn||'KI-sone',bruk:s.bruk,byggeaar:s.byggeaar,pts:s.pts}));
+  kiSoneHist=[];
   gode.forEach(s=>{
     const a=mpp?(areal(s.pts)*mpp*mpp/1e6).toFixed(1)+' m²':s.pts.length+' hjørne';
     logAi('✓ '+(s.namn||'KI-sone')+' — '+a+(s.bruk&&s.bruk!=='Ukjend'?' · '+s.bruk:'')
@@ -10783,6 +10813,124 @@ function kiGodtaSoner(){
     +(sk?' '+sk+' felles vegg'+(sk===1?'':'ar')+' vart skiljekonstruksjon.':'');
   return nye.length;
 }
+
+// ── Slå saman soner i forslaget ──
+// KI-en deler gjerne finare enn ein vil ha det. Under gjennomsynet kan
+// brukaren krysse av soner (i lista eller ved å klikke i teikninga) og slå
+// dei saman til éi. Den største av dei valde gir namn, bruk og byggeår.
+// Samanslåinga skjer berre i forslaget — det er «Godta» som legg det inn.
+let kiSoneHist=[];   // draftZones før kvar samanslåing, for «Angre»
+const kiAreal=pts=>Math.abs(pts.reduce((a,p,i)=>{const q=pts[(i+1)%pts.length];return a+p.x*q.y-q.x*p.y;},0))/2;
+function kiTeiknSoneListe(){
+  const el=document.getElementById('aiSoneListe');
+  el.innerHTML='';
+  const mpp=mppForFloor(curFloor());
+  draftZones.forEach(d=>{
+    const r=document.createElement('label');
+    r.className='ai-srad'+(d._valt?' valt':'');
+    const cb=document.createElement('input');cb.type='checkbox';cb.checked=!!d._valt;
+    cb.onchange=()=>{d._valt=cb.checked;r.classList.toggle('valt',cb.checked);kiOppdaterSlaa();draw();};
+    const nm=document.createElement('span');nm.className='nm';nm.textContent=d.name;
+    const ar=document.createElement('span');ar.className='ar';
+    ar.textContent=mpp?(kiAreal(d.pts)*mpp*mpp/1e6).toFixed(1)+' m²':'';
+    r.append(cb,nm,ar);
+    r.onmouseenter=()=>{d._hover=true;draw();};
+    r.onmouseleave=()=>{d._hover=false;draw();};
+    el.appendChild(r);
+  });
+  kiOppdaterSlaa();
+}
+function kiOppdaterSlaa(){
+  const n=draftZones.filter(d=>d._valt).length,b=document.getElementById('aiSlaa');
+  b.disabled=n<2;
+  b.textContent='⊕ Slå saman valde'+(n>=2?' ('+n+')':'');
+  document.getElementById('aiAngreSlaa').disabled=!kiSoneHist.length;
+  document.getElementById('aiAccept').textContent='✓ Godta '+draftZones.length+' sone'+(draftZones.length===1?'':'r');
+}
+// To polygon til eitt. Er den felles veggen nesten, men ikkje heilt, felles
+// (KI-en har ikkje alltid same hjørne i begge), vert hjørna til den eine lagde
+// på hjørna eller kanten til den andre innanfor tol, og så prøver vi igjen.
+// _slaaSamanPolygon sjekkar arealet — null tyder at dei ikkje heng saman.
+function kiSlaaSamanTo(a,b,tol){
+  const r=_slaaSamanPolygon(a,b);
+  if(r)return r;
+  const tilpass=(pts,mot)=>pts.map(p=>{
+    let best=null;
+    mot.forEach(q=>{const d=Math.hypot(q.x-p.x,q.y-p.y);if(d<tol&&(!best||d<best.d))best={d,x:q.x,y:q.y};});
+    if(best)return{x:best.x,y:best.y};
+    for(let i=0;i<mot.length;i++){
+      const k=kiNaerastePaaKant(p,mot[i],mot[(i+1)%mot.length]);
+      if(k.t>0&&k.t<1&&k.d<tol&&(!best||k.d<best.d))best={d:k.d,x:k.x,y:k.y};
+    }
+    return best?{x:best.x,y:best.y}:{x:p.x,y:p.y};
+  });
+  const b2=tilpass(b,a),a2=tilpass(a,b2);
+  return _slaaSamanPolygon(a2,b2);
+}
+function kiSlaaSamanValde(){
+  const valde=draftZones.filter(d=>d._valt);
+  if(valde.length<2)return;
+  const mpp=mppForFloor(curFloor());
+  const tol=mpp?400/mpp:0.005*Math.max(bgImg.width,bgImg.height);
+  valde.sort((a,b)=>kiAreal(b.pts)-kiAreal(a.pts));
+  // Ein og ein inn, så lenge nokon deler vegg med det som alt er slege saman —
+  // rekkjefølgja i lista skal ikkje avgjere om A+C+B går når A og C ikkje rører.
+  let pts=valde[0].pts;
+  const med=[valde[0]];
+  let rest=valde.slice(1),framgang=true;
+  while(rest.length&&framgang){
+    framgang=false;
+    for(const d of rest){
+      const r=kiSlaaSamanTo(pts,d.pts,tol);
+      if(r){pts=r;med.push(d);rest=rest.filter(x=>x!==d);framgang=true;break;}
+    }
+  }
+  if(med.length<2){
+    logAi('⚠ Dei valde sonene deler ingen vegg og kan ikkje slåast saman.');
+    return;
+  }
+  kiSoneHist.push(draftZones.map(d=>({...d,pts:d.pts.map(q=>({x:q.x,y:q.y}))})));
+  const ny={...valde[0],pts:kiRyddPolygon(pts,1).map(q=>({x:q.x,y:q.y})),_valt:false,_hover:false};
+  const plass=draftZones.indexOf(valde[0]);
+  draftZones=draftZones.filter(d=>!med.includes(d));
+  draftZones.splice(Math.min(plass,draftZones.length),0,ny);
+  const aar=new Set(med.map(d=>d.byggeaar||0));
+  logAi('⊕ '+med.map(d=>d.name).join(' + ')+' → '+ny.name
+    +(aar.size>1?' (ulike byggeår på teikninga — '+(ny.byggeaar||'byggeåret til bygget')+' står)':''));
+  if(rest.length)logAi('⚠ '+rest.map(d=>d.name).join(', ')+' deler ingen vegg med dei andre og står for seg.');
+  if(draftZones.length>1)kiTeiknSoneListe();
+  else kiKnappar(true);
+  draw();
+}
+document.getElementById('aiSlaa').onclick=kiSlaaSamanValde;
+document.getElementById('aiAngreSlaa').onclick=()=>{
+  if(!kiSoneHist.length)return;
+  draftZones=kiSoneHist.pop();
+  logAi('↶ Samanslåinga er angra.');
+  kiKnappar(true);
+  draw();
+};
+// Klikk i ei forslagssone i teikninga vel henne. Berre eit klikk — ei
+// panorering (musa flytta seg) skal ikkje velje noko.
+(function(){
+  let ned=null,svelg=false;
+  cv.addEventListener('pointerdown',e=>{
+    ned=(kiSteg==='soner'&&draftZones.length>1)?{x:e.clientX,y:e.clientY}:null;
+  },true);
+  cv.addEventListener('pointerup',e=>{
+    if(!ned||kiSteg!=='soner')return;
+    const flytta=Math.hypot(e.clientX-ned.x,e.clientY-ned.y);
+    ned=null;
+    if(flytta>4)return;
+    const r=cv.getBoundingClientRect(),ip=s2i(e.clientX-r.left,e.clientY-r.top);
+    const d=draftZones.slice().sort((a,b)=>kiAreal(a.pts)-kiAreal(b.pts)).find(d=>kiInniPolygon(ip,d.pts));
+    if(!d)return;
+    d._valt=!d._valt;svelg=true;
+    kiTeiknSoneListe();draw();
+  },true);
+  // Klikket har valt ei forslagssone — det skal ikkje òg opne sona under
+  cv.addEventListener('click',e=>{if(svelg){svelg=false;e.stopImmediatePropagation();e.preventDefault();}},true);
+})();
 
 // ── Steg 2: vindauge og dører ──
 const KI_SKJEMA_OPN={

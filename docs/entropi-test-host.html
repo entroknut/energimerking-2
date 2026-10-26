@@ -146,10 +146,11 @@ const KIMOCK=new URLSearchParams(location.search).has('kimock');
 const KI_NOKKEL='testvertKiNokkel';
 async function kiMock(d){
   await new Promise(r=>setTimeout(r,1200));
-  if(d.oppgave==='soner')return{analyse:'Oppdikta svar frå testverten (?kimock=1): to soner side om side.',
+  if(d.oppgave==='soner')return{analyse:'Oppdikta svar frå testverten (?kimock=1): tre soner — éi til venstre, to til høgre.',
     soner:[
       {namn:'Fløy A',bruk:'Kontorbygg',byggeaar:0,pts:[{x:200,y:250},{x:500,y:250},{x:500,y:700},{x:200,y:700}]},
-      {namn:'Tilbygg 1997',bruk:'Ukjend',byggeaar:1997,pts:[{x:503,y:252},{x:800,y:250},{x:800,y:700},{x:498,y:701}]}
+      {namn:'Tilbygg 1997',bruk:'Ukjend',byggeaar:1997,pts:[{x:503,y:252},{x:800,y:250},{x:800,y:470},{x:500,y:472}]},
+      {namn:'Lager',bruk:'Ukjend',byggeaar:0,pts:[{x:500,y:476},{x:800,y:474},{x:800,y:700},{x:498,y:701}]}
     ]};
   // Tre like vindauge på kvar nummerert vegg (vert éi gruppe ×3), eitt
   // breiare på den fyrste (eige element), og ei dør der.
