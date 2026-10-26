@@ -24,6 +24,7 @@
   <span style="margin-left:auto"></span>
   <button class="btn grey" id="reqSave">Ber verktøyet lagre</button>
   <button class="btn grey" id="pushSys">Send systema uoppmoda</button>
+  <button class="btn grey" id="kiKey">KI-nøkkel</button>
   <button class="btn grey" id="reload">Last iframe på nytt</button>
   <button class="btn grey" id="wipe">Slett lagra fil</button>
 </header>
@@ -120,7 +121,75 @@ window.addEventListener('message',async ev=>{
     log('  fekk SXI-fil '+d.filename+' — '+d.bytes+' teikn');
     return;
   }
+  if(d.type==='sxi:ai-request'){
+    log('  KI: '+d.oppgave+', '+(d.images||[]).length+' bilete ('
+      +((d.images||[]).reduce((s,b)=>s+b.data.length,0)/1024|0)+' kB)'+(d.meta&&d.meta.sone?' — '+d.meta.sone:''));
+    send({type:'sxi:ai-ack',requestId:d.requestId});
+    try{
+      const result=KIMOCK?await kiMock(d):await kiClaude(d);
+      send({type:'sxi:ai-result',requestId:d.requestId,ok:true,result});
+      log('▶ sxi:ai-result #'+d.requestId);
+    }catch(e){
+      send({type:'sxi:ai-result',requestId:d.requestId,ok:false,message:e.message});
+      log('▶ sxi:ai-result #'+d.requestId+' FEIL: '+e.message);
+    }
+    return;
+  }
 });
+
+// ── KI-oppteikning ──
+// Produksjonssida kallar Claude på serveren med sin eigen nøkkel. Testverten
+// kan gjere det same rett frå nettlesaren med ein nøkkel du legg inn sjølv
+// (berre lokalt, berre her), eller svare med eit fast oppdikta forslag
+// (?kimock=1) så heile flyten i verktøyet kan testast utan nøkkel.
+const KIMOCK=new URLSearchParams(location.search).has('kimock');
+const KI_NOKKEL='testvertKiNokkel';
+async function kiMock(d){
+  await new Promise(r=>setTimeout(r,1200));
+  if(d.oppgave==='soner')return{analyse:'Oppdikta svar frå testverten (?kimock=1): to soner side om side.',
+    soner:[
+      {namn:'Fløy A',bruk:'Kontorbygg',pts:[{x:200,y:250},{x:500,y:250},{x:500,y:700},{x:200,y:700}]},
+      {namn:'Fløy B',bruk:'Ukjend',pts:[{x:503,y:252},{x:800,y:250},{x:800,y:700},{x:498,y:701}]}
+    ]};
+  // Eitt vindauge midt på kvar nummerert vegg, 20 % av veggen breitt, og ei
+  // dør på den fyrste.
+  const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
+  const opningar=[];
+  ((d.meta&&d.meta.vegger)||[]).forEach((v,i)=>{
+    opningar.push({vegg:v.nr,type:'vindauge',a:lerp(v.a,v.b,0.4),b:lerp(v.a,v.b,0.6),merke:''});
+    if(i===0)opningar.push({vegg:v.nr,type:'dor',a:lerp(v.a,v.b,0.1),b:lerp(v.a,v.b,0.2),merke:''});
+  });
+  return{opningar};
+}
+async function kiClaude(d){
+  let key='';try{key=localStorage.getItem(KI_NOKKEL)||'';}catch(e){}
+  if(!key)throw new Error('Testverten har ingen API-nøkkel — trykk «KI-nøkkel», eller opne med ?kimock=1.');
+  const {default:Anthropic}=await import('https://esm.sh/@anthropic-ai/sdk');
+  const client=new Anthropic({apiKey:key,dangerouslyAllowBrowser:true});
+  // Same førespurnad som EntroPi-sida skal sende — sjå docs/entropi-integrasjon.md
+  const msg=await client.beta.messages.create({
+    model:'claude-opus-5-5',
+    max_tokens:Math.min(d.maxTokens||16000,32000),
+    thinking:{type:'adaptive'},
+    output_config:{effort:'high',format:{type:'json_schema',schema:d.schema}},
+    betas:['server-side-fallback-2026-07-01'],
+    fallbacks:'default',
+    messages:[{role:'user',content:[
+      ...d.images.map(b=>({type:'image',source:{type:'base64',media_type:b.mediaType,data:b.data}})),
+      {type:'text',text:d.prompt}
+    ]}]
+  });
+  if(msg.stop_reason==='refusal')throw new Error('Claude avslo førespurnaden.');
+  if(msg.stop_reason==='max_tokens')throw new Error('Svaret vart for langt og er avkorta.');
+  const text=msg.content.filter(c=>c.type==='text').map(c=>c.text).join('');
+  log('  KI: '+msg.usage.input_tokens+' inn / '+msg.usage.output_tokens+' ut');
+  return JSON.parse(text);
+}
+document.getElementById('kiKey').onclick=()=>{
+  const k=(prompt('Anthropic API-nøkkel for testverten (vert lagra i localStorage her):')||'').trim();
+  try{k?localStorage.setItem(KI_NOKKEL,k):localStorage.removeItem(KI_NOKKEL);}catch(e){}
+  log(k?'KI-nøkkel lagra':'KI-nøkkel fjerna');
+};
 
 document.getElementById('reqSave').onclick=()=>{send({type:'sxi:request-save'});log('▶ sxi:request-save');};
 document.getElementById('reload').onclick=()=>{fr.src=fr.src;setState('lastar…');};

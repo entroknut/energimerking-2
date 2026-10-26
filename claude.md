@@ -504,6 +504,14 @@ Fallgruver som er retta, og som ikkje må innførast på nytt:
   har ei gjetta høgd som kan vere 200–500 px feil, og det er nettlesaren si
   forankring som held lista i ro når dei rullar inn. v5.6.0 slo ho av, og då
   hoppa lista med heile avviket kvar gong eit slikt kort kom til syne.
+- **All panel-tilstand er nøkla på sona, ikkje indeksen** (`_zuk(z)` → `z._uk`):
+  `_zcardCollapsed`, `_flateCollapsed`, `_winlistCollapsed`, `_zcardH`,
+  rulleankeret. Med `z_${fi}_${zi}` flytta tilstanden seg til kortet under når
+  ei sone vart sletta eller delt, og lista hoppa. `_uk` følgjer angre-historikken
+  (spread), vert fjerna i `serialiserEtasje`, og duplikat (kopiar) får ny nøkkel
+  i `updateResults()`. Ny kollaps-tilstand: bruk `_zuk(z)` i nøkkelen.
+  «Slå saman alle» må skrive tilstanden for **kvart** kort, ikkje berre
+  nøklane som alt finst — elles sprett korta opp ved neste ombygging.
 - **Berre ekte høgder i `_zcardH`.** Eit kort som er hoppa over rapporterer
   plasshaldaren, ikkje si eiga høgd. Lagra vi den, såg kortet «kjent» ut og
   vart aldri retta — difor `_zcardEkte`: ei høgd tel berre når ho skil seg frå
@@ -1192,6 +1200,28 @@ er berre til å sjå på: bilete, soner med namn og kontrollmål, med eigen zoom
   i ruta skriv `zones` tilbake før `activeFloor` endrar seg.
 - `draw()` ber om ei omteikning av ruta via `requestAnimationFrame`, så ho vert
   teikna maks éin gong per frame. Valet vert ikkje lagra.
+
+## KI-oppteikning (beta)
+
+«✦ KI-oppteikning» (`// ── 2e.`, `.embed-only`) lèt Claude teikne soner og
+deretter vindauge/dører frå planteikninga. **Berre i EntroPi:** verktøyet har
+ingen API-nøkkel — `EntroHost.askAi()` sender prompt, bilete og JSON-skjema som
+`sxi:ai-request`, verten svarar `sxi:ai-ack` (innan 15 s) og `sxi:ai-result`.
+Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
+`?kimock=1` gir eit fast forslag, elles kallar han Claude med «KI-nøkkel».
+
+- To steg, kvart med forslag på lerretet og eitt angre-steg: soner
+  (`draftZones`), så opningar (`kiDraftWins`) — éin førespurnad per sone, med
+  eit reint og eit merka utsnitt der berre fasadeveggane er nummererte.
+- Koordinatane frå KI-en er normaliserte 0–1000 og grove. `kiRettSoner`
+  snappar hjørna med `_linjeKryss`, slår saman hjørne på tvers av soner og
+  legg T-kryss på nabokanten — elles ser ikkje `autoSkilleveggForNySone`
+  (8 cm) den felles veggen.
+- Opningar: projiserte på segmentet, forkasta om dei ligg langt frå veggen,
+  er under 0,3 m eller overlappar noko som finst. «10x12»-merke (dm) vinn
+  over det målte når dei er innanfor 30 %. Høgda er elles standard.
+- Krev kalibrering for opningane (breiddemålet). Den gamle varianten med
+  API-nøkkel i nettlesaren er fjerna.
 
 ## 3D-skann (MatterPak) → soner
 

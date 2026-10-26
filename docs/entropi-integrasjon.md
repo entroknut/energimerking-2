@@ -51,6 +51,7 @@ plukkar lyttaren opp meldingar frå andre bibliotek (Mapbox, React DevTools).
 | `sxi:save` | `requestId`, `auto`, `filename`, `bytes`, `blob`, `meta` | brukaren trykte «Lagre» (eller EntroPi bad om det). **Må** svarast med `sxi:save-result`. |
 | `sxi:request-systems` | `requestId` | brukaren opna «Hent tekniske systemer». Svar med `sxi:systems`. Verktøyet ventar 12 s, så gir det opp og seier det til brukaren. |
 | `sxi:export-sxi` | `filename`, `bytes`, `blob`, `meta` | SXI-fila til SIMIEN vart eksportert. Kjem berre om init hadde `wantsSxi:true`. Krev ikkje svar. |
+| `sxi:ai-request` | `requestId`, `oppgave`, `prompt`, `images`, `schema`, `maxTokens`, `meta` | KI-oppteikninga (beta) treng eit svar frå Claude. **Må** stadfestast med `sxi:ai-ack` innan 15 s og svarast med `sxi:ai-result`. Sjå «KI-oppteikning». |
 
 `meta` på `sxi:save`: `{floors, zones, braM2, adresse, savedAt, appVersion}` —
 nok til å vise «3 etasjar · 12 soner · 2 480 m²» på byggkortet utan å opne fila.
@@ -64,6 +65,8 @@ nok til å vise «3 etasjar · 12 soner · 2 480 m²» på byggkortet utan å op
 | `sxi:request-save` | `requestId`, `auto` | ber verktøyet lagre no. Kvar førespurnad endar i ein `sxi:save` med same `requestId` — kjem han medan ei lagring alt går (t.d. ei autolagring), vert han lagd i kø og send så snart den fyrste er ferdig. |
 | `sxi:save-result` | `requestId`, `ok`, `message` | resultatet av lagringa. Utan svar innan 45 s gir verktøyet opp og ber brukaren prøve igjen. |
 | `sxi:systems` | `requestId`, `ok`, `systems`, `message` | dei tekniske systema på bygget. Svar på `sxi:request-systems`, men kan òg sendast uoppmoda — då oppdaterer verktøyet lista si (og eit ope vindauge) med ein gong. |
+| `sxi:ai-ack` | `requestId` | verten har teke imot `sxi:ai-request` og kallar Claude. Send med ein gong — verktøyet ventar deretter opptil 6 min på svaret. |
+| `sxi:ai-result` | `requestId`, `ok`, `result`, `message` | svaret: `result` er JSON-objektet Claude returnerte (objekt eller streng). `ok:false` + `message` ved feil — meldinga vert vist til brukaren. |
 
 Felta i `sxi:init`:
 
@@ -360,6 +363,77 @@ Ei anna strukturell avgjerd som må tas då: i dag får **kvar sone sin eigen**
 `<ventilation>`. Eitt EntroPi-aggregat som betjener fleire soner bør heller bli
 **eitt** element som sonene deler.
 
+### KI-oppteikning (beta)
+
+Knappen **«✦ KI-oppteikning»** lèt Claude teikne opp soner frå planteikninga, og
+deretter vindauge og ytterdører på fasadane. Brukaren ser forslaget på
+lerretet og godtek eller forkastar det, steg for steg. Kvart steg er eitt
+angre-steg.
+
+Verktøyet har **ingen API-nøkkel**. Det byggjer prompt, bilete og JSON-skjema,
+og ber verten om svaret. EntroPi kallar Claude på serveren med sin eigen nøkkel.
+Knappen er `.embed-only`, så funksjonen finst berre inne i EntroPi.
+
+**Meldinga frå verktøyet:**
+
+```js
+{ type:'sxi:ai-request', requestId:'ki3',
+  oppgave:'soner',          // 'soner' | 'opningar' — til logging og grenser
+  prompt:'…',               // ferdig tekst, nynorsk
+  images:[{mediaType:'image/jpeg', data:'<base64>'}],   // 1–2 bilete, ≤ 2400 px
+  schema:{…},               // JSON-skjema for svaret (structured outputs)
+  maxTokens:16000,
+  meta:{…} }                // berre til logging, skal ikkje til Claude
+```
+
+**Verten svarar i to steg:** `sxi:ai-ack` med ein gong (elles gir verktøyet opp
+etter 15 s og seier at vertssida ikkje svarar), så `sxi:ai-result` når Claude
+er ferdig. Steg 2 sender éin førespurnad per sone, tre om gongen, så verten må
+tole fleire samtidige.
+
+**Serversida (Next.js route handler, TypeScript SDK):**
+
+```ts
+import Anthropic from '@anthropic-ai/sdk';
+const client = new Anthropic();   // ANTHROPIC_API_KEY frå miljøet
+
+export async function POST(req: Request) {
+  // Krev innlogga brukar, og avgrens: maks 2 bilete, maks ~6 MB, maxTokens ≤ 32000.
+  const d = await req.json();
+  const msg = await client.beta.messages.create({
+    model: 'claude-opus-5-5',
+    max_tokens: Math.min(d.maxTokens ?? 16000, 32000),
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'high', format: { type: 'json_schema', schema: d.schema } },
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default',     // eit avslag vert køyrt på nytt på ein annan modell
+    messages: [{ role: 'user', content: [
+      ...d.images.map((b: any) => ({ type: 'image',
+        source: { type: 'base64', media_type: b.mediaType, data: b.data } })),
+      { type: 'text', text: d.prompt },
+    ]}],
+  });
+  if (msg.stop_reason === 'refusal')   return Response.json({ ok: false, message: 'Claude avslo førespurnaden.' });
+  if (msg.stop_reason === 'max_tokens') return Response.json({ ok: false, message: 'Svaret vart avkorta.' });
+  const text = msg.content.filter(c => c.type === 'text').map(c => c.text).join('');
+  return Response.json({ ok: true, result: JSON.parse(text) });
+}
+```
+
+React-sida sender `sxi:ai-ack` når meldinga kjem, poster til ruta, og sender
+`{type:'sxi:ai-result', requestId, ...svaret}` tilbake til iframen.
+
+- **Modellen vel verten**, ikkje verktøyet. Ein analyse med to bilete på
+  `effort:'high'` tek gjerne 30–120 s; kortare tidsavbrot enn 6 min på
+  vertssida vil gi feil på store teikningar.
+- **Prompt og skjema kjem frå verktøyet.** Då kan dei forbetrast med ein ny
+  versjon av verktøyet utan endring i EntroPi. Ruta må difor ha grenser
+  (innlogging, storleik, `maxTokens`) — ho er ein open Claude-proxy for alle som
+  er logga inn.
+- Svaret vert ikkje stolt blindt på: verktøyet snappar hjørna til veggane i
+  teikninga, kastar opningar som ikkje ligg på ein fasadevegg, og viser alt som
+  eit forslag før noko vert lagt inn.
+
 ### `?embed=1` — slår på handtrykket
 
 Utan `?embed=1` sender verktøyet **ingen** meldingar og endrar ingenting: det
@@ -638,6 +712,12 @@ testar at eit ope vindauge oppdaterer seg, og `?nosys=1` gjer verten stum, så
 ein kan sjå at vindauget forklarar seg etter tidsavbrotet i staden for å stå og
 hente.
 
+For KI-oppteikninga: `?kimock=1` på testverten svarar med eit fast oppdikta
+forslag (to soner side om side, eitt vindauge per fasadevegg og ei dør), så
+heile flyten kan testast utan nøkkel. Utan flagget kallar testverten Claude
+rett frå nettlesaren med ein nøkkel du legg inn med «KI-nøkkel» — same
+førespurnad som serverruta over.
+
 Verifisert 20. august 2026 (v3.2.0): handtrykk, lagring med `meta` (BRA, soner,
 etasjar), rundtur der soner, kalibrering, kontrollmål og adresse kjem uendra
 tilbake, `sxi:request-save`, at autolagringstoasten frå localStorage vert
@@ -678,6 +758,10 @@ undertrykt når verten sender eit prosjekt, og at `?silent=1` framleis lastar ne
 - «⚙ Hent tekniske systemer» (beta) er ny: eige vindauge under
   `// ── 2c. Tekniske system frå EntroPi` i `index.html`, og koplinga ligg på
   sona som `z.tekniskeSystem`. Knappen er `.embed-only`.
+- «✦ KI-oppteikning» (beta) er ny: `// ── 2e. KI-oppteikning` i `index.html`,
+  meldingane `sxi:ai-request` / `sxi:ai-ack` / `sxi:ai-result`. Knappen er
+  `.embed-only`. Den gamle varianten som spurde etter API-nøkkel i nettlesaren
+  er fjerna.
 - Autolagringstoasten («Autolaga prosjekt frå 52 min sidan») vert undertrykt
   når verten sender eit prosjekt, og gjenopprettinga vert utsett 1,5 s i
   iframe så `sxi:init` får komme fyrst.
