@@ -407,8 +407,9 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .ai-srad.valt{background:rgba(37,99,235,.08)}
 .ai-srad .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
 .ai-srad .ar{color:var(--text3);font-size:11.5px;white-space:nowrap}
-.ai-valbtns{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
-.ai-valbtns button{padding:5px 10px;font-size:12px}
+.ai-srad select{font-size:11px;padding:1px 2px;border:1px solid var(--border);border-radius:4px;max-width:120px;font-family:inherit;color:var(--text2);background:var(--surface)}
+.ai-valbtns{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-top:6px}
+.ai-valbtns button{padding:5px 9px;font-size:12px;white-space:nowrap}
 .ai-valbtns button:disabled{opacity:.45;cursor:default}
 .ai-skil{height:1px;background:var(--border);margin:6px 0 4px}
 .ai-etg{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
@@ -692,7 +693,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.10.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.10.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -1013,7 +1014,9 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
           <label class="ai-opt"><input type="checkbox" id="aiSoner" checked> Teikn soner</label>
           <div class="ai-sub2" id="aiDelRow">
             <label class="ai-opt"><input type="radio" name="aiDel" value="ein" checked> Éi sone per bygningskropp</label>
-            <label class="ai-opt"><input type="radio" name="aiDel" value="bruk"> Del etter bruk, leigetakar og byggetrinn</label>
+            <label class="ai-opt"><input type="radio" name="aiDel" value="bruk"> Del etter bygningskategori og byggetrinn</label>
+            <label class="ai-opt"><input type="checkbox" id="aiSlaaKat" checked> Éi sone per kategori i kvar etasje</label>
+            <label class="ai-opt"><input type="checkbox" id="aiKople" checked> Kople like kategoriar mellom etasjane</label>
           </div>
           <label class="ai-opt"><input type="checkbox" id="aiOpn" checked> Finn vindauge og dører på fasadane</label>
           <label class="ai-opt" id="aiHoyderRow"><input type="checkbox" id="aiHoyder" checked> Etasjehøgder frå fasadeteikningane</label>
@@ -1026,7 +1029,8 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
           <div id="aiSoneListe"></div>
           <div class="ai-valbtns">
             <button class="ai-skip" id="aiAngreSlaa" disabled>↶ Angre</button>
-            <button class="ai-skip" id="aiSlaa" disabled>⊕ Slå saman valde</button>
+            <button class="ai-skip" id="aiSlaaKatBtn" title="Slå saman nabosoner med same kategori og byggeår — i alle etasjane i forslaget. Endre kategorien i lista om KI-en har bomma.">⊕ Same kategori</button>
+            <button class="ai-skip" id="aiSlaa" disabled title="Slå saman dei avkryssa sonene">⊕ Slå saman</button>
           </div>
         </div>
         <div class="aibtns" id="aiMainBtns">
@@ -10768,7 +10772,7 @@ function kiTeiknEtasjar(vis){
   });
 }
 function kiEtterEtasjebyte(){
-  if(kiSteg==='soner'&&kiUtkast){draftZones=kiUtkast.get(curFloor())||[];kiSoneHist=[];}
+  if(kiSteg==='soner'&&kiUtkast)draftZones=kiUtkast.get(curFloor())||[];
   if(kiSteg)kiKnappar(true);
   draw();
 }
@@ -10884,17 +10888,17 @@ function kiPromptSoner(del){
     'ligg utanpå fasaden som eigne små tilbygg.',
     '',
     del==='bruk'
-      ?'INNDELING: del bygget slik ein energirådgjevar gjer det for SIMIEN. Ny sone der (1) bruken skiftar '
-       +'(bygningskategori), (2) ein annan leigetakar eller eining held til — sjå etter namn og areal skrivne på '
-       +'teikninga, t.d. «Sky Fitness 270 m²», (3) byggetrinnet skiftar — tilbygg, «eksisterande»/«nytt», årstal som '
-       +'«Tilbygg 1997» eller «oppgradert 2025», eller (4) ein del er uisolert eller kald, t.d. «Lager – uisolert». '
+      ?'INNDELING: del bygget slik ein energirådgjevar gjer det for SIMIEN. Same bygningskategori i same etasje '
+       +'skal i hovudsak vere ÉI sone — også når fleire leigetakarar eller einingar deler henne. Ny sone berre der '
+       +'(1) bygningskategorien skiftar, (2) byggetrinnet skiftar så byggeåret er eit anna — tilbygg, årstal som '
+       +'«Tilbygg 1997» eller «oppgradert 2025», eller (3) ein del er uisolert eller kald, t.d. «Lager – uisolert». '
        +'Følg skiljeveggane mellom delane, også når dei har sprang. Ikkje del i einskilde rom. Nabosoner skal dele '
        +'vegg nøyaktig: bruk same koordinatar på felles hjørne, og legg skiljet midt i skiljeveggen.'
       :'INNDELING: éi sone per samanhengande bygningskropp. Ikkje del i rom.',
     '',
     '`bruk` er bygningskategorien sona truleg har, ut frå romnamn og planløysing. «Ukjend» når teikninga ikkje seier det.',
-    '`namn`: bruk namnet som står på teikninga for delen (leigetakar, «Tilbygg 1997», «Personaldel»), elles kort,',
-    't.d. «Kontor», «Fløy A» eller «Bustad».',
+    '`namn`: bruk namnet som står på teikninga for delen («Tilbygg 1997», «Personaldel»), elles kort etter bruken,',
+    't.d. «Kontor», «Butikk» eller «Bustad».',
     '`byggeaar` er byggeåret for delen når teikninga seier det (t.d. 1997 for «Tilbygg 1997», 2025 for «oppgradert',
     '2025»). 0 når teikninga ikkje seier noko.',
     '',
@@ -11220,16 +11224,19 @@ async function kiKoyrSoner(maal){
   if(feil)logAi('\n⚠ '+feil+' etasje'+(feil===1?'':'r')+' kunne ikkje analyserast — køyr på nytt for dei.');
   logAi('\nSjå over forslaget på lerretet'+(kiUtkast.size>1?' — byt etasje med knappane over':'')
     +'. Hjørna kan justerast etterpå med ⊹ Rediger.');
-  kiSteg='soner';kiSoneHist=[];
+  kiSteg='soner';kiSoneHist.clear();
+  // Same kategori i same etasje er som regel éi sone
+  if(kiInnst.slaaKat){logAi('');kiSlaaSamanKategoriAlle(true);}
   // Vis ein etasje som har forslag — den aktive om han har det
   if(!kiUtkast.has(curFloor())){switchFloor(floors.indexOf([...kiUtkast.keys()][0]));}
   draftZones=kiUtkast.get(curFloor())||[];
   const n=[...kiUtkast.values()].reduce((s,a)=>s+a.length,0);
   kiKnappar(true,'✓ Godta '+n+' sone'+(n===1?'':'r'));
+  if(kiInnst.kople)logAi('Soner med same kategori vert kopla (SIMIEN-gruppe) når du godtek.');
   draw();
 }
 // Sonene i eitt forslag inn i den AKTIVE etasjen (zones), utan angre-steg.
-function kiLeggInnSoner(nye){
+function kiLeggInnSoner(nye,laga){
   const tatt=new Set();
   floors.forEach((f,i)=>(i===activeFloor?zones:f.zones).forEach(z=>tatt.add(z.name)));
   let sk=0;
@@ -11246,6 +11253,7 @@ function kiLeggInnSoner(nye){
     if(d.byggeaar)nz.byggeaar=d.byggeaar;
     else if(piBygg.byggeaar)nz.byggeaar=piBygg.byggeaar;
     zones.push(nz);
+    if(laga)laga.push(nz);
     sk+=autoSkilleveggForNySone(nz);
   });
   return{n:nye.length,sk};
@@ -11260,20 +11268,46 @@ function kiGodtaSoner(){
   saveFloorState();
   snapshot();markDirty();
   const start=curFloor(),vis={sc,offX,offY};
-  let n=0,sk=0;
+  let n=0,sk=0;const laga=[];
   opp.forEach(([f,arr])=>{
     const i=floors.indexOf(f);
     if(i<0)return;
     if(i!==activeFloor)switchFloor(i);
-    const r=kiLeggInnSoner(arr);n+=r.n;sk+=r.sk;
+    const r=kiLeggInnSoner(arr,laga);n+=r.n;sk+=r.sk;
   });
   const hm=kiBrukHoyder();
+  const kopla=kiInnst.kople?kiKopleKategoriar(laga):0;
   if(curFloor()!==start){switchFloor(floors.indexOf(start));sc=vis.sc;offX=vis.offX;offY=vis.offY;}
   saveFloorState();
   updateResults();renderTable();draw();
   hintText.textContent=n+' sone'+(n===1?'':'r')+' lagt til frå KI-forslaget'
     +(opp.length>1?' på '+opp.length+' etasjar':'')+'.'
-    +(sk?' '+sk+' felles vegg'+(sk===1?'':'ar')+' vart skiljekonstruksjon.':'')+(hm?' '+hm:'');
+    +(sk?' '+sk+' felles vegg'+(sk===1?'':'ar')+' vart skiljekonstruksjon.':'')
+    +(kopla?' '+kopla+' gruppe'+(kopla===1?'':'r')+' med same kategori kopla.':'')+(hm?' '+hm:'');
+  return n;
+}
+// Kople dei nye sonene med same bygningskategori og byggeår til éi SIMIEN-gruppe
+// (groupId) — på tvers av etasjane, og innanfor ein etasje når sonene ikkje
+// deler vegg. Berre same kategori, som all kopling. Uisolerte/kalde delar og
+// soner som alt er kopla, står for seg. Returnerer talet på grupper.
+function kiKopleKategoriar(laga){
+  const per=new Map();
+  laga.forEach(z=>{
+    // Ukjend kategori står for seg: utan bygkat vert sona rekna som kontor, og
+    // ei kopling på det grunnlaget ville vore ei gjetting
+    if(z.groupId||!z.bygkat||/uisolert|kald\b|kaldt/i.test(z.name))return;
+    // Same regel som samanslåinga: eit tilbygg med anna byggeår står for seg
+    const k=z.bygkat+'|'+(z.byggeaar||'');
+    if(!per.has(k))per.set(k,[]);
+    per.get(k).push(z);
+  });
+  let n=0;
+  per.forEach(l=>{
+    if(l.length<2)return;
+    const g='g'+(++_nextGroupId);
+    l.forEach(z=>{z.groupId=g;});
+    n++;
+  });
   return n;
 }
 
@@ -11282,7 +11316,10 @@ function kiGodtaSoner(){
 // brukaren krysse av soner (i lista eller ved å klikke i teikninga) og slå
 // dei saman til éi. Den største av dei valde gir namn, bruk og byggeår.
 // Samanslåinga skjer berre i forslaget — det er «Godta» som legg det inn.
-let kiSoneHist=[];   // draftZones før kvar samanslåing, for «Angre»
+// Forslaget før kvar samanslåing, for «Angre» — per etasje, så eit etasjebyte
+// ikkje tek med seg angre-historikken til ein annan etasje
+const kiSoneHist=new Map();
+const kiHist=f=>{if(!kiSoneHist.has(f))kiSoneHist.set(f,[]);return kiSoneHist.get(f);};
 const kiAreal=pts=>Math.abs(pts.reduce((a,p,i)=>{const q=pts[(i+1)%pts.length];return a+p.x*q.y-q.x*p.y;},0))/2;
 function kiTeiknSoneListe(){
   const el=document.getElementById('aiSoneListe');
@@ -11294,9 +11331,15 @@ function kiTeiknSoneListe(){
     const cb=document.createElement('input');cb.type='checkbox';cb.checked=!!d._valt;
     cb.onchange=()=>{d._valt=cb.checked;r.classList.toggle('valt',cb.checked);kiOppdaterSlaa();draw();};
     const nm=document.createElement('span');nm.className='nm';nm.textContent=d.name;
+    // Kategorien kan rettast her — «⊕ Same kategori» slår saman etter han
+    const kat=document.createElement('select');
+    [...Object.keys(BYGKAT_SXI),'Ukjend'].forEach(k=>{const o=document.createElement('option');o.value=k;
+      o.textContent=k==='Ukjend'?'(ukjend)':k;if(k===(d.bruk||'Ukjend'))o.selected=true;kat.appendChild(o);});
+    kat.onclick=e=>e.preventDefault();   // label-klikk skal ikkje krysse av raden
+    kat.onchange=()=>{d.bruk=kat.value;};
     const ar=document.createElement('span');ar.className='ar';
     ar.textContent=mpp?(kiAreal(d.pts)*mpp*mpp/1e6).toFixed(1)+' m²':'';
-    r.append(cb,nm,ar);
+    r.append(cb,nm,kat,ar);
     r.onmouseenter=()=>{d._hover=true;draw();};
     r.onmouseleave=()=>{d._hover=false;draw();};
     el.appendChild(r);
@@ -11306,8 +11349,8 @@ function kiTeiknSoneListe(){
 function kiOppdaterSlaa(){
   const n=draftZones.filter(d=>d._valt).length,b=document.getElementById('aiSlaa');
   b.disabled=n<2;
-  b.textContent='⊕ Slå saman valde'+(n>=2?' ('+n+')':'');
-  document.getElementById('aiAngreSlaa').disabled=!kiSoneHist.length;
+  b.textContent='⊕ Slå saman'+(n>=2?' ('+n+')':'');
+  document.getElementById('aiAngreSlaa').disabled=!kiHist(curFloor()).length;
   if(kiUtkast)kiUtkast.set(curFloor(),draftZones);
   const alle=kiUtkast?[...kiUtkast.values()].reduce((s,a)=>s+a.length,0):draftZones.length;
   document.getElementById('aiAccept').textContent='✓ Godta '+alle+' sone'+(alle===1?'':'r')
@@ -11355,7 +11398,7 @@ function kiSlaaSamanValde(){
     logAi('⚠ Dei valde sonene deler ingen vegg og kan ikkje slåast saman.');
     return;
   }
-  kiSoneHist.push(draftZones.map(d=>({...d,pts:d.pts.map(q=>({x:q.x,y:q.y}))})));
+  kiHist(curFloor()).push(kiKopiUtkast(draftZones));
   const ny={...valde[0],pts:kiRyddPolygon(pts,1).map(q=>({x:q.x,y:q.y})),_valt:false,_hover:false};
   const plass=draftZones.indexOf(valde[0]);
   draftZones=draftZones.filter(d=>!med.includes(d));
@@ -11369,9 +11412,63 @@ function kiSlaaSamanValde(){
   draw();
 }
 document.getElementById('aiSlaa').onclick=kiSlaaSamanValde;
+const kiKopiUtkast=arr=>arr.map(d=>({...d,pts:d.pts.map(q=>({x:q.x,y:q.y}))}));
+// Nøkkelen soner må dele for å slåast saman av seg sjølv: same kategori og
+// same byggeår. Ein uisolert eller kald del held seg for seg sjølv — han
+// skal ha andre konstruksjonar i SIMIEN.
+const kiKatNokkel=d=>/uisolert|kald\b|kaldt/i.test(d.name||'')?null:(d.bruk||'Ukjend')+'|'+(d.byggeaar||'');
+// Slå saman nabosoner med same nøkkel i eitt forslag (éin etasje). Returnerer
+// {arr, linjer}. Soner som ikkje deler vegg, står for seg — dei kan koplast.
+function kiSlaaSamanKategori(arr,mpp,img){
+  const tol=mpp?400/mpp:0.005*Math.max(img.width,img.height);
+  let ut=arr.slice(),endra=true;const linjer=[];
+  while(endra){
+    endra=false;
+    outer:for(let i=0;i<ut.length;i++){
+      const ki=kiKatNokkel(ut[i]);if(ki==null)continue;
+      for(let j=i+1;j<ut.length;j++){
+        if(kiKatNokkel(ut[j])!==ki)continue;
+        const r=kiSlaaSamanTo(ut[i].pts,ut[j].pts,tol);
+        if(!r)continue;
+        const [st,li]=kiAreal(ut[i].pts)>=kiAreal(ut[j].pts)?[ut[i],ut[j]]:[ut[j],ut[i]];
+        linjer.push(st.name+' + '+li.name+(st.bruk&&st.bruk!=='Ukjend'?' ('+st.bruk+')':''));
+        const ny={...st,pts:kiRyddPolygon(r,1).map(q=>({x:q.x,y:q.y})),_valt:false,_hover:false};
+        ut=ut.filter(d=>d!==ut[i]&&d!==ut[j]);
+        ut.splice(Math.min(i,ut.length),0,ny);
+        endra=true;break outer;
+      }
+    }
+  }
+  return{arr:ut,linjer};
+}
+// Alle etasjane i forslaget. Kvar etasje får eit angre-steg.
+// stille: kalla rett etter skannet, før forslaget er vist — då er draftZones
+// ikkje sett enno og skal ikkje skrivast over forslaget for etasjen.
+function kiSlaaSamanKategoriAlle(stille){
+  if(!kiUtkast)return 0;
+  if(!stille)kiUtkast.set(curFloor(),draftZones);
+  let n=0;
+  kiUtkast.forEach((arr,f)=>{
+    const r=kiSlaaSamanKategori(arr,mppForFloor(f),f.bgImg||bgImg);
+    if(!r.linjer.length)return;
+    kiHist(f).push(kiKopiUtkast(arr));
+    kiUtkast.set(f,r.arr);
+    n+=r.linjer.length;
+    logAi('⊕ '+(kiUtkast.size>1?arkNamn(f)+': ':'')+r.linjer.join(', '));
+  });
+  draftZones=kiUtkast.get(curFloor())||[];
+  if(!n&&!stille)logAi('Ingen nabosoner med same kategori og byggeår å slå saman.');
+  if(n)logAi('↶ «Angre» deler dei att, etasje for etasje.');
+  return n;
+}
+document.getElementById('aiSlaaKatBtn').onclick=()=>{
+  kiSlaaSamanKategoriAlle(false);
+  kiKnappar(true);draw();
+};
 document.getElementById('aiAngreSlaa').onclick=()=>{
-  if(!kiSoneHist.length)return;
-  draftZones=kiSoneHist.pop();
+  const hist=kiHist(curFloor());
+  if(!hist.length)return;
+  draftZones=hist.pop();
   if(kiUtkast)kiUtkast.set(curFloor(),draftZones);
   logAi('↶ Samanslåinga er angra.');
   kiKnappar(true);
@@ -11789,6 +11886,8 @@ aiGo.onclick=async()=>{
     bygg:(document.querySelector('input[name="aiOmfang"]:checked')||{}).value==='bygg',
     soner:document.getElementById('aiSoner').checked,
     del:(document.querySelector('input[name="aiDel"]:checked')||{}).value||'ein',
+    slaaKat:document.getElementById('aiSlaaKat').checked,
+    kople:document.getElementById('aiKople').checked,
     opn:opnEl.checked&&!opnEl.disabled,
     hoyder:document.getElementById('aiHoyder').checked&&!!kiFasadeArk().length
   };

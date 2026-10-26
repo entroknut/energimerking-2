@@ -1277,6 +1277,18 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
   igjen. Soner som ikkje deler vegg vert ikkje slegne saman — det vert meldt.
   `kiSoneHist` gir «Angre». Alt skjer i `draftZones`; fyrst «Godta» legg
   sonene inn (eitt angre-steg som før).
+- **Éi sone per kategori:** same bygningskategori i same etasje skal i
+  hovudsak vere éi sone (prompten seier det, og leigetakarar deler ikkje
+  lenger). Etter skannet slår `kiSlaaSamanKategoriAlle` saman nabosoner med
+  same `kiKatNokkel` — kategori + byggeår; «uisolert/kald» i namnet står for
+  seg — med eitt angre-steg per etasje (`kiSoneHist` er ein Map per etasje).
+  Kategorien kan endrast i forslagslista, og «⊕ Same kategori» gjer det same
+  på nytt. Ukjend + ukjend vert slegne saman; ukjend + kjend ikkje.
+- **Kopling ved «Godta»** (`kiKopleKategoriar`, valet «Kople like
+  kategoriar»): nye soner med same `bygkat` og byggeår får éin `groupId` på
+  tvers av etasjane. Soner utan kjend kategori vert ikkje kopla — utan
+  `bygkat` reknar programmet dei som kontor, og ei kopling på det grunnlaget
+  ville vore ei gjetting.
 - **Heile bygget** (omfang i dialogen): alle ark med planteikning i éi
   køyring. Stega les ALDRI lerret-globalane for anna enn den aktive etasjen —
   alt går gjennom `kiArk(f)` = `{f,img,mpp,zones}` (etter `saveFloorState()`).
