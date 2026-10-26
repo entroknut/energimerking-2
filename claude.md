@@ -1289,6 +1289,18 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
   tvers av etasjane. Soner utan kjend kategori vert ikkje kopla — utan
   `bygkat` reknar programmet dei som kontor, og ei kopling på det grunnlaget
   ville vore ei gjetting.
+- **Kalibrering frå teikninga** (`kiKalibrer`, fyrste steg, oppgåve
+  `skala`): berre ark UTAN skala — ein skala brukaren har sett, vert aldri
+  rørt. KI-en les målestokken i tittelfeltet og opptil tre lange målsette mål
+  (endepunkt + lengd i mm). Målestokk × papirformat (PDF eksakt, bilete frå
+  DPI) gir skalaen; medianen av måla kontrollerer. Innanfor 3 % ⇒
+  målestokken, «stadfesta». Større avvik ⇒ måla vinn og det vert åtvara
+  (forhold √2/2 ⇒ «skalert ved utskrift»). Utan papirformat ⇒ måla åleine
+  (sprik > 5 % ⇒ åtvaring). Planark: det fyrste set den globale, dei andre
+  deler han innanfor 1 %, elles `ownCal`. Fasadeark får eigen skala. Lagt inn
+  med ein gong som eitt angre-steg (`snapshot` + `_snapshotMpp` /
+  `_reskalerAlleEtasjar`), så resten av skannet reknar med han. Kan køyrast
+  åleine.
 - **Heile bygget** (omfang i dialogen): alle ark med planteikning i éi
   køyring. Stega les ALDRI lerret-globalane for anna enn den aktive etasjen —
   alt går gjennom `kiArk(f)` = `{f,img,mpp,zones}` (etter `saveFloorState()`).

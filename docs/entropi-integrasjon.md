@@ -378,7 +378,7 @@ Knappen er `.embed-only`, så funksjonen finst berre inne i EntroPi.
 
 ```js
 { type:'sxi:ai-request', requestId:'ki3',
-  oppgave:'soner',          // 'soner' | 'opningar' | 'fasade' — til logging og grenser
+  oppgave:'soner',          // 'skala' | 'soner' | 'opningar' | 'fasade' — til logging og grenser
   prompt:'…',               // ferdig tekst, nynorsk
   images:[{mediaType:'image/jpeg', data:'<base64>'}],   // 1–2 bilete, ≤ 2400 px
   schema:{…},               // JSON-skjema for svaret (structured outputs)
