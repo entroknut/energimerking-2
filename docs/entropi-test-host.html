@@ -148,16 +148,19 @@ async function kiMock(d){
   await new Promise(r=>setTimeout(r,1200));
   if(d.oppgave==='soner')return{analyse:'Oppdikta svar frå testverten (?kimock=1): to soner side om side.',
     soner:[
-      {namn:'Fløy A',bruk:'Kontorbygg',pts:[{x:200,y:250},{x:500,y:250},{x:500,y:700},{x:200,y:700}]},
-      {namn:'Fløy B',bruk:'Ukjend',pts:[{x:503,y:252},{x:800,y:250},{x:800,y:700},{x:498,y:701}]}
+      {namn:'Fløy A',bruk:'Kontorbygg',byggeaar:0,pts:[{x:200,y:250},{x:500,y:250},{x:500,y:700},{x:200,y:700}]},
+      {namn:'Tilbygg 1997',bruk:'Ukjend',byggeaar:1997,pts:[{x:503,y:252},{x:800,y:250},{x:800,y:700},{x:498,y:701}]}
     ]};
-  // Eitt vindauge midt på kvar nummerert vegg, 20 % av veggen breitt, og ei
-  // dør på den fyrste.
+  // Tre like vindauge på kvar nummerert vegg (vert éi gruppe ×3), eitt
+  // breiare på den fyrste (eige element), og ei dør der.
   const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
   const opningar=[];
   ((d.meta&&d.meta.vegger)||[]).forEach((v,i)=>{
-    opningar.push({vegg:v.nr,type:'vindauge',a:lerp(v.a,v.b,0.4),b:lerp(v.a,v.b,0.6),merke:''});
-    if(i===0)opningar.push({vegg:v.nr,type:'dor',a:lerp(v.a,v.b,0.1),b:lerp(v.a,v.b,0.2),merke:''});
+    [0.3,0.5,0.7].forEach(t=>opningar.push({vegg:v.nr,type:'vindauge',a:lerp(v.a,v.b,t-0.05),b:lerp(v.a,v.b,t+0.05),merke:''}));
+    if(i===0){
+      opningar.push({vegg:v.nr,type:'vindauge',a:lerp(v.a,v.b,0.8),b:lerp(v.a,v.b,0.95),merke:''});
+      opningar.push({vegg:v.nr,type:'dor',a:lerp(v.a,v.b,0.05),b:lerp(v.a,v.b,0.15),merke:''});
+    }
   });
   return{opningar};
 }

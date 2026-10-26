@@ -1213,13 +1213,33 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
 - To steg, kvart med forslag på lerretet og eitt angre-steg: soner
   (`draftZones`), så opningar (`kiDraftWins`) — éin førespurnad per sone, med
   eit reint og eit merka utsnitt der berre fasadeveggane er nummererte.
-- Koordinatane frå KI-en er normaliserte 0–1000 og grove. `kiRettSoner`
-  snappar hjørna med `_linjeKryss`, slår saman hjørne på tvers av soner og
-  legg T-kryss på nabokanten — elles ser ikkje `autoSkilleveggForNySone`
-  (8 cm) den felles veggen.
+- Koordinatane frå KI-en er normaliserte 0–1000 og grove (bom på 0,5–1,5 m
+  er vanleg). `kiRettSoner` rettar dei i tre steg:
+  1. **Kanttilpassing** (`kiTilpassFasadar`/`kiTilpassKant`): kvar kant vert
+     tilpassa som HEIL linje. Tvers over kanten vert teikninga lesen (±2 m,
+     gråtonekopi `kiGraa()` ≤ 4096 px), veggband (fylt, skravert — strekar
+     under 20 cm frå kvarandre er same band — eller to strekar) gir
+     kandidatpunkt, og Hough-røysting over ±4° vel linja. Fasade: innsida av
+     det YTSTE bandet med minst halve røystene (ein heil korridorvegg rett
+     innanfor slår elles ein vindaugsbroten yttervegg). Skiljevegg mot ei
+     anna sone (`kiDeltKant`): midt i veggen. Hjørna = kryss av nabolinjene.
+     Målt på syntetiske planar: 1–3 cm, sjølv med 3° skeivheit og 1,3 m bom.
+  2. `_linjeKryss`-snap berre for hjørne som ingen tilpassa kant rørte.
+  3. Felles hjørne slegne saman og T-kryss lagde på nabokanten — elles ser
+     ikkje `autoSkilleveggForNySone` (8 cm) den felles veggen.
+  Fell kanttilpassinga gjennom (for få einige punkt), står KI-kanten — aldri
+  ei gjetting.
 - Opningar: projiserte på segmentet, forkasta om dei ligg langt frå veggen,
   er under 0,3 m eller overlappar noko som finst. «10x12»-merke (dm) vinn
   over det målte når dei er innanfor 30 %. Høgda er elles standard.
+- Lært av ferdige EntroPi-prosjekt (skjermbilete, oktober 2026):
+  sonekanten på innsida av ytterveggen; deling etter bruk, **leigetakar**,
+  **byggetrinn** (tilbygg/årstal) og uisolerte delar, med namnet frå
+  teikninga; kjerner (trapp, heis, teknisk) inne i sona; like vindauge på
+  same vegg som éi gruppe. Difor: `byggeaar` frå teikninga går på sona og
+  slår `piBygg.byggeaar`, og `kiGrupperVindauge` samlar vindauge med same
+  høgd og breidd (±10 %, min 10 cm) på same segment til `antal`+`posT`.
+  Dører vert aldri grupperte.
 - Krev kalibrering for opningane (breiddemålet). Den gamle varianten med
   API-nøkkel i nettlesaren er fjerna.
 

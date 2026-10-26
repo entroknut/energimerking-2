@@ -391,7 +391,8 @@ etter 15 s og seier at vertssida ikkje svarar), så `sxi:ai-result` når Claude
 er ferdig. Steg 2 sender éin førespurnad per sone, tre om gongen, så verten må
 tole fleire samtidige.
 
-**Serversida (Next.js route handler, TypeScript SDK):**
+**Serversida (Next.js route handler, TypeScript SDK)** — `app/api/sxi/ki/route.ts`,
+som komponenten under poster til (`case 'sxi:ai-request'`):
 
 ```ts
 import Anthropic from '@anthropic-ai/sdk';
@@ -612,6 +613,25 @@ export function Energimerking({ bygg, brukar, onClose }: { bygg: Bygg; brukar: B
             send({ type: 'sxi:systems', requestId: d.requestId, ok: true, systems });
           } catch (e) {
             send({ type: 'sxi:systems', requestId: d.requestId, ok: false, systems: [],
+                   message: e instanceof Error ? e.message : 'ukjend feil' });
+          }
+          break;
+        }
+
+        case 'sxi:ai-request': {
+          // KI-oppteikninga. Stadfest med ein gong — verktøyet gir opp etter
+          // 15 s utan ack. Sjølve analysen kan ta eit par minutt.
+          send({ type: 'sxi:ai-ack', requestId: d.requestId });
+          try {
+            const res = await fetch('/api/sxi/ki', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: d.prompt, images: d.images,
+                                     schema: d.schema, maxTokens: d.maxTokens }),
+            });
+            const svar = await res.json();     // {ok, result} eller {ok:false, message}
+            send({ type: 'sxi:ai-result', requestId: d.requestId, ...svar });
+          } catch (e) {
+            send({ type: 'sxi:ai-result', requestId: d.requestId, ok: false,
                    message: e instanceof Error ? e.message : 'ukjend feil' });
           }
           break;

@@ -675,7 +675,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.9.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.9.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -991,7 +991,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
           <label class="ai-opt"><input type="checkbox" id="aiSoner" checked> Teikn soner</label>
           <div class="ai-sub2" id="aiDelRow">
             <label class="ai-opt"><input type="radio" name="aiDel" value="ein" checked> Éi sone per bygningskropp</label>
-            <label class="ai-opt"><input type="radio" name="aiDel" value="bruk"> Del i soner etter bruk og fløy</label>
+            <label class="ai-opt"><input type="radio" name="aiDel" value="bruk"> Del etter bruk, leigetakar og byggetrinn</label>
           </div>
           <label class="ai-opt"><input type="checkbox" id="aiOpn" checked> Finn vindauge og dører på fasadane</label>
           <div class="ai-note" id="aiNote"></div>
@@ -4751,12 +4751,12 @@ function draw(){
   });
 
   // KI-forslag til vindauge og dører (sjå «2e. KI-oppteikning»)
-  if(viewMode==='plan')kiDraftWins.forEach(d=>{
+  if(viewMode==='plan')kiDraftWins.forEach(d=>(d.spans||[d]).forEach((sp,si)=>{
     if(!zones.includes(d.z))return;
     const a=d.z.pts[d.segIdx],b=d.z.pts[(d.segIdx+1)%d.z.pts.length];
     if(!a||!b)return;
-    const q0=i2s(a.x+(b.x-a.x)*d.t0,a.y+(b.y-a.y)*d.t0);
-    const q1=i2s(a.x+(b.x-a.x)*d.t1,a.y+(b.y-a.y)*d.t1);
+    const q0=i2s(a.x+(b.x-a.x)*sp.t0,a.y+(b.y-a.y)*sp.t0);
+    const q1=i2s(a.x+(b.x-a.x)*sp.t1,a.y+(b.y-a.y)*sp.t1);
     ctx.beginPath();ctx.moveTo(q0.x,q0.y);ctx.lineTo(q1.x,q1.y);
     ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=9;ctx.lineCap='butt';ctx.stroke();
     ctx.strokeStyle=d.type==='dor'?'#7c3aed':'#d97706';ctx.lineWidth=5;
@@ -4764,11 +4764,12 @@ function draw(){
     ctx.stroke();ctx.setLineDash([]);
     const mx=(q0.x+q1.x)/2,my=(q0.y+q1.y)/2;
     ctx.font='bold 10px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    const lbl=(d.type==='dor'?'D ':'V ')+(d.breddeMm/1000).toFixed(1);
+    if(si)return;   // lappen éin gong per gruppe, ved fyrste stk
+    const lbl=(d.type==='dor'?'D ':'V ')+(d.breddeMm/1000).toFixed(1)+((d.antal||1)>1?' ×'+d.antal:'');
     const tw=ctx.measureText(lbl).width+6;
     ctx.fillStyle='rgba(255,255,255,.92)';ctx.fillRect(mx-tw/2,my-17,tw,13);
     ctx.fillStyle=d.type==='dor'?'#5b21b6':'#92400e';ctx.fillText(lbl,mx,my-10);
-  });
+  }));
 
   // Current polygon being drawn
   if(curPts.length>0&&mode==='draw'){
@@ -10410,9 +10411,10 @@ const kiSkjemaSoner=()=>({
   properties:{
     analyse:{type:'string'},
     soner:{type:'array',items:{
-      type:'object',additionalProperties:false,required:['namn','bruk','pts'],
+      type:'object',additionalProperties:false,required:['namn','bruk','byggeaar','pts'],
       properties:{
         namn:{type:'string'},
+        byggeaar:{type:'integer'},
         bruk:{type:'string',enum:[...Object.keys(BYGKAT_SXI),'Ukjend']},
         pts:{type:'array',items:{type:'object',additionalProperties:false,required:['x','y'],
           properties:{x:{type:'number'},y:{type:'number'}}}}
@@ -10425,19 +10427,29 @@ function kiPromptSoner(del){
     '',
     'KOORDINATAR: normaliserte tal 0–1000 langs kvar akse — x frå venstre kant, y frå øvre kant av biletet.',
     '',
-    'KVAR SONE er eitt polygon langs INNSIDA av ytterveggen, der golvarealet byrjar. Gi hjørna i rekkjefølgje rundt sona,',
-    'med alle knekkpunkt i veggen, men utan dører, vindaugsnisjar og søyler.',
-    'Ta berre med oppvarma innvendig areal: ikkje balkongar, terrassar, svalgangar, utvendige trapper, carport eller',
-    'uoppvarma garasje og bod når teikninga viser at dei er det.',
+    'KVAR SONE er eitt polygon langs INNSIDA av ytterveggen, der golvarealet byrjar. Ytterveggen er det tjukke bandet',
+    '(grått, svart eller skravert, eller to parallelle strekar) som går rundt bygget. Polygonkanten skal liggje på',
+    'romsida av bandet — aldri ute i veggen eller utanfor fasaden. Følg veggen si faktiske retning: er bygget skeivt',
+    'eller har skrå fasadar, skal polygonet vere det òg. Gi hjørna i rekkjefølgje rundt sona, med alle knekkpunkt i',
+    'veggen, men utan dører, vindaugsnisjar og søyler.',
+    'Trapperom, heissjakter, sjakter og tekniske rom INNE i bygget høyrer med i sona — ikkje lag hòl for dei.',
+    'Ta ikkje med balkongar, terrassar, svalgangar, utvendige trapper, carport, eller bodar, vareheisar og rom som',
+    'ligg utanpå fasaden som eigne små tilbygg.',
     '',
     del==='bruk'
-      ?'INNDELING: del bygget slik ein energirådgjevar gjer det for SIMIEN — ny sone der bruken skiftar (bygningskategori), '
-       +'eller for tydeleg skilde fløyer og bygningskroppar. Ikkje del i einskilde rom. Nabosoner skal dele vegg nøyaktig: '
-       +'bruk same koordinatar på felles hjørne, og legg skiljet midt i skiljeveggen.'
+      ?'INNDELING: del bygget slik ein energirådgjevar gjer det for SIMIEN. Ny sone der (1) bruken skiftar '
+       +'(bygningskategori), (2) ein annan leigetakar eller eining held til — sjå etter namn og areal skrivne på '
+       +'teikninga, t.d. «Sky Fitness 270 m²», (3) byggetrinnet skiftar — tilbygg, «eksisterande»/«nytt», årstal som '
+       +'«Tilbygg 1997» eller «oppgradert 2025», eller (4) ein del er uisolert eller kald, t.d. «Lager – uisolert». '
+       +'Følg skiljeveggane mellom delane, også når dei har sprang. Ikkje del i einskilde rom. Nabosoner skal dele '
+       +'vegg nøyaktig: bruk same koordinatar på felles hjørne, og legg skiljet midt i skiljeveggen.'
       :'INNDELING: éi sone per samanhengande bygningskropp. Ikkje del i rom.',
     '',
     '`bruk` er bygningskategorien sona truleg har, ut frå romnamn og planløysing. «Ukjend» når teikninga ikkje seier det.',
-    '`namn` er kort, t.d. «Kontor», «Fløy A» eller «Bustad».',
+    '`namn`: bruk namnet som står på teikninga for delen (leigetakar, «Tilbygg 1997», «Personaldel»), elles kort,',
+    't.d. «Kontor», «Fløy A» eller «Bustad».',
+    '`byggeaar` er byggeåret for delen når teikninga seier det (t.d. 1997 for «Tilbygg 1997», 2025 for «oppgradert',
+    '2025»). 0 når teikninga ikkje seier noko.',
     '',
     'Ignorer tittelfelt, målsetjing, aksesystem, situasjonsplan, snitt og detaljar. Er det fleire etasjeplanar på same ark,',
     'ta berre med den største.',
@@ -10473,6 +10485,177 @@ function kiNaerastePaaKant(p,a,b){
   const x=a.x+t*dx,y=a.y+t*dy;
   return{t,d:Math.hypot(p.x-x,p.y-y),x,y};
 }
+// ── Kanttilpassing mot ytterveggen ──
+// KI-en treffer sjeldan innsida av veggen: kanten kan liggje ein meter ute
+// i fasaden eller vere nokre grader skeiv. Hjørnesnappinga (_linjeKryss)
+// hjelper ikkje på teikningar der veggane er tjukke, grå band — ho leitar
+// etter tynne strekar som kryssar. Difor vert kvar fasadekant tilpassa som
+// HEIL linje: tvers over kanten vert teikninga lesen på mange stader, og
+// innsida av veggbandet (eller den indre av to tynne veggstrekar) gir eit
+// kandidatpunkt. Ei Hough-røysting over små vinklar finn linja flest
+// punkt er einige om — møblar, tekst og dørslag kjem på tilfeldige stader
+// og vert røysta ut. Hjørna vert så krysset mellom nabokantane.
+let _kiGraa=null;
+// Gråtonekopi av planteikninga, nedskalert til maks 4096 px, med papirnivået.
+function kiGraa(){
+  if(_kiGraa&&_kiGraa.img===bgImg)return _kiGraa;
+  const k=Math.min(1,4096/Math.max(bgImg.width,bgImg.height));
+  const W=Math.max(1,Math.round(bgImg.width*k)),H=Math.max(1,Math.round(bgImg.height*k));
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d',{willReadFrequently:true});
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);
+  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
+  x.drawImage(bgImg,0,0,W,H);
+  let d;
+  try{d=x.getImageData(0,0,W,H).data;}catch(e){return null;}
+  const g=new Uint8Array(W*H),hist=new Uint32Array(256);
+  for(let i=0;i<W*H;i++){const v=(d[i*4]*77+d[i*4+1]*150+d[i*4+2]*29)>>8;g[i]=v;hist[v]++;}
+  // Papiret: det lysaste tiandeparten av arket. Mørkare enn papir − 40 er strek.
+  let acc=0,papir=255;
+  for(let v=255;v>=0;v--){acc+=hist[v];if(acc>=W*H*0.10){papir=v;break;}}
+  _kiGraa={img:bgImg,k,W,H,g,mork:Math.max(60,papir-40)};
+  return _kiGraa;
+}
+// Tilpass kanten a→b (biletpikslar) til innsida av veggen. inn = einingsnormal
+// mot innsida av sona. M = mål i biletpikslar (S søk, vegg, maxVegg, steg).
+// Returnerer {p,q} (ny linje gjennom to punkt) eller null når teikninga ikkje
+// gir ei einig linje — då står KI-kanten. midt: legg linja midt i veggen i
+// staden for på innsida (skiljevegg mellom to soner).
+function kiTilpassKant(G,a,b,inn,M,midt){
+  const k=G.k;
+  const ax=a.x*k,ay=a.y*k,dx=(b.x-a.x)*k,dy=(b.y-a.y)*k,L=Math.hypot(dx,dy);
+  if(L<1)return null;
+  const ux=dx/L,uy=dy/L,S=Math.max(4,Math.round(M.S*k));
+  const minV=Math.max(2,M.vegg*k),maxV=Math.max(minV+2,M.maxVegg*k);
+  // Strekar med under ~20 cm mellomrom er same vegg: skravering, og ein
+  // vegg teikna med tette strekar. Veggstrekar lenger frå kvarandre vert
+  // fanga av par-regelen under.
+  const hol=Math.max(1,Math.round(M.hol*k));
+  const n=Math.max(8,Math.min(60,Math.round(L/Math.max(4,M.steg*k))));
+  const kand=[];
+  for(let j=0;j<n;j++){
+    const s=L*(0.06+0.88*j/(n-1)),bx=ax+ux*s,by=ay+uy*s;
+    const runs=[];let start=null,sist=null;   // u kan vere negativ — null tyder «ingen»
+    for(let u=-S;u<=S;u++){
+      const px=Math.round(bx+inn.x*u),py=Math.round(by+inn.y*u);
+      const mork=px>=0&&py>=0&&px<G.W&&py<G.H&&G.g[py*G.W+px]<G.mork;
+      if(!mork)continue;
+      if(start===null||u-sist>hol+1){if(start!==null)runs.push([start,sist]);start=u;}
+      sist=u;
+    }
+    if(start!==null)runs.push([start,sist]);
+    runs.forEach((r,i)=>{
+      const bredd=r[1]-r[0]+1;
+      // Tjukke veggar tel meir: ytterveggen er som regel tjukkare enn innerveggane
+      if(bredd>=minV&&bredd<=maxV*1.5){kand.push({j,s,u:midt?(r[0]+r[1])/2:r[1]+0.5,w:2*Math.sqrt(bredd/minV)});return;}
+      // Veggen teikna som to tynne strekar: den indre streken er innsida
+      const o=runs[i-1];
+      if(o&&bredd<minV&&o[1]-o[0]+1<minV){
+        const tjukn=r[1]-o[0]+1;
+        if(tjukn>=minV&&tjukn<=maxV)kand.push({j,s,u:midt?(o[0]+r[1])/2:r[1]+0.5,w:1.5});
+      }
+    });
+  }
+  if(kand.length<4)return null;
+  const bw=Math.max(1.5,minV/3),mid=L/2;
+  let best=null;const alle=[];
+  for(let deg=-4;deg<=4.001;deg+=0.5){
+    const t=Math.tan(deg*Math.PI/180),bin=new Map();
+    kand.forEach(c=>{const o=Math.round((c.u-(c.s-mid)*t)/bw);bin.set(o,(bin.get(o)||0)+c.w);});
+    bin.forEach((v,o)=>{
+      const sum=v+0.5*((bin.get(o-1)||0)+(bin.get(o+1)||0));
+      const sc=sum*(1-0.3*Math.abs(o*bw)/S);           // nær KI-kanten vinn ein jamn kamp
+      const e={sc,t,o:o*bw};alle.push(e);
+      if(!best||sc>best.sc)best=e;
+    });
+  }
+  // Ein fasade er det YTSTE veggbandet. Ein heil korridorvegg rett innanfor
+  // kan få fleire røyster enn ytterveggen, som er broten av vindauge — difor
+  // vinn eit band lenger ute så lenge det har over halvparten av røystene.
+  if(!midt){
+    const ref=best;
+    alle.forEach(e=>{if(e.sc>=0.5*ref.sc&&e.o<ref.o-2*minV&&(best===ref||e.o<best.o))best=e;});
+  }
+  // Nok av kanten må vere einig — elles er det møblar og tekst, ikkje ein vegg
+  const naer=kand.filter(c=>Math.abs(c.u-(c.s-mid)*best.t-best.o)<=2*bw);
+  if(new Set(naer.map(c=>c.j)).size<Math.max(4,0.35*n))return null;
+  // Minste kvadrat på punkta nær den vinnande linja: u = α + β·(s−mid)
+  let sw=0,ss=0,su=0,sss=0,ssu=0;
+  naer.forEach(c=>{const x=c.s-mid;sw++;ss+=x;su+=c.u;sss+=x*x;ssu+=x*c.u;});
+  const det=sw*sss-ss*ss;
+  const beta=Math.abs(det)>1e-9?(sw*ssu-ss*su)/det:best.t;
+  const alfa=(su-beta*ss)/sw;
+  if(Math.abs(beta)>Math.tan(5*Math.PI/180))return null;
+  const P=s=>{const u=alfa+beta*(s-mid);return{x:(ax+ux*s+inn.x*u)/k,y:(ay+uy*s+inn.y*u)/k};};
+  return{p:P(0),q:P(L)};
+}
+function kiLinjeKryss(l1,l2){
+  const d1x=l1.q.x-l1.p.x,d1y=l1.q.y-l1.p.y,d2x=l2.q.x-l2.p.x,d2y=l2.q.y-l2.p.y;
+  const kr=d1x*d2y-d1y*d2x,n1=Math.hypot(d1x,d1y),n2=Math.hypot(d2x,d2y);
+  if(!n1||!n2||Math.abs(kr)/(n1*n2)<Math.sin(8*Math.PI/180))return null;  // nesten parallelle
+  const t=((l2.p.x-l1.p.x)*d2y-(l2.p.y-l1.p.y)*d2x)/kr;
+  return{x:l1.p.x+t*d1x,y:l1.p.y+t*d1y};
+}
+// Ligg kanten a→b mot ei anna sone (KI-forslag eller ei som alt finst)? Då er
+// han ein skiljevegg: skiljet skal stå midt i veggen, ikkje på innsida.
+function kiDeltKant(a,b,andre,tol){
+  const m={x:(a.x+b.x)/2,y:(a.y+b.y)/2},L=Math.hypot(b.x-a.x,b.y-a.y)||1;
+  const ux=(b.x-a.x)/L,uy=(b.y-a.y)/L;
+  return andre.some(pts=>{
+    if(kiInniPolygon(m,pts))return true;
+    for(let i=0;i<pts.length;i++){
+      const p=pts[i],q=pts[(i+1)%pts.length],l=Math.hypot(q.x-p.x,q.y-p.y);
+      if(!l)continue;
+      const par=Math.abs(ux*(q.x-p.x)/l+uy*(q.y-p.y)/l)>0.95;
+      const r=kiNaerastePaaKant(m,p,q);
+      if(par&&r.d<tol&&r.t>-0.05&&r.t<1.05)return true;
+    }
+    return false;
+  });
+}
+// Fasadekantane i alle sonene inn til innsida av veggen. Returnerer talet på
+// kantar som vart tilpassa, og merkjer hjørna som ligg på ein tilpassa kant.
+function kiTilpassFasadar(soner,mpp){
+  const G=kiGraa();
+  if(!G)return{kantar:0,av:0};
+  const D=Math.max(bgImg.width,bgImg.height);
+  const M=mpp?{S:2000/mpp,hol:200/mpp,vegg:80/mpp,maxVegg:700/mpp,steg:250/mpp,minKant:800/mpp,deltTol:600/mpp}
+             // Ukalibrert: eit ark er typisk 30–80 m breitt i verkelegheita
+             :{S:0.04*D,hol:0.005*D,vegg:0.002*D,maxVegg:0.015*D,steg:0.004*D,minKant:0.01*D,deltTol:0.01*D};
+  const finst=zones.filter(z=>(z.pts||[]).length>=3).map(z=>z.pts);
+  let kantar=0,av=0;
+  soner.forEach(s=>{
+    const pts=s.pts,m=pts.length;
+    if(m<3)return;
+    const andre=[...soner.filter(o=>o!==s).map(o=>o.pts),...finst];
+    const linjer=[],tilpassa=[];
+    for(let i=0;i<m;i++){
+      const a=pts[i],b=pts[(i+1)%m],L=Math.hypot(b.x-a.x,b.y-a.y);
+      linjer[i]={p:a,q:b};tilpassa[i]=false;
+      if(L<M.minKant)continue;
+      // Skiljevegg mot ei anna sone: midt i veggen, så begge sonene får same
+      // linje. Fasade: innsida av veggen.
+      const delt=kiDeltKant(a,b,andre,M.deltTol);
+      if(!delt)av++;
+      let inn={x:-(b.y-a.y)/L,y:(b.x-a.x)/L};
+      const e=Math.max(1,L*0.01);
+      if(!kiInniPolygon({x:(a.x+b.x)/2+inn.x*e,y:(a.y+b.y)/2+inn.y*e},pts))inn={x:-inn.x,y:-inn.y};
+      const r=kiTilpassKant(G,a,b,inn,M,delt);
+      if(r){linjer[i]=r;tilpassa[i]=true;if(!delt)kantar++;}
+    }
+    s.pts=pts.map((p,i)=>{
+      const f=(i-1+m)%m;
+      if(!tilpassa[f]&&!tilpassa[i])return p;
+      let x=kiLinjeKryss(linjer[f],linjer[i]);
+      // Nesten rett vidare: legg hjørnet på den tilpassa kanten
+      if(!x){const l=tilpassa[i]?linjer[i]:linjer[f];const r=kiNaerastePaaKant(p,l.p,l.q);x={x:r.x,y:r.y};}
+      if(Math.hypot(x.x-p.x,x.y-p.y)>3*M.S)return p;   // eit kryss langt ute er feil, ikkje betre
+      return{x:x.x,y:x.y,_fit:1};
+    });
+  });
+  return{kantar,av};
+}
+
 // Rettar KI-polygona mot teikninga og mot kvarandre. Returnerer statistikk.
 function kiRettSoner(soner){
   const D=Math.max(bgImg.width,bgImg.height);
@@ -10483,9 +10666,12 @@ function kiRettSoner(soner){
   R=Math.max(10,Math.min(160,R));
   const slaa=mpp?Math.max(3,Math.min(R,400/mpp)):R;   // hjørne nærare enn dette er same hjørne
   let snappa=0,tal=0;
+  soner.forEach(s=>{s.pts=kiRyddPolygon(s.pts,Math.max(2,slaa/4));});
+  const fit=kiTilpassFasadar(soner,mpp);
   soner.forEach(s=>{
-    s.pts=kiRyddPolygon(s.pts,Math.max(2,slaa/4)).map(p=>{
+    s.pts=s.pts.map(p=>{
       tal++;
+      if(p._fit){snappa++;return{x:p.x,y:p.y,_s:1};}   // ligg alt på innsida av veggen
       const r=_linjeKryss(bgImg,p,R);
       if(!r)return{x:p.x,y:p.y};
       snappa++;
@@ -10527,14 +10713,14 @@ function kiRettSoner(soner){
     if(best&&best.d>0){p.x=best.x;p.y=best.y;}
   }));
   soner.forEach(s=>{s.pts=kiRyddPolygon(s.pts,1).map(p=>({x:p.x,y:p.y}));});
-  return{snappa,tal,slegne};
+  return{snappa,tal,slegne,kantar:fit.kantar,av:fit.av};
 }
 
 async function kiKoyrSoner(){
   const run=kiKoyring;
   const rect={x:0,y:0,w:bgImg.width,h:bgImg.height};
   const del=(document.querySelector('input[name="aiDel"]:checked')||{}).value||'ein';
-  logAi('Steg 1 — soner ('+(del==='bruk'?'delt etter bruk og fløy':'éi per bygningskropp')+')…');
+  logAi('Steg 1 — soner ('+(del==='bruk'?'delt etter bruk, leigetakar og byggetrinn':'éi per bygningskropp')+')…');
   logAi('Claude les teikninga. Det tek gjerne eitt til to minutt.');
   const res=await kiSpor({oppgave:'soner',prompt:kiPromptSoner(del),images:[kiBilete(rect)],
     schema:kiSkjemaSoner(),maxTokens:16000});
@@ -10543,6 +10729,7 @@ async function kiKoyrSoner(){
   const mpp=mppForFloor(curFloor());
   const minAreal=mpp?2e6/(mpp*mpp):(bgImg.width*bgImg.height*1e-4);   // 2 m², elles 0,01 % av arket
   const soner=(res.soner||[]).map(s=>({namn:String(s.namn||'').trim(),bruk:s.bruk,
+    byggeaar:(s.byggeaar>=1800&&s.byggeaar<=2100)?Math.round(s.byggeaar):null,
     pts:(s.pts||[]).map(p=>kiTilBilete(p,rect))})).filter(s=>s.pts.length>=3);
   const st=kiRettSoner(soner);
   const areal=pts=>Math.abs(pts.reduce((a,p,i)=>{const q=pts[(i+1)%pts.length];return a+p.x*q.y-q.x*p.y;},0))/2;
@@ -10553,12 +10740,15 @@ async function kiKoyrSoner(){
     kiKnappar(false);aiGo.textContent='Prøv igjen';aiGo.disabled=false;
     return;
   }
-  draftZones=gode.map(s=>({name:s.namn||'KI-sone',bruk:s.bruk,pts:s.pts}));
+  draftZones=gode.map(s=>({name:s.namn||'KI-sone',bruk:s.bruk,byggeaar:s.byggeaar,pts:s.pts}));
   gode.forEach(s=>{
     const a=mpp?(areal(s.pts)*mpp*mpp/1e6).toFixed(1)+' m²':s.pts.length+' hjørne';
-    logAi('✓ '+(s.namn||'KI-sone')+' — '+a+(s.bruk&&s.bruk!=='Ukjend'?' · '+s.bruk:''));
+    logAi('✓ '+(s.namn||'KI-sone')+' — '+a+(s.bruk&&s.bruk!=='Ukjend'?' · '+s.bruk:'')
+      +(s.byggeaar?' · byggeår '+s.byggeaar+' (frå teikninga)':''));
   });
-  logAi(st.snappa+' av '+st.tal+' hjørne snappa til veggkryss i teikninga'
+  if(st.av)logAi(st.kantar+' av '+st.av+' fasadekantar lagde på innsida av veggen i teikninga'
+    +(st.kantar<st.av?' (resten står der KI-en sette dei — sjå over dei)':'')+'.');
+  logAi(st.snappa+' av '+st.tal+' hjørne ligg på veggen i teikninga'
     +(st.slegne?', '+st.slegne+' felles hjørne slegne saman':'')+'.');
   logAi('\nSjå over forslaget på lerretet. Hjørna kan justerast etterpå med ⊹ Rediger.');
   kiSteg='soner';
@@ -10581,7 +10771,10 @@ function kiGodtaSoner(){
     const nz={name:namn,pts:d.pts.map(p=>({x:p.x,y:p.y})),windows:[],skillevegg:new Set(),
       zoneConnections:new Map(),takflater:[],gulvflater:[],gavlflater:[]};
     if(d.bruk&&BYGKAT_SXI[d.bruk])nz.bygkat=d.bruk;
-    if(piBygg.byggeaar)nz.byggeaar=piBygg.byggeaar;
+    // Byggeåret som står på teikninga for DENNE delen (tilbygg, oppgradering)
+    // slår byggeåret til heile bygget frå EntroPi — det styrer U-verdiane.
+    if(d.byggeaar)nz.byggeaar=d.byggeaar;
+    else if(piBygg.byggeaar)nz.byggeaar=piBygg.byggeaar;
     zones.push(nz);
     sk+=autoSkilleveggForNySone(nz);
   });
@@ -10630,6 +10823,33 @@ function kiInniPolygon(p,pts){
     if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)inn=!inn;
   }
   return inn;
+}
+// Like vindauge på same vegg vert éi gruppe (antal + posT), slik
+// energirådgjevarane teiknar dei: «Vindauge 8 ×10» er eitt SIMIEN-element,
+// ikkje ti. Like = same høgd og breidd innanfor 10 % (minst 10 cm) — dei
+// treng ikkje stå side om side. Dører vert aldri grupperte.
+function kiGrupperVindauge(liste,segs,mpp){
+  const ut=[],grupper=[];
+  liste.slice().sort((a,b)=>(a.t0+a.t1)-(b.t0+b.t1)).forEach(f=>{
+    const c=(f.t0+f.t1)/2;
+    if(f.type!=='vindauge'){ut.push(Object.assign(f,{antal:1,spans:[{t0:f.t0,t1:f.t1}]}));return;}
+    const g=grupper.find(g=>g.segIdx===f.segIdx&&Math.abs(g.hoyMm-f.hoyMm)<=50
+      &&Math.abs(g.sum/g.n-f.breddeMm)<=Math.max(100,0.1*g.sum/g.n));
+    if(g){g.n++;g.sum+=f.breddeMm;g.c.push(c);g.fraMerke=g.fraMerke||f.fraMerke;}
+    else grupper.push({z:f.z,segIdx:f.segIdx,dir:f.dir,type:'vindauge',hoyMm:f.hoyMm,
+      n:1,sum:f.breddeMm,c:[c],fraMerke:f.fraMerke});
+  });
+  grupper.forEach(g=>{
+    const bredde=Math.round(g.sum/g.n/10)*10,segLen=segs[g.segIdx].lenPx,wPx=bredde/mpp;
+    const posT=g.c.slice().sort((a,b)=>a-b);
+    const w={z:g.z,segIdx:g.segIdx,dir:g.dir,type:'vindauge',breddeMm:bredde,hoyMm:g.hoyMm,
+      antal:g.n,posT:g.n>1?posT:null,fraMerke:g.fraMerke};
+    const anker=fitSpanT(posT.reduce((s,t)=>s+t,0)/posT.length,wPx,segLen);
+    w.t0=anker.t0;w.t1=anker.t1;
+    w.spans=posT.map(t=>fitSpanT(t,wPx,segLen));
+    ut.push(w);
+  });
+  return ut;
 }
 // Opningane i éi sone. Returnerer {forslag, avvist}.
 async function kiOpningarForSone(z){
@@ -10700,7 +10920,7 @@ async function kiOpningarForSone(z){
     if(kryss){avvist++;return;}
     ut.push(f);
   });
-  return{forslag:ut,avvist};
+  return{forslag:kiGrupperVindauge(ut,segs,mpp),avvist};
 }
 async function kiKoyrOpningar(){
   const run=kiKoyring;
@@ -10717,7 +10937,7 @@ async function kiKoyrOpningar(){
         if(run!==kiKoyring)return;
         forslag.push(...r.forslag);avvist+=r.avvist;
         const nd=r.forslag.filter(f=>f.type==='dor').length;
-        logAi('✓ '+z.name+': '+r.forslag.filter(f=>f.type==='vindauge').length+' vindauge, '
+        logAi('✓ '+z.name+': '+r.forslag.filter(f=>f.type==='vindauge').reduce((s,f)=>s+(f.antal||1),0)+' vindauge, '
           +nd+(nd===1?' dør':' dører'));
       }catch(e){
         if(run!==kiKoyring)return;
@@ -10736,11 +10956,13 @@ async function kiKoyrOpningar(){
     return;
   }
   const merka=forslag.filter(f=>f.fraMerke).length;
-  logAi('\n'+forslag.length+' opningar funne'+(merka?', '+merka+' med mål frå vindaugsmerkinga':'')+'.'
+  const stk=forslag.reduce((s,f)=>s+(f.antal||1),0),grupper=forslag.filter(f=>f.antal>1).length;
+  logAi('\n'+stk+' opningar funne'+(grupper?', samla i '+forslag.length+' element ('+grupper+' grupper av like vindauge)':'')
+    +(merka?', '+merka+' med mål frå vindaugsmerkinga':'')+'.'
     +' Høgda er '+(merka?'elles ':'')+'standard (vindauge 1,2 m, dør 2,1 m) — sjå over i sonekorta.');
   kiDraftWins=forslag;
   kiSteg='opningar';
-  kiKnappar(true,'✓ Godta '+forslag.length+' opningar');
+  kiKnappar(true,'✓ Godta '+stk+' opningar');
   draw();
 }
 function kiGodtaOpningar(){
@@ -10754,11 +10976,14 @@ function kiGodtaOpningar(){
     const z=d.z;z.windows=z.windows||[];
     const typeL=d.type==='dor'?'Dør':'Vindauge';
     const nr=z.windows.filter(w=>w.type===d.type).length+1;
+    const n=d.antal||1;
+    // posT er ein ny array — forslaget og vindauget skal ikkje dele han
     z.windows.push({segIdx:d.segIdx,dir:d.dir,t0:d.t0,t1:d.t1,breddeMm:d.breddeMm,hoyMm:d.hoyMm,
-      antal:1,type:d.type,name:typeL+' '+nr,brystningMm:null,posT:null});
+      antal:n,type:d.type,name:typeL+' '+nr,brystningMm:null,posT:n>1&&d.posT?d.posT.slice():null});
   });
   updateResults();renderTable();draw();
-  hintText.textContent=nye.length+' opningar lagt til frå KI-forslaget. Sjå over høgdene i sonekorta.';
+  const stk=nye.reduce((s,d)=>s+(d.antal||1),0);
+  hintText.textContent=stk+' opningar ('+nye.length+' element) lagt til frå KI-forslaget. Sjå over høgdene i sonekorta.';
   return nye.length;
 }
 
