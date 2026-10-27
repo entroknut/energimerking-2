@@ -764,7 +764,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.12.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.12.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -2078,7 +2078,7 @@ function drawSide(){
   if(cv2.width!==Math.floor(r.width)||cv2.height!==Math.floor(r.height)){cv2.width=r.width;cv2.height=r.height;}
   renderSideSel();
   const a=sideArk(),plan=sideKind()==='plan';
-  ctx2.fillStyle='#d0d6de';ctx2.fillRect(0,0,cv2.width,cv2.height);
+  ctx2.clearRect(0,0,cv2.width,cv2.height);   // punktrutenettet på #sidePane syner gjennom
   const tom=document.getElementById('sideEmpty');
   const tomTekst=!a?'Ingen fasadeark enno. Trykk «+ Fasade» for å lage eitt.'
     :!a.bgImg?'Ingen teikning på «'+a.name+'».':'';
@@ -4796,9 +4796,9 @@ function draw(){
     ctx.translate(-cx2, -cy2);
   }
 
+  // Ingen fyllfarge her: lerretet er gjennomsiktig, så punktrutenettet på
+  // #cwrap syner rundt arket (ei grå flate dekte det etter fyrste draw()).
   if(bgImg){
-    ctx.fillStyle='#d0d6de';ctx.fillRect(0,0,cv.width,cv.height);
-
     // Ghost-overlay: vis nabeetasje UNDER, aktiv etasje OVER med redusert opacity
     // floorDxImg i biletpikslar → skjermoffset = floorDxImg * sc
     const _ao=_arkOffset();
@@ -4833,8 +4833,6 @@ function draw(){
       _teiknSysterBilete(0.35,'multiply');
     }
   } else {
-    ctx.fillStyle='#d0d6de';
-    ctx.fillRect(0,0,cv.width,cv.height);
     _teiknSysterBilete(0.55);   // ei blank delplan viser framleis resten av etasjen
   }
   _teiknSysterSoner();
