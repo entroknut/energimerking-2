@@ -311,6 +311,19 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .zcard.skjult{opacity:.5}
 .zcard.skjult:hover{opacity:.75}
 .zcard.skjult .zname-input{text-decoration:line-through}
+/* Kopling mellom planteikninga og sonelista: musa over sona i teikninga gir
+   ramme på kortet, klikk på sona får kortet til å blinke (visSonekort). */
+.zcard.planhover{border-color:var(--zcard-color,var(--accent));box-shadow:0 0 0 1px var(--zcard-color,var(--accent)),var(--shadow-sm)}
+@keyframes zkortBlink{0%,100%{box-shadow:var(--shadow-xs)}25%,60%{box-shadow:0 0 0 3px color-mix(in srgb,var(--zcard-color,var(--accent)) 50%,transparent),var(--shadow-md)}}
+.zcard.blink{animation:zkortBlink 1.3s ease 1}
+/* Står fast øvst medan lista rullar — det er på lange lister ein treng søket */
+#zlistFilter{display:none;gap:6px;align-items:center;padding:10px 2px 6px 2px;margin-top:-10px;position:sticky;top:-10px;z-index:3;background:var(--bg)}
+#zlistSok{flex:1;min-width:0;font-size:11.5px;padding:4px 8px 4px 24px;border:1px solid var(--border2);border-radius:6px;background:var(--surface) no-repeat 7px 50%/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2398a2b3' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='4.5'/%3E%3Cpath d='M10.5 10.5 14 14'/%3E%3C/svg%3E");color:var(--text);font-family:inherit;outline:none}
+#zlistSok:focus{border-color:var(--accent)}
+#zlistEtgBtn{font-size:10.5px;padding:4px 9px;border:1px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit;white-space:nowrap}
+#zlistEtgBtn.on{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
+.zlist-filtrert{font-size:11px;color:var(--text3);text-align:center;padding:8px 6px 4px;line-height:1.5}
+.zlist-filtrert button{border:none;background:none;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:0;text-decoration:underline}
 .zeye{flex-shrink:0;width:22px;height:22px;padding:0;display:flex;align-items:center;justify-content:center;border:none;border-radius:6px;background:none;color:var(--text3);cursor:pointer;transition:background .12s,color .12s}
 .zeye:hover{background:var(--surface3);color:var(--accent)}
 /* Kollapsbar underseksjon i sonekortet (vindauge/dører) */
@@ -337,9 +350,49 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .card-btn{flex:1;padding:5px 8px;font-size:11.5px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:background .12s,border-color .12s,color .12s,box-shadow .12s;font-weight:500;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;min-width:0}
 .card-btn svg{width:13px;height:13px;flex-shrink:0}
 .card-btn.ik{flex:0 0 auto;padding:5px 7px}
-.card-btns{display:flex;gap:4px;margin-top:10px}
+.card-btns{display:flex;gap:4px;margin:12px 0 4px}
 .card-btn.kopla{color:#6d28d9;border-color:#ddd6fe;background:#f5f3ff}
 .card-btn.kopla:hover{background:#ede9fe;color:#5b21b6}
+/* Kople soner-dialogen (showLinkZoneMenu) */
+.kz-ov{position:fixed;inset:0;background:rgba(13,27,42,.4);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.kz-box{background:var(--surface);border-radius:14px;width:440px;max-width:calc(100vw - 32px);max-height:84vh;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(13,27,42,.18);overflow:hidden}
+.kz-hdr{padding:18px 20px 10px}
+.kz-tit{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:var(--text)}
+.kz-ik{display:inline-flex;width:26px;height:26px;border-radius:7px;background:#f5f3ff;color:#6d28d9;align-items:center;justify-content:center}
+.kz-ik svg{width:15px;height:15px}
+.kz-sub{font-size:11.5px;color:var(--text3);line-height:1.55;margin-top:6px}
+.kz-src{display:flex;align-items:center;gap:10px;margin:0 20px 10px;padding:8px 12px;border:1px solid #ddd6fe;background:#f5f3ff;border-radius:9px}
+.kz-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.kz-namn{flex:1;min-width:0;display:flex;flex-direction:column}
+.kz-namn b{font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kz-namn span{font-size:10.5px;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.kz-chip{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--text3);white-space:nowrap;flex-shrink:0}
+.kz-chip.kopla{background:#ede9fe;color:#6d28d9}
+.kz-chip.varsel{background:#fef3c7;color:#92400e}
+.kz-src .kz-chip{background:#ddd6fe;color:#5b21b6}
+.kz-snar{display:flex;gap:6px;padding:0 20px 10px}
+.kz-liste{flex:1;min-height:60px;overflow-y:auto;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:4px 12px 8px}
+.kz-etg{display:flex;align-items:center;gap:8px;padding:10px 8px 4px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;cursor:pointer}
+.kz-etg span:nth-child(2){flex:1}
+.kz-etg-n{font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:0}
+.kz-rad{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;transition:background .1s}
+.kz-rad:hover{background:var(--surface2)}
+.kz-rad.on{background:#faf8ff;border-color:#ede9fe}
+.kz-ov input[type=checkbox]{accent-color:#7c3aed;width:15px;height:15px;cursor:pointer;margin:0;flex-shrink:0}
+.kz-tom{padding:22px 20px;text-align:center;color:var(--text3);font-size:12px;border-top:1px solid var(--border)}
+.kz-fot{padding:12px 20px 16px}
+.kz-sum{font-size:11.5px;color:var(--text2);margin-bottom:10px;line-height:1.5}
+.kz-knr{display:flex;gap:6px;align-items:center}
+.kz-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-size:12px;font-weight:500;font-family:inherit;cursor:pointer;white-space:nowrap}
+.kz-btn svg{width:13px;height:13px;flex-shrink:0}
+.kz-btn:hover:not(:disabled){background:var(--surface2)}
+.kz-btn:disabled{opacity:.45;cursor:default}
+.kz-prim{background:#7c3aed;border-color:#7c3aed;color:#fff;font-weight:600}
+.kz-prim:hover:not(:disabled){background:#6d28d9}
+.kz-snar .kz-prim{flex:1;justify-content:center;min-width:0}
+.kz-snar .kz-prim span{overflow:hidden;text-overflow:ellipsis}
+.kz-fare{color:#dc2626;border-color:#fca5a5;background:#fef2f2}
+.kz-fare:hover:not(:disabled){background:#fee2e2}
 /* Kontekstmenyar (høgreklikk) — alle menyane brukar desse klassene.
    Ikona kjem frå ctxIkon(): monokrome SVG-ar, aldri fargerike emoji. */
 @keyframes ctxIn{from{opacity:0;transform:scale(.96) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
@@ -930,7 +983,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.14.1</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.15.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -1315,6 +1368,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div id="spanel">
       <div id="zonesPanel" class="plan-only">
         <div class="empty" id="empty"><div class="empty-icon">⬡</div>Teikn ei sone på plantegningen<br>for å sjå areal og fasadar</div>
+        <div id="zlistFilter"><input id="zlistSok" type="search" placeholder="Søk etter sone…" title="Vis berre soner der namnet inneheld teksten" autocomplete="off"><button id="zlistEtgBtn" type="button" title="Vis berre sonekorta for etasjen du står på">Berre denne etasjen</button></div>
         <div id="zlistToolbar" style="display:none;justify-content:flex-end;gap:6px;padding:0 2px 6px 2px"><button id="skjulAllBtn" onclick="window._toggleAllSkjul()" style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit" title="Skjul / vis alle soner i planteikninga og 3D-modellen">Skjul alle soner</button><button id="collapseAllBtn" onclick="window._toggleAllZcards()" style="font-size:10.5px;padding:3px 9px;border:1px solid var(--border2);border-radius:5px;background:var(--surface2);color:var(--text3);cursor:pointer;font-family:inherit" title="Slå saman / vis alle sonekort">Slå saman alle ▾</button></div>
         <div id="zlist"></div>
       </div>
@@ -5567,6 +5621,12 @@ function draw(){
     const p0=i2s(z.pts[0].x,z.pts[0].y);ctx.moveTo(p0.x,p0.y);
     z.pts.forEach((p,i)=>{if(i>0){const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);}});
     ctx.closePath();ctx.fillStyle=FILLS[ci];ctx.fill();
+    // Musa over kortet i sonelista: dobbel fylling og ein brei, mjuk kant under
+    // veggstrekane, så sona er lett å finne i teikninga
+    if(z===_kortHover){
+      ctx.fill();
+      ctx.save();ctx.strokeStyle=COLORS[ci];ctx.globalAlpha=.4;ctx.lineWidth=7;ctx.lineJoin='round';ctx.setLineDash([]);ctx.stroke();ctx.restore();
+    }
     const isEditing=mode==='edit'&&editZoneIdx===zi;
     const sk_set=z.skillevegg||new Set();
     ensureZoneConnectionsMap(z);
@@ -8429,12 +8489,117 @@ function _zlistTilAnker(sp,a){
   const t=setTimeout(stopp,400);
   _zlistRO={stopp};
 }
+// ── Finn sonekortet att ──
+// På store bygg er sonelista lang. Tre ting hjelper: klikk på ei sone i
+// teikninga får kortet fram (visSonekort), musa over sona eller kortet merkjer
+// det andre, og lista kan filtrerast på etasje og namn. Filteret er berre
+// visning — tabell, BRA og eksport ser alle soner — og vert ikkje lagra.
+// Det seier alltid frå kor mange kort det gøymer.
+let zlistBerreEtg=false;
+let zlistSok='';
+let _kortHover=null;   // sona musa er over i sonelista → utheva i teikninga
+let _planHoverZ=null;  // sona musa er over i teikninga → ramme på kortet
+function _fleireEtasjar(){return floors.filter(f=>!erDelplan(f)).length>1;}
+function _iSonelista(f,z){
+  // Delplanane høyrer til same etasje — «denne etasjen» er heile arkgruppa
+  if(zlistBerreEtg&&_fleireEtasjar()&&!etasjeArk(curFloor()).includes(f))return false;
+  const q=zlistSok.trim().toLowerCase();
+  if(q&&!(z.name||'').toLowerCase().includes(q))return false;
+  return true;
+}
+function _nullstillSonefilter(){
+  zlistBerreEtg=false;zlistSok='';
+  const s=document.getElementById('zlistSok');if(s)s.value='';
+}
+function _kortFor(z){return zlist.querySelector('.zcard[data-zkey="z_'+_zuk(z)+'"]');}
+function _markerKort(z){
+  if(z===_planHoverZ)return;
+  if(_planHoverZ){const c=_kortFor(_planHoverZ);if(c)c.classList.remove('planhover');}
+  _planHoverZ=z||null;
+  if(_planHoverZ){const c=_kortFor(_planHoverZ);if(c)c.classList.add('planhover');}
+}
+// Rull fram kortet til sona, opne det og la det blinke.
+function visSonekort(z){
+  const fl=floors.find(f=>f.zones.includes(z));
+  if(!fl)return;
+  const tab=document.querySelector('.stab[data-tab="zones"]');
+  if(tab&&!tab.classList.contains('on'))tab.click();
+  let melding='';
+  // Nullstill berre det filteret som gøymer kortet
+  if(zlistSok&&!(z.name||'').toLowerCase().includes(zlistSok.trim().toLowerCase())){
+    zlistSok='';const s=document.getElementById('zlistSok');if(s)s.value='';
+    melding=' — søket i sonelista er tømt';
+  }
+  if(!_iSonelista(fl,z)){zlistBerreEtg=false;melding=' — «Berre denne etasjen» er slått av';}
+  const key='z_'+_zuk(z);
+  if(!window._zcardCollapsed)window._zcardCollapsed={};
+  window._zcardCollapsed[key]=false;
+  updateResults();
+  const card=_kortFor(z);
+  const sp=document.getElementById('spanel');
+  if(!card||!sp)return;
+  // Kortet er sist klikka: rulleankeret held det i ro ved neste ombygging
+  _zlistSist={key,path:[]};
+  if(_zlistRO){_zlistRO.stopp();_zlistRO=null;}
+  // Korta over har gjetta høgder (content-visibility) som vert rette fyrst
+  // når dei er teikna. Difor same rullinga nokre gonger dei fyrste framene.
+  const filt=document.getElementById('zlistFilter');
+  const rull=()=>{
+    // Under den faste filterraden, ikkje bak henne
+    const topp=filt&&filt.offsetHeight?filt.getBoundingClientRect().bottom:sp.getBoundingClientRect().top;
+    const d=card.getBoundingClientRect().top-topp-8;
+    if(Math.abs(d)>=1)sp.scrollTop+=d;
+  };
+  rull();
+  requestAnimationFrame(()=>{rull();requestAnimationFrame(rull);});
+  setTimeout(rull,120);
+  card.classList.remove('blink');void card.offsetWidth;card.classList.add('blink');
+  setTimeout(()=>card.classList.remove('blink'),1400);
+  if(melding)hintText.textContent='Viser sonekortet til «'+z.name+'»'+melding;
+}
+(()=>{
+  const sok=document.getElementById('zlistSok');
+  const etg=document.getElementById('zlistEtgBtn');
+  let t=null;
+  sok.addEventListener('input',()=>{
+    clearTimeout(t);
+    t=setTimeout(()=>{zlistSok=sok.value;updateResults();},120);
+  });
+  sok.addEventListener('keydown',e=>{
+    e.stopPropagation();   // Ctrl+Z/C/V i feltet skal ikkje treffe teikninga
+    if(e.key==='Escape'){sok.value='';zlistSok='';updateResults();sok.blur();}
+    if(e.key==='Enter'){
+      // Enter: zoom til det fyrste treffet
+      const c=zlist.querySelector('.zcard');
+      if(c&&c._z){const fi=floors.findIndex(f=>f.zones.includes(c._z));
+        if(fi>=0&&fi!==activeFloor){saveFloorState();activeFloor=fi;syncFloorState();renderFloorTabs();updateResults();}
+        zoomToZone(c._z);}
+    }
+  });
+  etg.addEventListener('click',()=>{zlistBerreEtg=!zlistBerreEtg;updateResults();});
+  // Musa over eit kort → sona vert utheva i teikninga. Delegert på lista, sidan
+  // korta vert bygde på nytt heile tida.
+  zlist.addEventListener('mouseover',e=>{
+    const c=e.target.closest&&e.target.closest('.zcard');
+    const z=c?c._z||null:null;
+    if(z!==_kortHover){_kortHover=z;draw();}
+  });
+  zlist.addEventListener('mouseleave',()=>{if(_kortHover){_kortHover=null;draw();}});
+})();
 function updateResults(){
   const allZones=floors.flatMap((f,fi)=>f.zones.map((z,zi)=>({z,zi,fi,f})));
   const hasZones=allZones.length>0;
   emptyEl.style.display=hasZones?'none':'block';
   const _toolbar=document.getElementById('zlistToolbar');
   if(_toolbar)_toolbar.style.display=hasZones?'flex':'none';
+  const _filterRad=document.getElementById('zlistFilter');
+  if(_filterRad){
+    _filterRad.style.display=hasZones?'flex':'none';
+    const eb=document.getElementById('zlistEtgBtn');
+    eb.style.display=_fleireEtasjar()?'':'none';
+    eb.classList.toggle('on',zlistBerreEtg);
+  }
+  let _filtrerte=0;
   // Bevar scroll-posisjonen: forankra på eit kort, ikkje på scrollTop åleine.
   // Korta over kan endre høgd (avrunding, content-visibility som fyrst får
   // storleik i neste frame), og då glei lista under brukaren for kvar endring.
@@ -8489,6 +8654,7 @@ function updateResults(){
   floors.forEach((f,fi)=>{
     if(!f.zones.length)return;
     f.zones.forEach((z,zi)=>{
+      if(!_iSonelista(f,z)){_filtrerte++;return;}
       // Grupperte soner: alle i gruppa brukar fargen til den fyrste i gruppa (global indeks)
       const linked=getLinkedZones(z);
       const isGrouped=linked.length>1;
@@ -8516,6 +8682,8 @@ function updateResults(){
       card.className='zcard'+(mode==='edit'&&fi===activeFloor&&editZoneIdx===zi?' editing':'')+(isCollapsed?' collapsed':'')+(z.skjult?' skjult':'');
       card.style.setProperty('--zcard-color', COLORS[ci]);
       card.dataset.zkey=zoneKey;
+      card._z=z;
+      if(z===_planHoverZ)card.classList.add('planhover');
       // Utan kjend høgd: eit samanslege kort er berre headeren (~40 px), så
       // 320 px-standarden ville gjort rullelista fleire hundre px for lang.
       const _hHint=window._zcardH[zoneKey]||(isCollapsed?40:0);
@@ -8750,6 +8918,10 @@ function updateResults(){
 
       cardBody.appendChild(settings);
 
+      // Vindauge, dører og gavlflater står under konstruksjonane, ikkje rett
+      // over knapperada — der såg knappane ut til å høyre til vindaugslista.
+      const _etterKonstr=document.createDocumentFragment();
+
       // ── Fasadar kompakt (kun YV med vindauge) ──
       if(segs&&(z.windows||[]).length>0){
         const winSummary=document.createElement('div');
@@ -8819,7 +8991,7 @@ function updateResults(){
           wc.appendChild(info);wc.appendChild(cpW);wc.appendChild(del);wl.appendChild(wc);
         });
         winSummary.appendChild(wl);
-        cardBody.appendChild(winSummary);
+        _etterKonstr.appendChild(winSummary);
       }
 
       // ── Gavlflater-oversikt (om dei er berekna) ──
@@ -8840,7 +9012,7 @@ function updateResults(){
           gc.appendChild(gInfo);gc.appendChild(gDel);gavlList.appendChild(gc);
         });
         gavlSum.appendChild(gavlList);
-        cardBody.appendChild(gavlSum);
+        _etterKonstr.appendChild(gavlSum);
       }
 
       // ── Action buttons ──
@@ -9373,12 +9545,23 @@ function updateResults(){
         });
         cardBody.appendChild(facSection);
       }
+      cardBody.appendChild(_etterKonstr);
       };
       if(isCollapsed)card._buildBody=_buildBody;else _buildBody();
 
       _zfrag.appendChild(card);
     });
   });
+  // Filteret gøymer aldri kort i stillheit
+  if(_filtrerte){
+    const n=document.createElement('div');n.className='zlist-filtrert';
+    const vist=allZones.length-_filtrerte;
+    n.textContent=(vist?'Filteret gøymer '+_filtrerte+' av '+allZones.length+' soner · ':'Ingen soner passar filteret · ');
+    const b=document.createElement('button');b.type='button';b.textContent='Vis alle';
+    b.onclick=()=>{_nullstillSonefilter();updateResults();};
+    n.appendChild(b);
+    _zfrag.appendChild(n);
+  }
   zlist.appendChild(_zfrag);
   // Eit nybygd kort får høgda frå førre runde som plasshaldar, og vert
   // fyrst teikna i neste frame. Har det aldri vore målt (200–500 px feil),
@@ -9612,100 +9795,159 @@ function showCopyWindowMenu(w, srcZone, srcZi, srcFloor, srcFi){
 }
 
 // ── Link existing zones across floors ────────────────────────
+// Avkryssing i staden for eitt klikk per sone: brukaren vel heile gruppa og
+// lagrar éin gong (eitt angre-steg). Soner i ein annan kategori vert ikkje
+// viste — kopla soner må ha same bygningskategori. Ei sone som alt ligg i ei
+// anna gruppe vert flytt hit; ei gruppe som då står att med éi sone fell bort.
 function showLinkZoneMenu(z, srcFloor, srcFi){
-  const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(13,27,42,.4);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
-  const box=document.createElement('div');
-  box.style.cssText='background:#fff;border-radius:14px;padding:22px;width:360px;max-height:80vh;overflow-y:auto;box-shadow:0 12px 40px rgba(13,27,42,.15)';
+  saveFloorState();
+  const kat=x=>x.bygkat||'Kontorbygg';
+  const srcBygkat=kat(z);
+  const alle=[];
+  floors.forEach((fl,fli)=>fl.zones.forEach((zz,zi)=>alle.push({z:zz,fl,fli,zi})));
+  const gNamn=gid=>alle.filter(e=>e.z.groupId===gid).map(e=>e.z.name);
+  // Kandidatar: same kategori, eller alt i gruppa (ei gammal kopling på tvers
+  // av kategoriar skal kunne løysast opp, ikkje gøymast).
+  const kand=alle.filter(e=>e.z!==z&&(kat(e.z)===srcBygkat||(z.groupId&&e.z.groupId===z.groupId)));
+  const valt=new Set(kand.filter(e=>z.groupId&&e.z.groupId===z.groupId).map(e=>e.z));
 
-  const srcBygkat=z.bygkat||'Kontorbygg';
-  const srcBT=BYGKAT_SXI[srcBygkat]?.type||srcBygkat;
+  const overlay=document.createElement('div');overlay.className='kz-ov';
+  const box=document.createElement('div');box.className='kz-box';
+  overlay.appendChild(box);
+  const tast=e=>{if(e.key==='Escape'){e.stopPropagation();lukk();}};
+  const lukk=()=>{overlay.remove();document.removeEventListener('keydown',tast,true);};
+  document.addEventListener('keydown',tast,true);
+  overlay.onmousedown=e=>{if(e.target===overlay)lukk();};
 
-  box.innerHTML=`<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">⇌ Koble soner</div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.6">Vel soner som skal slåast saman til éi felles sone i SIMIEN. Berre soner med same bygningskategori (<strong>${srcBygkat}</strong>) kan koplast saman.</div>`;
+  const lagre=()=>{
+    snapshot();
+    const gamle=new Set();
+    // Soner som var i gruppa, men ikkje er valde lenger
+    if(z.groupId)alle.forEach(e=>{if(e.z!==z&&e.z.groupId===z.groupId&&!valt.has(e.z))delete e.z.groupId;});
+    if(!valt.size){
+      if(z.groupId)gamle.add(z.groupId);
+      delete z.groupId;
+    } else {
+      const gid=z.groupId||('g'+(++_nextGroupId));
+      z.groupId=gid;
+      valt.forEach(x=>{if(x.groupId&&x.groupId!==gid)gamle.add(x.groupId);x.groupId=gid;});
+      gamle.add(gid);
+    }
+    // Ei gruppe med berre éi sone att er inga kopling
+    gamle.forEach(g=>{const l=alle.filter(e=>e.z.groupId===g);if(l.length===1)delete l[0].z.groupId;});
+    updateResults();renderTable();draw();
+    const n=getLinkedZones(z).length;
+    hintText.textContent=z.groupId?'«'+z.name+'» er kopla med '+(n-1)+' andre soner — éi sone i SIMIEN.':'«'+z.name+'» er ikkje kopla med nokon.';
+    lukk();
+  };
 
-  // Sjekk om det finst nokon kompatible soner i det heile
-  const allCompatible=floors.flatMap(f=>f.zones).filter(tz=>tz!==z&&(tz.bygkat||'Kontorbygg')===srcBygkat);
-  if(!allCompatible.length){
-    const empty=document.createElement('div');
-    empty.style.cssText='text-align:center;padding:20px;color:var(--text3);font-size:12px';
-    empty.textContent='Ingen andre soner med kategori «'+srcBygkat+'» finst i prosjektet.';
-    box.appendChild(empty);
-  }
+  const sameKat=kand.filter(e=>kat(e.z)===srcBygkat);
+  const ci=zoneColorIdx(srcFi,srcFloor.zones.indexOf(z),z);
 
-  floors.forEach((f,fi)=>{
-    const zonesHere=f.zones.filter((_,i)=>!(fi===srcFi&&f.zones[i]===z));
-    if(!zonesHere.length)return;
+  const teikn=()=>{
+    box.innerHTML='';
+    const hdr=document.createElement('div');hdr.className='kz-hdr';
+    hdr.innerHTML='<div class="kz-tit"><span class="kz-ik">'+ikonSvg('kople')+'</span>Kople soner</div>'
+      +'<div class="kz-sub">Kopla soner vert éi felles sone i SIMIEN. Geometri og areal vert framleis rekna per sone. Berre soner i same kategori kan koplast.</div>';
+    box.appendChild(hdr);
 
-    // Sjekk at minst éi sone i denne etasjen har same kategori (eller er kopla)
-    const hasCompatible=zonesHere.some(tz=>(tz.bygkat||'Kontorbygg')===srcBygkat||(z.groupId&&tz.groupId===z.groupId));
-    if(!hasCompatible)return; // Ikkje vis etasjen i det heile tatt
+    // Sona vi står på — alltid med
+    const src=document.createElement('div');src.className='kz-src';
+    src.innerHTML='<span class="kz-dot" style="background:'+COLORS[ci]+'"></span><div class="kz-namn"><b></b><span></span></div><span class="kz-chip">Denne sona</span>';
+    src.querySelector('b').textContent=z.name;
+    const za=getAreaM2(z);
+    src.querySelector('.kz-namn span').textContent=arkNamn(srcFloor)+' · '+srcBygkat+(za!=null?' · '+za.toFixed(1)+' m²':'');
+    box.appendChild(src);
 
-    const flHdr=document.createElement('div');
-    flHdr.style.cssText='font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin:10px 0 5px';
-    flHdr.textContent=fi===srcFi?'Same etasje ('+f.name+')':f.name;
-    box.appendChild(flHdr);
+    if(!kand.length){
+      const tom=document.createElement('div');tom.className='kz-tom';
+      tom.textContent='Ingen andre soner med kategori «'+srcBygkat+'» finst i prosjektet.';
+      box.appendChild(tom);
+    } else {
+      // Snarvegar
+      const sn=document.createElement('div');sn.className='kz-snar';
+      const kb=document.createElement('button');kb.className='kz-btn kz-prim';
+      kb.innerHTML=ikonSvg('kople')+'<span></span>';
+      kb.lastChild.textContent='Kople alle '+(sameKat.length+1)+' soner i «'+srcBygkat+'»';
+      kb.title='Kryssar av alle soner i kategorien og lagrar med ein gong';
+      kb.disabled=!sameKat.length||(!!z.groupId&&sameKat.every(e=>e.z.groupId===z.groupId));
+      kb.onclick=()=>{sameKat.forEach(e=>valt.add(e.z));lagre();};
+      sn.appendChild(kb);
+      const ingen=document.createElement('button');ingen.className='kz-btn';ingen.textContent='Fjern alle kryss';
+      ingen.disabled=!valt.size;
+      ingen.onclick=()=>{valt.clear();teikn();};
+      sn.appendChild(ingen);
+      box.appendChild(sn);
 
-    zonesHere.forEach(tz=>{
-      const tzBygkat=tz.bygkat||'Kontorbygg';
-      const sameCategory=tzBygkat===srcBygkat;
-      const isLinked=z.groupId&&tz.groupId===z.groupId;
-      if(!sameCategory&&!isLinked)return; // Hopp over ukompatible soner heilt
-      // Finn farge for tz
-      const tzAllZ=floors.flatMap((fl,fli2)=>fl.zones.map((zz,zzi)=>({z:zz,fli:fli2,zi:zzi})));
-      const tzEntry=tzAllZ.find(({z:zz})=>zz===tz);
-      let tzCi=tzEntry?(floors.slice(0,tzEntry.fli).reduce((s,fl)=>s+fl.zones.length,0)+tzEntry.zi)%COLORS.length:0;
-      // Farge etter kopling: viss dei blir kopla, brukar tz fargen til z (primær)
-      const srcEntry=tzAllZ.find(({z:zz})=>zz===z);
-      let srcCi=srcEntry?(floors.slice(0,srcEntry.fli).reduce((s,fl)=>s+fl.zones.length,0)+srcEntry.zi)%COLORS.length:0;
-      const tzColor=isLinked?COLORS[srcCi]:COLORS[tzCi];
-      const tzArea=getAreaM2(tz);
-      const row=document.createElement('button');
-      row.style.cssText=`width:100%;display:flex;align-items:center;gap:10px;padding:8px 12px;border:2px solid ${isLinked?COLORS[srcCi]:'var(--border)'};border-left:4px solid ${tzColor};border-radius:8px;background:${isLinked?'#f5f3ff':'#fff'};cursor:pointer;text-align:left;margin-bottom:5px;font-family:inherit;transition:all .12s`;
-      row.innerHTML=`<div style="width:10px;height:10px;border-radius:50%;background:${tzColor};flex-shrink:0"></div><div style="flex:1"><div style="font-size:12.5px;font-weight:600;color:var(--text)">${tz.name}${tzArea!=null?' <span style="font-size:10.5px;font-weight:400;color:var(--text3);font-family:JetBrains Mono,monospace">'+tzArea.toFixed(1)+' m²</span>':''}</div><div style="font-size:10.5px;color:${isLinked?'#7c3aed':'var(--text3)'}">${isLinked?'✓ Kopla — klikk for å frikoble':'Klikk for å koble saman'}</div></div>`;
-      row.onmouseenter=()=>{if(!isLinked)row.style.borderColor='var(--accent)';};
-      row.onmouseleave=()=>{if(!isLinked)row.style.borderColor='var(--border)';};
-      row.onclick=()=>{
-        snapshot();
-        if(isLinked){
-          delete tz.groupId;
-          // Rydd opp om berre éin att i gruppa
-          const remaining=floors.flatMap(fl=>fl.zones).filter(x=>x.groupId===z.groupId);
-          if(remaining.length===1)delete remaining[0].groupId;
-        } else {
-          if(!z.groupId)z.groupId='g'+(++_nextGroupId);
-          tz.groupId=z.groupId;
-        }
-        updateResults();renderTable();
-        // Refresh overlay in-place
-        overlay.remove();
-        showLinkZoneMenu(z,srcFloor,srcFi);
-      };
-      box.appendChild(row);
-    });
-  });
+      const liste=document.createElement('div');liste.className='kz-liste';
+      // Per ark, i same rekkjefølgje som floors (delplanar under hovudetasjen)
+      floors.forEach(fl=>{
+        const her=kand.filter(e=>e.fl===fl);
+        if(!her.length)return;
+        const eh=document.createElement('label');eh.className='kz-etg';
+        const ecb=document.createElement('input');ecb.type='checkbox';
+        const nv=her.filter(e=>valt.has(e.z)).length;
+        ecb.checked=nv===her.length;ecb.indeterminate=nv>0&&nv<her.length;
+        ecb.title='Vel alle i '+arkNamn(fl);
+        ecb.onchange=()=>{her.forEach(e=>ecb.checked?valt.add(e.z):valt.delete(e.z));teikn();};
+        const et=document.createElement('span');et.textContent=arkNamn(fl);
+        const en=document.createElement('span');en.className='kz-etg-n';en.textContent=nv+' / '+her.length;
+        eh.appendChild(ecb);eh.appendChild(et);eh.appendChild(en);
+        liste.appendChild(eh);
+        her.forEach(e=>{
+          const r=document.createElement('label');r.className='kz-rad'+(valt.has(e.z)?' on':'');
+          const cb=document.createElement('input');cb.type='checkbox';cb.checked=valt.has(e.z);
+          cb.onchange=()=>{cb.checked?valt.add(e.z):valt.delete(e.z);teikn();};
+          const dot=document.createElement('span');dot.className='kz-dot';
+          dot.style.background=COLORS[zoneColorIdx(e.fli,e.zi,e.z)];
+          const nm=document.createElement('div');nm.className='kz-namn';
+          const b=document.createElement('b');b.textContent=e.z.name;
+          const s=document.createElement('span');
+          const a=getAreaM2(e.z);
+          s.textContent=[a!=null?a.toFixed(1)+' m²':null,e.z.byggeaar?'byggeår '+e.z.byggeaar:null].filter(Boolean).join(' · ');
+          nm.appendChild(b);nm.appendChild(s);
+          r.appendChild(cb);r.appendChild(dot);r.appendChild(nm);
+          // Status: i denne gruppa, i ei anna gruppe, eller annan kategori
+          const chip=document.createElement('span');chip.className='kz-chip';
+          if(kat(e.z)!==srcBygkat){chip.classList.add('varsel');chip.textContent=kat(e.z);chip.title='Annan kategori — kan berre koplast frå';}
+          else if(z.groupId&&e.z.groupId===z.groupId){chip.classList.add('kopla');chip.textContent='Kopla';}
+          else if(e.z.groupId){
+            chip.textContent='I anna gruppe';
+            chip.title='Kopla med '+gNamn(e.z.groupId).filter(n=>n!==e.z.name).join(', ')+' — vert flytt hit om du kryssar av';
+          }
+          if(chip.textContent)r.appendChild(chip);
+          liste.appendChild(r);
+        });
+      });
+      box.appendChild(liste);
+    }
 
-  // Frikoble alle
-  if(z.groupId){
-    const sep=document.createElement('div');sep.style.cssText='height:1px;background:var(--border);margin:10px 0';
-    box.appendChild(sep);
-    const ulAll=document.createElement('button');
-    ulAll.style.cssText='width:100%;padding:8px 12px;border:1px solid #fca5a5;border-radius:8px;background:#fef2f2;color:#dc2626;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;margin-bottom:6px';
-    ulAll.textContent='✂ Del opp — frikoble alle soner i gruppa';
-    ulAll.onclick=()=>{
-      snapshot();
-      floors.flatMap(fl=>fl.zones).filter(x=>x.groupId===z.groupId).forEach(x=>delete x.groupId);
-      updateResults();renderTable();overlay.remove();
-    };
-    box.appendChild(ulAll);
-  }
-
-  const cancel=document.createElement('button');
-  cancel.textContent='Lukk';
-  cancel.style.cssText='width:100%;padding:8px;border:1px solid var(--border2);border-radius:8px;background:transparent;color:var(--text3);cursor:pointer;font-family:inherit;font-size:13px;margin-top:4px';
-  cancel.onclick=()=>overlay.remove();
-  box.appendChild(cancel);
-  overlay.appendChild(box);document.body.appendChild(overlay);
+    // Samandrag og knappar
+    const fot=document.createElement('div');fot.className='kz-fot';
+    const sum=document.createElement('div');sum.className='kz-sum';
+    const valde=[z,...valt];
+    const sa=valde.reduce((s,x)=>s+(getAreaM2(x)||0),0);
+    const flytt=[...valt].filter(x=>x.groupId&&x.groupId!==z.groupId).length;
+    sum.textContent=valt.size
+      ?valde.length+' soner vert éi SIMIEN-sone · '+sa.toFixed(1)+' m²'+(flytt?' · '+flytt+' vert flytt frå ei anna gruppe':'')
+      :'Ingen soner valde — sona står for seg sjølv.';
+    fot.appendChild(sum);
+    const knr=document.createElement('div');knr.className='kz-knr';
+    if(z.groupId){
+      const ul=document.createElement('button');ul.className='kz-btn kz-fare';ul.textContent='Frikople alle';
+      ul.title='Løys opp heile gruppa';
+      ul.onclick=()=>{valt.clear();lagre();};
+      knr.appendChild(ul);
+    }
+    const sp=document.createElement('span');sp.style.flex='1';knr.appendChild(sp);
+    const av=document.createElement('button');av.className='kz-btn';av.textContent='Avbryt';av.onclick=lukk;
+    const ok=document.createElement('button');ok.className='kz-btn kz-prim';ok.textContent='Lagre';ok.onclick=lagre;
+    knr.appendChild(av);knr.appendChild(ok);
+    fot.appendChild(knr);
+    box.appendChild(fot);
+  };
+  teikn();
+  document.body.appendChild(overlay);
 }
 
 // ── Table panel ───────────────────────────────────────────────
@@ -10413,12 +10655,17 @@ cwrap.addEventListener('mousemove',e=>{
   } else if(hoveredWin){
     hoveredZone=null;
   }
+  _markerKort(mode==='navigate'&&hoveredZone?hoveredZone.z:null);
 });
+cwrap.addEventListener('mouseleave',()=>_markerKort(null));
 cwrap.addEventListener('mousedown',e=>{
   if(!paaLerretet(e))return;
   if(e.button===1||(e.button===0&&e.altKey)||(e.button===0&&mode==='navigate'&&!hoveredWin)){
     dragging=true;const r=cv.getBoundingClientRect();
-    dragSt={x:e.clientX-r.left,y:e.clientY-r.top};lastOff={x:offX,y:offY};e.preventDefault();return;
+    dragSt={x:e.clientX-r.left,y:e.clientY-r.top};lastOff={x:offX,y:offY};e.preventDefault();
+    // Eit klikk utan panorering på ei sone viser sonekortet (sjå mouseup)
+    _klikkSone=(e.button===0&&!e.altKey&&mode==='navigate'&&hoveredZone)?{z:hoveredZone.z,x:e.clientX,y:e.clientY}:null;
+    return;
   }
   // Start window drag
   if(e.button===0&&hoveredWin&&mode==='navigate'){
@@ -10454,8 +10701,13 @@ cwrap.addEventListener('mousedown',e=>{
     }
   }
 });
-cwrap.addEventListener('mouseup',()=>{
+let _klikkSone=null;
+cwrap.addEventListener('mouseup',e=>{
   dragging=false;
+  if(_klikkSone){
+    const k=_klikkSone;_klikkSone=null;
+    if(Math.hypot(e.clientX-k.x,e.clientY-k.y)<4)visSonekort(k.z);
+  }
   if(dragCorner){updateResults();dragCorner=null;}
   if(dragZone){updateResults();renderTable();dragZone=null;cv.style.cursor='crosshair';}
   if(dragWin){updateResults();renderTable();dragWin=null;cv.style.cursor='grab';}
@@ -10599,6 +10851,7 @@ const IKON_SVG={
   auge:'<path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="2"/>',
   zoom:'<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>',
   ok:'<path d="M3 8.5 6.5 12 13 4.5"/>',
+  kort:'<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M10 2.5v11M4.5 5.5h3M4.5 8h3M4.5 10.5h2"/>',
   vindauge:'<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M8 2.5v11M2.5 8h11"/>',
   dor:'<path d="M4 14V2.5h8V14M2.5 14h11"/><circle cx="10" cy="8.5" r=".8" fill="currentColor"/>',
   loys:'<rect x="1.5" y="5" width="3.5" height="6" rx=".6"/><rect x="6.25" y="5" width="3.5" height="6" rx=".6"/><rect x="11" y="5" width="3.5" height="6" rx=".6"/>',
@@ -10611,7 +10864,7 @@ function ikonSvg(namn){
 // Teikna som menyane alltid har brukt, omsette til SVG der vi har eitt.
 // Andre teikn (⇱ ⇲ ▣ …) er monokrome og står som dei er.
 const _CTX_IKON={'⊹':'geometri','✂':'klipp','🔍':'zoom','👁':'auge','⬡':'kopier','⧉':'kopier','⎘':'kopier',
-  '📋':'lim','⧈':'lim','⋮⋮':'loys','⇔':'jamn','⇌':'kople','✓':'ok','✎':'rediger','🗑':'slett','▭':'vindauge','🚪':'dor'};
+  '📋':'lim','⧈':'lim','⋮⋮':'loys','⇔':'jamn','⇌':'kople','▤':'kort','✓':'ok','✎':'rediger','🗑':'slett','▭':'vindauge','🚪':'dor'};
 function ctxIkon(sym){
   const n=_CTX_IKON[sym];
   return n?ikonSvg(n):'<span class="ctx-g">'+sym+'</span>';
@@ -10657,6 +10910,7 @@ function showZoneContextMenu(clientX,clientY,z,zi,f,fi){
     draw();
   }));
   menu.appendChild(mkItem('🔍','Zoom til sone',()=>zoomToZone(z)));
+  menu.appendChild(mkItem('▤','Vis sonekort',()=>visSonekort(z)));
   menu.appendChild(mkItem('👁','Skjul sona',()=>{
     setSkjult(z,fi,zi,true);
     markDirty();updateResults();draw();_rebuild3DDebounced();

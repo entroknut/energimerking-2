@@ -1231,6 +1231,24 @@ SXI-eksporten er urørte — å skjule er eit visingsval, ikkje ei sletting.
 - 3D-legenda og verdssentrum i 3D/kart reknast frå dei synlege sonene, så
   modellen sentrerer på det som faktisk vert vist.
 
+## Finne sonekortet att
+
+- **Klikk på ei sone i teikninga** (Naviger, utan å panorere — under 4 px
+  rørsle mellom mousedown og mouseup, `_klikkSone`) eller «Vis sonekort» i
+  høgreklikkmenyen kallar `visSonekort(z)`: byter til Soner-fana, opnar kortet,
+  rullar det fram under filterraden og lèt det blinke. Rullinga vert gjenteken
+  nokre frames, sidan korta over har gjetta høgder (content-visibility).
+  `_zlistSist` vert sett til kortet, så rulleankeret held det i ro etterpå.
+- **Musa over sona** i teikninga → `.planhover` på kortet (`_markerKort`,
+  `_planHoverZ`). **Musa over kortet** → sona vert utheva i `draw()`
+  (`_kortHover`, delegert `mouseover` på `#zlist` sidan korta vert bygde på nytt).
+- **Filter** (`#zlistFilter`, fast øvst i panelet): søk på namn (`zlistSok`)
+  og «Berre denne etasjen» (`zlistBerreEtg`, heile `etasjeArk`, knappen berre
+  synleg med fleire hovudetasjar). Berre visning, vert ikkje lagra. Filteret
+  seier alltid kor mange kort det gøymer (`.zlist-filtrert`). `visSonekort`
+  nullstiller berre det filteret som gøymer kortet, og seier frå i hintlinja.
+- «Slå saman alle» verkar på dei korta som er viste.
+
 ## Fasadeteikningar
 
 Eit **fasadeark** er ei teikning som berre vert målt på. Det ligg VED SIDA AV
