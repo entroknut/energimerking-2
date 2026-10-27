@@ -334,7 +334,27 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .metric:last-of-type{border-bottom:none}
 .metric-l{color:var(--text3);font-weight:500}
 .metric-v{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',monospace;font-size:11px}
-.card-btn{flex:1;padding:5px 8px;font-size:11.5px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:background .12s,border-color .12s,color .12s,box-shadow .12s;font-weight:500;font-family:inherit}
+.card-btn{flex:1;padding:5px 8px;font-size:11.5px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:background .12s,border-color .12s,color .12s,box-shadow .12s;font-weight:500;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;min-width:0}
+.card-btn svg{width:13px;height:13px;flex-shrink:0}
+.card-btn.ik{flex:0 0 auto;padding:5px 7px}
+.card-btns{display:flex;gap:4px;margin-top:10px}
+.card-btn.kopla{color:#6d28d9;border-color:#ddd6fe;background:#f5f3ff}
+.card-btn.kopla:hover{background:#ede9fe;color:#5b21b6}
+/* Kontekstmenyar (høgreklikk) — alle menyane brukar desse klassene.
+   Ikona kjem frå ctxIkon(): monokrome SVG-ar, aldri fargerike emoji. */
+@keyframes ctxIn{from{opacity:0;transform:scale(.96) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.ctx-menu{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-lg),0 0 0 1px rgba(16,24,40,.03);z-index:600;min-width:210px;padding:4px;font-family:inherit;animation:ctxIn .12s ease;max-height:80vh;overflow-y:auto}
+.ctx-menu-item{display:flex;align-items:center;gap:10px;padding:7px 10px;font-size:12.5px;cursor:pointer;color:var(--text2);transition:background .1s,color .1s;border:none;background:none;width:100%;text-align:left;font-family:inherit;border-radius:7px;line-height:1.35}
+.ctx-menu-item:hover{background:var(--surface2);color:var(--text)}
+.ctx-menu-item.danger{color:var(--red)}
+.ctx-menu-item.danger:hover{background:var(--red-dim);color:var(--red)}
+.ctx-menu-sep{height:1px;background:var(--border);margin:4px 6px}
+.ctx-menu-header{padding:7px 10px 4px;font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px}
+.ctx-ik{width:16px;height:16px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;color:var(--text3)}
+.ctx-menu-item:hover .ctx-ik{color:var(--accent)}
+.ctx-menu-item.danger .ctx-ik,.ctx-menu-item.danger:hover .ctx-ik{color:var(--red)}
+.ctx-ik svg{width:15px;height:15px}
+.ctx-ik .ctx-g{font-size:13px;line-height:1}
 .card-btn:hover{background:var(--surface);color:var(--text);border-color:var(--border2);box-shadow:var(--shadow-xs)}
 .card-btn.danger{color:var(--red);border-color:#fca5a5;background:var(--surface)}
 .card-btn.danger:hover{background:var(--red-dim)}
@@ -385,12 +405,30 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 /* ── Dropzone ── */
 #dropz{position:absolute;inset:0;margin:auto;width:min(560px,calc(100% - 48px));height:min(340px,calc(100% - 48px));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;cursor:pointer;border:2px dashed var(--border2);border-radius:20px;background:rgba(255,255,255,.55);backdrop-filter:blur(2px);transition:border-color .2s,background .2s}
 #dropz:hover{border-color:rgba(29,79,79,.45);background:rgba(255,255,255,.8)}
-#dropz-icon{width:68px;height:68px;border-radius:18px;background:var(--accent-dim);border:1px solid rgba(29,79,79,.15);display:flex;align-items:center;justify-content:center;font-size:26px;transition:all .2s;box-shadow:var(--shadow-sm)}
+#dropz-icon{position:relative;width:68px;height:68px;border-radius:18px;background:var(--accent-dim);border:1px solid rgba(29,79,79,.15);display:flex;align-items:center;justify-content:center;font-size:26px;transition:all .2s;box-shadow:var(--shadow-sm)}
+/* Ikonet: eit teikneark med ei lita planteikning, Entro-symbolet i det
+   største rommet (fritt for veggane) og ei opplastingspil i hjørnet.
+   Koordinatane til symbolet er i % av ikonet, same rutenett som SVG-en (68). */
+#dropz-icon svg{position:absolute;inset:0;width:100%;height:100%}
+#dropz-icon .entro-ikon{position:absolute;left:36%;top:40.5%;width:13.2%;height:20.6%}
+#dropz-icon .dz-pil{position:absolute;right:6px;bottom:6px;width:18px;height:18px;border-radius:50%;background:#1a7a6e;color:#fff;font-size:11px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.2)}
 /* Entro-ikonet (berre symbolet) som maske, farga i mørkeblått som «entro Pi»-logoen.
    --entro-ikon er den eine kopien av biletet: opplastingsboksen, bakgrunnen og nordpila les han. */
 .entro-ikon{width:24px;height:38px;background:#32595e;-webkit-mask:var(--entro-ikon) center/contain no-repeat;mask:var(--entro-ikon) center/contain no-repeat}
 #dropz:hover #dropz-icon{background:#d7e6e4;border-color:rgba(29,79,79,.35);transform:translateY(-2px);box-shadow:var(--shadow-md)}
-#dropz-text{text-align:center;color:var(--text3);font-size:13px;line-height:1.9}
+#dropz-text{text-align:center;color:var(--text3);font-size:13px;line-height:1.7;max-width:420px;padding:0 16px}
+#dropz-text small{display:block;margin-top:4px;line-height:1.5}
+/* Filer vert dregne over lerretet (#cwrap.dra-inn). Er slippsona framme,
+   lyser ho opp; elles kjem ei slippflate over heile teikninga. */
+#cwrap.dra-inn #dropz{border:3px solid var(--accent);background:rgba(208,233,228,.97);box-shadow:0 0 0 8px rgba(26,122,110,.16),var(--shadow-lg)}
+#cwrap.dra-inn #dropz #dropz-icon{transform:translateY(-6px) scale(1.18);background:#d7e6e4;border-color:rgba(29,79,79,.35);box-shadow:var(--shadow-md)}
+#cwrap.dra-inn #dropz-text strong{color:var(--accent);font-size:18px}
+#cwrap.dra-inn #dropz-text{color:var(--text2)}
+#slippFlate{display:none;position:absolute;inset:14px;z-index:40;pointer-events:none;border:3px dashed var(--accent);border-radius:16px;
+  background:rgba(208,233,228,.9);backdrop-filter:blur(2px);align-items:center;justify-content:center;flex-direction:column;gap:6px;text-align:center}
+#cwrap.dra-inn.over-teikning #slippFlate{display:flex}
+#slippFlate b{font-size:20px;color:var(--accent)}
+#slippFlate span{font-size:12.5px;color:var(--text2)}
 #dropz-text strong{color:var(--text2);display:block;margin-bottom:2px;font-size:14px;font-weight:600}
 /* Lastekort medan teikningar vert lesne/lagde inn */
 #lasteKort{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;width:min(340px,calc(100% - 32px));padding:16px 18px 14px;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 32px rgba(13,27,42,.16);display:none;animation:dlgInn .18s ease-out;cursor:progress}
@@ -447,6 +485,70 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .ai-note{font-size:11.5px;color:#b45309;line-height:1.5;padding:2px 0 0 22px}
 .ai-note:empty{display:none}
 .ai-kalkrav{margin:8px 0 0;padding:10px 12px;border:1px solid #fca5a5;background:#fef2f2;border-radius:var(--r);font-size:12.5px;color:#991b1b;line-height:1.5}
+/* Listebasert redigering */
+#listeOverlay{position:fixed;z-index:320}
+#listeWin{width:min(1240px,96vw);height:min(860px,92vh);display:flex;flex-direction:column;padding:18px 20px}
+.li-topp{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.li-topp h3{margin:0}
+.li-val{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.li-val label{font-size:12px;color:var(--text2);white-space:nowrap}
+.li-val select{width:220px;font-size:13px;padding:6px 8px;text-align:left}
+.li-val input{flex:1;font-size:13px;padding:6px 10px;text-align:left}
+.li-hint{font-size:11.5px;color:var(--text3);min-height:18px;margin-bottom:6px;line-height:1.5}
+.li-hint b{color:var(--accent)}
+.li-tabwrap{flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:10px}
+.li-tab{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+.li-tab th{position:sticky;top:0;z-index:2;background:var(--surface2);text-align:left;font-weight:600;color:var(--text2);padding:8px 8px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;font-size:11.5px}
+.li-tab th.num{text-align:right}
+.li-tab th .li-pil{opacity:.5;margin-left:3px}
+.li-tab th .li-ein{font-weight:400;color:var(--text3)}
+.li-tab tr.li-alle td{position:sticky;top:33px;z-index:1;background:#5f6670;color:#fff;font-size:11.5px;padding:6px 8px}
+.li-tab td{padding:3px 8px;border-bottom:1px solid var(--border);white-space:nowrap;color:var(--text)}
+.li-tab td.num{text-align:right;font-family:'JetBrains Mono',monospace;font-size:11.5px}
+.li-tab td.les{color:var(--text3)}
+.li-tab tr.vald td{background:#e8f3f1}
+.li-tab tbody tr:hover td{background:var(--surface2)}
+.li-tab tbody tr.vald:hover td{background:#dcefeb}
+.li-tab input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;vertical-align:middle}
+.li-tab .li-inp{width:100%;min-width:64px;box-sizing:border-box;padding:3px 6px;border:1px solid transparent;border-radius:5px;background:transparent;font:inherit;color:inherit}
+.li-tab .li-inp.num{text-align:right;font-family:'JetBrains Mono',monospace;font-size:11.5px;min-width:70px}
+.li-tab .li-inp.txt{min-width:120px}
+.li-tab .li-inp:hover{border-color:var(--border2);background:#fff}
+.li-tab .li-inp:focus{border-color:var(--accent);background:#fff;outline:none}
+.li-tab .li-inp::placeholder{color:#a0a8b4}
+.li-tab .li-inp.endra{animation:liBlink .9s ease-out}
+@keyframes liBlink{from{background:#c9eee4}to{background:transparent}}
+.li-tab select.li-inp{cursor:pointer;min-width:110px}
+.li-tab tfoot td{position:sticky;bottom:0;background:var(--surface2);font-weight:600;border-top:1px solid var(--border);border-bottom:none;padding:7px 8px}
+.li-tom{padding:28px;text-align:center;color:var(--text3);font-size:12.5px}
+/* Slå saman fasadar */
+.mg-intro{font-size:12px;color:var(--text2);line-height:1.5;margin:-2px 0 12px}
+.mg-sek{margin-bottom:12px}
+.mg-hdr{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.mg-hdr .mg-tal{font-weight:600;text-transform:none;letter-spacing:0;color:var(--text3)}
+.mg-kopla{padding:10px 12px;border:1px solid #c4b5fd;background:#f5f3ff;border-radius:8px;margin-bottom:12px}
+.mg-kopla label{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;font-weight:600;color:#4c1d95;cursor:pointer;line-height:1.4}
+.mg-kopla input{margin-top:2px;accent-color:#7c3aed}
+.mg-kopla .mg-sub{font-size:11.5px;color:#5b21b6;font-weight:400;margin:6px 0 0 22px;line-height:1.45}
+.mg-rad{display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:7px;margin-bottom:4px;font-size:12px}
+.mg-rad.gruppe{background:#dbeafe;border:1px solid #93c5fd;color:#1e3a8a}
+.mg-rad.kopla{background:#ede9fe;border:1px solid #c4b5fd;color:#4c1d95}
+.mg-rad .mg-namn{font-weight:700;white-space:nowrap}
+.mg-rad .mg-info{flex:1;min-width:0;color:var(--text2);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mg-rad .mg-tal2{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text3);white-space:nowrap}
+.mg-rad button{font-size:11px;padding:2px 8px;border:1px solid currentColor;border-radius:5px;background:#fff;color:inherit;cursor:pointer;font-family:inherit;white-space:nowrap}
+.mg-tom{font-size:12px;color:var(--text3);padding:2px 0 4px}
+.mg-retn{font-size:10.5px;font-weight:700;color:var(--accent);margin:6px 0 2px 2px}
+.mg-val{display:flex;align-items:center;gap:8px;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:12px;user-select:none}
+.mg-val:hover{background:var(--surface2)}
+.mg-val input{accent-color:var(--accent);width:14px;height:14px}
+.mg-val .mg-tal2{margin-left:auto}
+.mg-liste{max-height:220px;overflow-y:auto;padding:4px;border:1px solid var(--border);border-radius:7px;margin-bottom:8px}
+.mg-warn{padding:6px 8px;background:#fef3c7;border:1px solid #d97706;border-radius:6px;font-size:11.5px;color:#92400e;margin-bottom:8px}
+.mg-btnrad{display:flex;gap:6px;align-items:center}
+.mg-btnrad .big-input{flex:1;font-size:12.5px;padding:5px 8px;text-align:left}
+#mergeZoneSel{text-align:left}
+#mergeOverlay .dok:disabled{opacity:.45;cursor:default}
 .ai-kalkrav.bor{border-color:#fcd34d;background:#fffbeb;color:#92400e}
 .ai-kalkrav.ok{border-color:#a7d7c5;background:#f0faf6;color:#1a5e4f}
 #aiKalListe{margin-top:6px;display:flex;flex-direction:column;gap:3px}
@@ -749,6 +851,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div class="tg">
       <button class="btn plan-only" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ <span class="tb-full">Slå saman fasadar</span><span class="tb-short">Fasadar</span></button>
+      <button class="btn plan-only" id="listeBtn" title="Listebasert redigering — sjå og endre vindauge, dører, ytterveggar, soner og etasjar i ein tabell. Vel fleire rader for å endre alle på ein gong.">☰ <span class="tb-full">Listebasert redigering</span><span class="tb-short">Liste</span></button>
       <!-- Tekniske system fungerer ikkje godt nok enno: knappen er gøymd, koden (// ── 2c.) står.
            Set klassa embed-only tilbake og fjern style="display:none" for å slå han på att. -->
       <button class="btn plan-only" id="sysBtn" style="display:none" title="Hent dei tekniske systema som ligg på bygget i EntroPi og legg dei på soner">⚙ <span class="tb-full">Hent tekniske systemer</span><span class="tb-short">Tekn. system</span> <span class="sys-beta">BETA</span></button>
@@ -798,15 +901,16 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.13.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.14.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
     <canvas id="cv"></canvas>
     <div id="dropz">
-      <div id="dropz-icon"><span class="entro-ikon" aria-hidden="true"></span></div>
-      <div id="dropz-text"><strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG) — eller eit prosjekt (.entro)<br><small>Klikk eller slepp filer her — fleire filer eller sider vert kvar sin etasje</small></div>
+      <div id="dropz-icon" aria-hidden="true"><svg viewBox="0 0 68 68"><path d="M16 11h28l8 8v38H16z" fill="#fff" stroke="#32595e" stroke-opacity=".35"/><path d="M44 11v8h8" fill="none" stroke="#32595e" stroke-opacity=".35"/><g fill="none" stroke="#32595e" stroke-opacity=".45" stroke-width="1.2"><path d="M21 24h26v28H21z"/><path d="M36 24v10M36 39v13M21 44h6M31 44h5"/></g></svg><span class="entro-ikon"></span><span class="dz-pil">↑</span></div>
+      <div id="dropz-text"><strong>Last opp planteikningar</strong>Éi eller fleire på ein gong — PDF, bilete eller prosjekt (.entro)<br><small>Klikk, eller dra filene hit. Kvar fil eller PDF-side vert ein etasje — du rettar namn og type før noko vert lagt inn.</small></div>
     </div>
+    <div id="slippFlate"><b id="slippTittel">Slepp filene her</b><span id="slippTekst"></span></div>
     <div id="lasteKort" role="status" aria-live="polite"><div class="lk-topp"><div class="lk-spin"></div><div style="min-width:0;flex:1"><div class="lk-tittel"></div><div class="lk-tekst"></div></div></div><div class="lk-bar"><div class="lk-fyll"></div></div></div>
     <div id="scaleBadge" class="uncal">Ikkje kalibrert</div>
     <canvas id="compassCanvas" class="plan-only" width="96" height="96" title="Nordpila — dra for å justere kva veg nord peikar"></canvas>
@@ -1064,42 +1168,35 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
     </div>
 
-    <!-- Merge facades dialog -->
-    <div class="dialog-overlay" id="mergeOverlay">
-      <div class="dialog" style="width:460px;max-height:80vh;display:flex;flex-direction:column">
-        <h3>⊞ Slå saman fasadar</h3>
-        <div style="overflow-y:auto;flex:1">
-          <div class="irow" style="margin-bottom:10px">
-            <label style="white-space:nowrap">Sone</label>
-            <select class="big-input" id="mergeZoneSel" style="flex:1;font-size:13px;padding:6px 8px"></select>
-          </div>
-          <div id="mergeExisting" style="margin-bottom:4px"></div>
-          <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:10px">
-            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Ny gruppe</div>
-            <div style="display:flex;gap:18px;margin-bottom:10px;font-size:12.5px">
-              <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-                <input type="radio" name="mergeMode" id="mergeAutoRad" value="auto" checked> Automatisk
-              </label>
-              <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-                <input type="radio" name="mergeMode" id="mergeManualRad" value="manual"> Manuelt
-              </label>
-            </div>
-            <div id="mergeAutoSection">
-              <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Slår saman alle fasadar med same himmelretning (Nord, Sør osv.) til éitt element kvar.</p>
-              <button class="dok" id="mergeDoAuto" style="width:100%">Slå saman automatisk</button>
-            </div>
-            <div id="mergeManualSection" style="display:none">
-              <p style="font-size:12px;color:var(--text2);margin-bottom:6px">Vel fasadar som skal slåast saman:</p>
-              <div id="mergeFacadeList" style="display:flex;flex-direction:column;gap:2px;max-height:190px;overflow-y:auto;padding:5px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px"></div>
-              <div id="mergeWarning" style="display:none;padding:6px 8px;background:#fef3c7;border:1px solid #d97706;border-radius:5px;font-size:11.5px;color:#92400e;margin-bottom:8px"></div>
-              <div class="irow">
-                <label style="white-space:nowrap">Gruppenamn</label>
-                <input type="text" class="big-input" id="mergeGroupName" placeholder="t.d. Nord" style="flex:1">
-              </div>
-              <button class="dok" id="mergeDoManual" style="width:100%;margin-top:6px">+ Legg til gruppe</button>
-            </div>
-          </div>
+    <!-- Listebasert redigering — sjå «Listebasert redigering» i JS-en -->
+    <div class="dialog-overlay" id="listeOverlay">
+      <div class="dialog" id="listeWin">
+        <div class="li-topp">
+          <h3>☰ Listebasert redigering</h3>
+          <span style="flex:1"></span>
+          <button class="dcancel" id="listeKopier" title="Kopier tabellen (med dei valde radene, eller alle) — lim inn i Excel">⧉ Kopier til Excel</button>
+          <button class="dok" id="listeLukk">Ferdig</button>
         </div>
+        <div class="li-val">
+          <label>Elementtype</label>
+          <select id="listeType" class="big-input"></select>
+          <input type="search" id="listeFilter" class="big-input" placeholder="Filtrer på namn, sone eller etasje">
+        </div>
+        <div class="li-hint" id="listeHint"></div>
+        <div class="li-tabwrap"><table class="li-tab" id="listeTab"></table></div>
+      </div>
+    </div>
+
+    <!-- Slå saman fasadar — sjå «Slå saman fasadar — dialog» i JS-en -->
+    <div class="dialog-overlay" id="mergeOverlay">
+      <div class="dialog" style="width:480px;max-height:84vh;display:flex;flex-direction:column">
+        <h3>⊞ Slå saman fasadar</h3>
+        <p class="mg-intro">Fasadar som er slegne saman vert <b>éin fasade</b> i SXI-eksporten — samla areal, alle vindauga og dørene, og snittretninga.</p>
+        <div class="irow" style="margin-bottom:10px">
+          <label style="white-space:nowrap">Sone</label>
+          <select class="big-input" id="mergeZoneSel" style="flex:1;font-size:13px;padding:6px 8px"></select>
+        </div>
+        <div id="mergeBody" style="overflow-y:auto;flex:1;min-height:0"></div>
         <div class="dbtns" style="margin-top:12px;flex-shrink:0">
           <button class="dcancel" id="mergeDone">Ferdig</button>
         </div>
@@ -2030,8 +2127,8 @@ function applyViewUI(){
   if(fb)fb.classList.toggle('on',iFasade());
   const dz=document.getElementById('dropz-text');
   if(dz)dz.innerHTML=iFasade()
-    ? '<strong>Last opp fasadeteikning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp fil her</small>'
-    : '<strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG) — eller eit prosjekt (.entro)<br><small>Klikk eller slepp fil her</small>';
+    ? '<strong>Last opp fasadeteikningar</strong>Éi eller fleire — PDF eller bilete (PNG, JPG)<br><small>Klikk, eller dra filene hit</small>'
+    : '<strong>Last opp planteikningar</strong>Éi eller fleire på ein gong — PDF, bilete eller prosjekt (.entro)<br><small>Klikk, eller dra filene hit. Kvar fil eller PDF-side vert ein etasje — du rettar namn og type før noko vert lagt inn.</small>';
 }
 
 function setViewMode(v){
@@ -2953,6 +3050,13 @@ function winForTrongt(w,width,segLen){
 function fasadarMedForStoreOpningar(z){
   const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z));
   if(!segs||!(z.windows||[]).length)return [];
+  // Kopla soner slegne saman på tvers: éin fasade per himmelretning over alle
+  // instansane, som i buildSXI. segs = veggane i DENNE sona i den fasaden.
+  if(koplaFasadarSaman(z)){
+    return koplaFasadeGrupper(getLinkedZones(z))
+      .filter(g=>g.opn>0&&g.opn>g.area+0.005&&g.segs.some(x=>x.lz===z))
+      .map(g=>({namn:g.dir+' (kopla soner)',segs:new Set(g.segs.filter(x=>x.lz===z).map(x=>x.seg.idx)),area:g.area,opn:g.opn}));
+  }
   const sk=z.skillevegg||new Set(), fhM=getHoyde(z), lbl=getFacadeLabels(z,segs);
   const segA=gs=>{const ov=z.segOverrides?.[gs.idx]||{};return ov.areaM2??gs.areaM2??((ov.lenM??gs.lenM??0)*fhM)??0;};
   const opnA=w=>{
@@ -3238,6 +3342,41 @@ function getAreaM2(z){return z.areaOverride!=null?z.areaOverride:calcAreaM2(z.pt
 function getLinkedZones(z){
   if(!z.groupId)return[z];
   return floors.flatMap(f=>f.zones).filter(x=>x.groupId===z.groupId);
+}
+// Fasadane i kopla soner slått saman på tvers: éin <facade> per himmelretning
+// i SXI-en for alle instansane. Valet ligg på kvar instans (`yvKoplaSaman`) og
+// vert sett/fjerna på alle samstundes; ei instans som vert kopla til seinare
+// får det med seg, sidan det held at éin har det.
+function koplaFasadarSaman(z){
+  if(!z||!z.groupId)return false;
+  const l=getLinkedZones(z);
+  return l.length>1&&l.some(x=>x.yvKoplaSaman);
+}
+// Ytterveggane (ikkje SK, ikkje kjellervegg) i alle instansane, gruppert på
+// himmelretning. Same tal som buildSXI og fasadarMedForStoreOpningar brukar.
+// Gavlflater er ikkje med — dei er eigne <facade>-element som før.
+function koplaFasadeGrupper(instances){
+  const per=new Map();
+  instances.forEach(lz=>{
+    const segs=calcSegments(lz.pts,getHoyde(lz),mppForZone(lz));
+    if(!segs)return;
+    const sk=lz.skillevegg||new Set(),fhM=getHoyde(lz);
+    segs.forEach(seg=>{
+      if(sk.has(seg.idx)||isKjellervegg(lz,seg.idx))return;
+      const ov=lz.segOverrides?.[seg.idx]||{};
+      const area=(ov.areaM2??seg.areaM2??((ov.lenM??seg.lenM??0)*fhM))??0;
+      if(!per.has(seg.dir))per.set(seg.dir,{dir:seg.dir,segs:[],area:0,opn:0,az:0});
+      const g=per.get(seg.dir);
+      g.segs.push({lz,seg,area});g.area+=area;
+      g.opn+=(lz.windows||[]).filter(w=>w.segIdx===seg.idx).reduce((s,w)=>{
+        const d=w.type==='dor';
+        return s+Math.max(0.1,(w.hoyMm||(d?2100:1200))/1000)*Math.max(0.1,(w.breddeMm||(d?900:1200))/1000)*(w.antal||1);
+      },0);
+    });
+  });
+  const ORD=['Nord','Nordøst','Øst','Sørøst','Sør','Sørvest','Vest','Nordvest'];
+  return [...per.values()].map(g=>({...g,az:Math.round(circularMeanAz(g.segs.map(x=>x.seg.normalAz)))}))
+    .sort((a,b)=>ORD.indexOf(a.dir)-ORD.indexOf(b.dir));
 }
 // Total area for a zone (sum across all linked floors)
 function getTotalAreaM2(z){
@@ -3707,148 +3846,449 @@ function updateMeasureUI(){
   const c=b.querySelector('.mcount');if(c)c.textContent=cnt;
   if(!cnt)hoveredMeasure=null;
 }
+// ── Listebasert redigering ────────────────────────────────────
+// Inspirert av SIMIEN: éin tabell per elementtype, der verdiane kan endrast
+// rett i cellene. Er rada vald og fleire rader er valde, gjeld endringa ALLE
+// dei valde — det er vegen til å endre mange element på ein gong.
+//
+// Kvar endring er eitt angre-steg (snapshot fyrst). Reglane er dei same som
+// sonekortet og vindaugsdialogen brukar, og står i set() per kolonne:
+//  - antal går gjennom winSetAntal (plasseringa), aldri w.antal=n
+//  - etasjehøgda gjeld heile delplangruppa (etasjeArk), og fhI for den aktive
+//  - kategori på ei kopla sone gjeld alle instansane (kopla soner må ha same)
+//  - tom celle i eit valfritt felt (U-verdi, høgd, brystning …) = standard
+// Utrekna kolonnar (areal, effektiv U, U·A) er berre til lesing og følgjer
+// dei same uttrykka som buildSXI.
+const listeOverlay=document.getElementById('listeOverlay');
+// Lista dekkjer heile vindauget, ikkje berre lerretet: flytt ho til <body>,
+// ut av stablinga til #cwrap (isolation:isolate) — elles låg sidepanelet over
+document.body.appendChild(listeOverlay);
+let listeType='vindauge',listeSort=null,listeVal=new Set();
+
+const _liNum=(v,d)=>v==null||v===''||isNaN(v)?'':(+v).toFixed(d);
+const _liPos=(v,heil)=>{const n=heil?parseInt(v):parseFloat(String(v).replace(',','.'));return n>0?n:null;};
+const _liStd=z=>entroStandard(z.byggeaar);
+function _liFlOf(z){return floors.find(f=>f.zones.includes(z))||null;}
+function _liU(z,k){const d={uVegg:0.26,uTak:0.18,uGulv:0.35,uVindu:1.60,uDor:2.00,n50:3.5};return z[k]??_liStd(z)?.[k]??d[k];}
+function _liOpnA(w){const d=w.type==='dor';return Math.max(0.1,(w.hoyMm||(d?2100:1200))/1000)*Math.max(0.1,(w.breddeMm||(d?900:1200))/1000)*(w.antal||1);}
+
+// Kolonne: {k, t (tittel), ein (eining), num, des (desimalar), get(r), set(r,v) — utan set er ho til lesing,
+// opt (liste for nedtrekk), valfri (tom = standard), ph(r) (standardverdien som plasshaldar), heil}
+const LISTE_TYPAR={
+  vindauge:{namn:'Vindauge',rader:()=>_liOpningar('vindauge'),kol:()=>_liOpnKol(false)},
+  dor:{namn:'Dører',rader:()=>_liOpningar('dor'),kol:()=>_liOpnKol(true)},
+  vegg:{namn:'Ytterveggar (U-verdi fasadar)',rader:_liVeggar,kol:()=>[
+    {k:'namn',t:'Namn',get:r=>r.namn},
+    {k:'sone',t:'Sone',get:r=>r.z.name},
+    {k:'etg',t:'Etasje',get:r=>r.etg},
+    {k:'retn',t:'Retning',get:r=>r.seg.dir},
+    {k:'areal',t:'Areal',ein:'m²',num:1,des:2,get:r=>r.areal},
+    {k:'u',t:'U-verdi',ein:'W/m²K',num:1,des:2,valfri:1,ph:r=>_liU(r.z,'uVegg'),
+      get:r=>r.z.uPerSeg?.['seg_'+r.seg.idx],
+      set:(r,v)=>{if(!r.z.uPerSeg)r.z.uPerSeg={};if(v==null)delete r.z.uPerSeg['seg_'+r.seg.idx];else r.z.uPerSeg['seg_'+r.seg.idx]=v;}},
+    {k:'ua',t:'Spesifikt varmetap',ein:'W/K',num:1,des:2,get:r=>r.areal*(r.z.uPerSeg?.['seg_'+r.seg.idx]??_liU(r.z,'uVegg'))},
+  ]},
+  sone:{namn:'Soner',rader:()=>floors.flatMap(f=>f.zones.map(z=>({key:z,z,etg:arkNamn(f),f}))),kol:()=>[
+    {k:'namn',t:'Namn',txt:1,get:r=>r.z.name,set:(r,v)=>{r.z.name=String(v||'').trim()||r.z.name;}},
+    {k:'etg',t:'Etasje',get:r=>r.etg},
+    {k:'kat',t:'Kategori',opt:Object.keys(BYGKAT_SXI),get:r=>r.z.bygkat||'Kontorbygg',
+      set:(r,v)=>{getLinkedZones(r.z).forEach(lz=>{lz.bygkat=v;});}},
+    {k:'aar',t:'Byggeår',num:1,heil:1,valfri:1,get:r=>r.z.byggeaar,set:(r,v)=>{r.z.byggeaar=v;}},
+    {k:'areal',t:'Areal',ein:'m²',num:1,des:1,get:r=>getAreaM2(r.z)},
+    {k:'hoyde',t:'Høgd',ein:'m',num:1,des:2,valfri:1,ph:r=>{const f=r.f;return f?.defaultHoyde??(parseFloat(fhI.value)||3);},get:r=>r.z.hoyde,set:(r,v)=>{r.z.hoyde=v;}},
+    {k:'him',t:'Himling',ein:'m',num:1,des:2,valfri:1,ph:r=>getHoyde(r.z),get:r=>r.z.himling,set:(r,v)=>{r.z.himling=v;}},
+    {k:'golv',t:'Golv',opt:GULV_TYPER,get:r=>r.z.gulvtype||GULV_TYPER[0],set:(r,v)=>{r.z.gulvtype=v;}},
+    {k:'tak',t:'Tak',opt:TAK_TYPER,get:r=>r.z.taktype||TAK_TYPER[0],set:(r,v)=>{r.z.taktype=v;}},
+    {k:'vinkel',t:'Takvinkel',ein:'°',num:1,des:0,valfri:1,ph:()=>0,get:r=>r.z.takvinkel||null,set:(r,v)=>{r.z.takvinkel=v;}},
+    ...[['uVegg','U-vegg'],['uTak','U-tak'],['uGulv','U-golv'],['uVindu','U-vindauge'],['uDor','U-dør'],['n50','n50']].map(([k,t])=>(
+      {k,t,ein:k==='n50'?'1/h':'W/m²K',num:1,des:2,valfri:1,ph:r=>_liU({...r.z,[k]:null},k),get:r=>r.z[k],set:(r,v)=>{r.z[k]=v;}})),
+  ]},
+  etasje:{namn:'Etasjar',rader:()=>floors.filter(f=>!erDelplan(f)).map(f=>({key:f,f,etg:f.name})),kol:()=>[
+    {k:'namn',t:'Namn',txt:1,get:r=>r.f.name,set:(r,v)=>{r.f.name=String(v||'').trim()||r.f.name;}},
+    {k:'ark',t:'Teikningar',num:1,des:0,get:r=>etasjeArk(r.f).length},
+    {k:'soner',t:'Soner',num:1,des:0,get:r=>etasjeArk(r.f).reduce((s,a)=>s+a.zones.length,0)},
+    {k:'bra',t:'Areal',ein:'m²',num:1,des:1,get:r=>etasjeArk(r.f).reduce((s,a)=>s+a.zones.reduce((t,z)=>t+(getAreaM2(z)||0),0),0)},
+    {k:'h',t:'Etasjehøgd',ein:'m',num:1,des:2,get:r=>r.f.defaultHoyde??(parseFloat(fhI.value)||3),
+      set:(r,v)=>{if(v==null)return;etasjeArk(r.f).forEach(x=>{x.defaultHoyde=v;});
+        if(etasjeArk(r.f).includes(curFloor()))fhI.value=v;}},
+  ]},
+};
+function _liOpningar(type){
+  const ut=[];
+  floors.forEach(f=>f.zones.forEach(z=>(z.windows||[]).forEach(w=>{
+    if((w.type==='dor')!==(type==='dor'))return;
+    ut.push({key:w,w,z,f,etg:arkNamn(f)});
+  })));
+  return ut;
+}
+function _liOpnKol(dor){
+  const uk=dor?'uDor':'uVindu';
+  return [
+    {k:'namn',t:'Namn',txt:1,get:r=>r.w.name||(dor?'Dør':'Vindauge'),set:(r,v)=>{r.w.name=String(v||'').trim()||r.w.name;}},
+    {k:'sone',t:'Sone',get:r=>r.z.name},
+    {k:'etg',t:'Etasje',get:r=>r.etg},
+    {k:'b',t:'Breidd',ein:'mm',num:1,des:0,heil:1,get:r=>r.w.breddeMm,set:(r,v)=>{if(v!=null)r.w.breddeMm=v;}},
+    {k:'h',t:'Høgd',ein:'mm',num:1,des:0,heil:1,get:r=>r.w.hoyMm,set:(r,v)=>{if(v!=null)r.w.hoyMm=v;}},
+    ...(dor?[]:[{k:'bryst',t:'Brystning',ein:'mm',num:1,des:0,heil:1,valfri:1,ph:()=>'standard',get:r=>r.w.brystningMm,set:(r,v)=>{r.w.brystningMm=v;}}]),
+    {k:'n',t:'Antal',num:1,des:0,heil:1,get:r=>winCount(r.w),
+      set:(r,v)=>{if(v==null)return;const g=winGeom(r.z,r.w);winSetAntal(r.w,v,g.width,g.segLen,winOpptekne(r.z,r.w,g.segLen,g.mpp));}},
+    {k:'u',t:'U-verdi',ein:'W/m²K',num:1,des:2,valfri:1,ph:r=>_liU(r.z,uk),get:r=>r.w.uVerdi,set:(r,v)=>{r.w.uVerdi=v==null?undefined:v;}},
+    {k:'a',t:'Areal',ein:'m²',num:1,des:2,get:r=>_liOpnA(r.w)},
+    {k:'ua',t:'Spesifikt varmetap',ein:'W/K',num:1,des:2,get:r=>_liOpnA(r.w)*(r.w.uVerdi??_liU(r.z,uk))},
+  ];
+}
+function _liVeggar(){
+  const ut=[];
+  floors.forEach(f=>f.zones.forEach(z=>{
+    const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z));
+    if(!segs)return;
+    const lbl=getFacadeLabels(z,segs),sk=z.skillevegg||new Set();
+    segs.forEach((seg,si)=>{
+      if(sk.has(seg.idx)||isKjellervegg(z,seg.idx))return;
+      const ov=z.segOverrides?.[seg.idx]||{};
+      const areal=(ov.areaM2??seg.areaM2??((ov.lenM??seg.lenM??0)*getHoyde(z)))??0;
+      ut.push({key:_zuk(z)+':'+seg.idx,z,f,seg,namn:lbl[si],etg:arkNamn(f),areal});
+    });
+  }));
+  return ut;
+}
+
+function opneListe(){
+  saveFloorState();   // floors[activeFloor].zones må vere den same som zones
+  const sel=document.getElementById('listeType');
+  sel.innerHTML='';
+  Object.entries(LISTE_TYPAR).forEach(([k,t])=>{const o=document.createElement('option');o.value=k;o.textContent=t.namn;sel.appendChild(o);});
+  sel.value=listeType;
+  sel.onchange=()=>{listeType=sel.value;listeSort=null;listeVal.clear();renderListe();};
+  document.getElementById('listeFilter').oninput=renderListe;
+  listeOverlay.classList.add('show');
+  renderListe();
+}
+function _liRader(){
+  const T=LISTE_TYPAR[listeType],kol=T.kol();
+  let rader=T.rader();
+  const q=document.getElementById('listeFilter').value.trim().toLowerCase();
+  if(q)rader=rader.filter(r=>kol.filter(c=>!c.num&&!c.opt).some(c=>String(c.get(r)??'').toLowerCase().includes(q)));
+  if(listeSort){
+    const c=kol.find(c=>c.k===listeSort.k);
+    if(c)rader.sort((a,b)=>{
+      const x=c.get(a)??(c.ph?c.ph(a):null),y=c.get(b)??(c.ph?c.ph(b):null);
+      const r=(typeof x==='number'&&typeof y==='number')?x-y:String(x??'').localeCompare(String(y??''),'nb',{numeric:true});
+      return r*listeSort.dir;
+    });
+  }
+  return {kol,rader};
+}
+function renderListe(){
+  const tab=document.getElementById('listeTab');
+  const {kol,rader}=_liRader();
+  // Valet held berre på rader som framleis finst (etter angre er objekta nye)
+  const finst=new Set(LISTE_TYPAR[listeType].rader().map(r=>r.key));
+  [...listeVal].forEach(k=>{if(!finst.has(k))listeVal.delete(k);});
+  const nVal=rader.filter(r=>listeVal.has(r.key)).length;
+  document.getElementById('listeHint').innerHTML=nVal>1
+    ?'<b>'+nVal+' rader er valde.</b> Endrar du ein verdi i ei vald rad, gjeld han alle dei valde. Tom celle i eit valfritt felt set standardverdien.'
+    :'Klikk i ei celle for å endre verdien. Vel fleire rader for å endre alle på ein gong. Tom celle i eit valfritt felt (grå tal) set standardverdien.';
+  tab.innerHTML='';
+  if(!rader.length){
+    tab.innerHTML='<tbody><tr><td class="li-tom">'+(document.getElementById('listeFilter').value?'Ingen rader passar filteret.':'Det finst ingen '+LISTE_TYPAR[listeType].namn.toLowerCase()+' i prosjektet enno.')+'</td></tr></tbody>';
+    return;
+  }
+  const thead=document.createElement('thead'),hr=document.createElement('tr');
+  const th0=document.createElement('th');th0.style.width='28px';th0.style.cursor='default';hr.appendChild(th0);
+  kol.forEach(c=>{
+    const th=document.createElement('th');if(c.num)th.className='num';
+    th.innerHTML='';th.append(c.t);
+    if(c.ein){const e=document.createElement('span');e.className='li-ein';e.textContent=' ['+c.ein+']';th.appendChild(e);}
+    if(listeSort&&listeSort.k===c.k){const p=document.createElement('span');p.className='li-pil';p.textContent=listeSort.dir>0?'▲':'▼';th.appendChild(p);}
+    th.onclick=()=>{listeSort=listeSort&&listeSort.k===c.k?{k:c.k,dir:-listeSort.dir}:{k:c.k,dir:1};renderListe();};
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+  // «Vel alle»-rad, som i SIMIEN
+  const ar=document.createElement('tr');ar.className='li-alle';
+  const atd=document.createElement('td');atd.colSpan=kol.length+1;
+  const acb=document.createElement('input');acb.type='checkbox';
+  acb.checked=nVal===rader.length;acb.indeterminate=nVal>0&&nVal<rader.length;
+  acb.onchange=()=>{rader.forEach(r=>{if(acb.checked)listeVal.add(r.key);else listeVal.delete(r.key);});renderListe();};
+  const al=document.createElement('label');al.style.cssText='display:inline-flex;align-items:center;gap:8px;cursor:pointer';
+  al.append(acb,' Vel alle'+(nVal?'  ·  '+nVal+' av '+rader.length+' valde':'  ·  '+rader.length+' rader'));
+  atd.appendChild(al);ar.appendChild(atd);thead.appendChild(ar);
+  tab.appendChild(thead);
+
+  const tb=document.createElement('tbody');
+  rader.forEach(r=>{
+    const tr=document.createElement('tr');if(listeVal.has(r.key))tr.className='vald';
+    const td0=document.createElement('td');
+    const cb=document.createElement('input');cb.type='checkbox';cb.checked=listeVal.has(r.key);
+    cb.onchange=()=>{if(cb.checked)listeVal.add(r.key);else listeVal.delete(r.key);renderListe();};
+    td0.appendChild(cb);tr.appendChild(td0);
+    kol.forEach(c=>{
+      const td=document.createElement('td');if(c.num)td.className='num';
+      const v=c.get(r);
+      if(!c.set){
+        td.classList.add('les');
+        td.textContent=c.num?_liNum(v,c.des):(v??'');
+      }else if(c.opt){
+        const sel=document.createElement('select');sel.className='li-inp';
+        c.opt.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;sel.appendChild(op);});
+        sel.value=v;
+        sel.onchange=()=>_liEndra(r,c,sel.value,rader);
+        td.appendChild(sel);
+      }else{
+        const inp=document.createElement('input');inp.className='li-inp '+(c.num?'num':'txt');
+        inp.value=c.num?_liNum(v,c.des):(v??'');
+        if(c.valfri&&c.ph){const p=c.ph(r);inp.placeholder=typeof p==='number'?_liNum(p,c.des):p;}
+        inp.dataset.k=c.k;
+        inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=c.num?_liNum(v,c.des):(v??'');inp.blur();}};
+        inp.onchange=()=>{
+          let nv;
+          if(c.num){
+            if(inp.value.trim()===''){
+              if(!c.valfri){inp.value=_liNum(v,c.des);return;}   // påkravd felt: tom = ingen endring
+              nv=null;
+            }else{
+              nv=_liPos(inp.value,c.heil);
+              if(nv==null){inp.value=_liNum(v,c.des);hintText.textContent='Ugyldig verdi — må vere eit tal større enn 0.';return;}
+            }
+          }else nv=inp.value;
+          _liEndra(r,c,nv,rader);
+        };
+        td.appendChild(inp);
+      }
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  tab.appendChild(tb);
+
+  // Sum for areal og varmetap
+  const sumK=kol.filter(c=>c.num&&!c.set&&(c.k==='a'||c.k==='areal'||c.k==='ua'||c.k==='bra'||c.k==='soner'));
+  if(sumK.length){
+    const tf=document.createElement('tfoot'),ftr=document.createElement('tr');
+    ftr.appendChild(document.createElement('td'));
+    kol.forEach((c,i)=>{
+      const td=document.createElement('td');if(c.num)td.className='num';
+      if(i===0)td.textContent='Sum'+(nVal>1?' (alle '+rader.length+')':'');
+      else if(sumK.includes(c))td.textContent=_liNum(rader.reduce((s,r)=>s+(+c.get(r)||0),0),c.des);
+      ftr.appendChild(td);
+    });
+    tf.appendChild(ftr);tab.appendChild(tf);
+  }
+}
+// Éi endring: til rada åleine, eller til alle valde om rada er vald og fleire er det
+function _liEndra(r,c,v,rader){
+  const mange=listeVal.has(r.key)&&listeVal.size>1;
+  const maal=mange?LISTE_TYPAR[listeType].rader().filter(x=>listeVal.has(x.key)):[r];
+  snapshot();
+  maal.forEach(x=>c.set(x,v));
+  markDirty();
+  updateResults();renderTable();draw();
+  renderListe();
+  // Vis kva som vart endra
+  const synlege=_liRader().rader,endra=new Set(maal.map(x=>x.key));
+  document.querySelectorAll('#listeTab tbody tr').forEach((tr,i)=>{
+    if(synlege[i]&&endra.has(synlege[i].key)){const e=tr.querySelector('[data-k="'+c.k+'"]');if(e)e.classList.add('endra');}
+  });
+  hintText.textContent=(mange?maal.length+' '+LISTE_TYPAR[listeType].namn.toLowerCase()+' endra':'Endra')+': '+c.t.toLowerCase()+'. Ctrl+Z angrar.';
+}
+function _liTilTekst(){
+  const {kol,rader}=_liRader();
+  const ut=rader.some(r=>listeVal.has(r.key))?rader.filter(r=>listeVal.has(r.key)):rader;
+  const fmt=(c,r)=>{const v=c.get(r)??(c.valfri&&c.ph&&typeof c.ph(r)==='number'?c.ph(r):null);return c.num?_liNum(v,c.des).replace('.',','):String(v??'');};
+  return [kol.map(c=>c.t+(c.ein?' ['+c.ein+']':'')).join('\t'),...ut.map(r=>kol.map(c=>fmt(c,r)).join('\t'))].join('\n');
+}
+document.getElementById('listeBtn').onclick=opneListe;
+document.getElementById('listeLukk').onclick=()=>listeOverlay.classList.remove('show');
+listeOverlay.addEventListener('click',e=>{if(e.target===listeOverlay)listeOverlay.classList.remove('show');});
+document.getElementById('listeKopier').onclick=async()=>{
+  try{await navigator.clipboard.writeText(_liTilTekst());hintText.textContent='Tabellen er kopiert — lim inn i Excel.';}
+  catch(e){alert('Kunne ikkje kopiere til utklippstavla: '+e.message);}
+};
+
 // ── Slå saman fasadar — dialog ────────────────────────────────
+// Éi side: samanslegne grupper øvst, så «etter himmelretning» (eitt klikk)
+// og «vel sjølv». For kopla soner (groupId) finst i tillegg valet om å slå
+// saman fasadane på TVERS av sonene — sjå koplaFasadarSaman().
+// Kvar endring er eitt angre-steg (snapshot), og ein vegg ligg i høgst
+// éi gruppe: medlemskap, aldri nøkkeloppslag på segmentlista.
 const mergeBtn=document.getElementById('mergeBtn');
 const mergeOverlay=document.getElementById('mergeOverlay');
+let _mergeVal=null;   // {fi,zi} — sona dialogen viser
 
 function buildMergeDialog(){
+  saveFloorState();   // floors[activeFloor].zones må vere den same som zones
   const sel=document.getElementById('mergeZoneSel');
   sel.innerHTML='';
-  // Aktiv etasje først, så resten
   const orderedFloors=[activeFloor,...floors.map((_,i)=>i).filter(i=>i!==activeFloor)];
   let defaultVal=null;
   orderedFloors.forEach(fi=>{
     const fl=floors[fi];
-    if(!fl)return;
+    if(!fl||!fl.zones.length)return;
+    const og=document.createElement('optgroup');og.label=arkNamn(fl);
     fl.zones.forEach((z,zi)=>{
       const opt=document.createElement('option');
       opt.value=fi+','+zi;
-      opt.textContent=z.name+(floors.length>1?' ('+fl.name+')':'');
-      sel.appendChild(opt);
+      opt.textContent=z.name+(getLinkedZones(z).length>1?'  · kopla':'');
+      og.appendChild(opt);
       if(defaultVal===null)defaultVal=fi+','+zi;
     });
+    sel.appendChild(og);
   });
-  if(defaultVal)sel.value=defaultVal;
+  // Hald på sona frå sist om ho framleis finst
+  const sist=_mergeVal&&floors[_mergeVal.fi]?.zones[_mergeVal.zi]?_mergeVal.fi+','+_mergeVal.zi:null;
+  if(sist||defaultVal)sel.value=sist||defaultVal;
   sel.onchange=renderMergeForZone;
-  document.getElementById('mergeAutoRad').onchange=updateMergeModeUI;
-  document.getElementById('mergeManualRad').onchange=updateMergeModeUI;
   renderMergeForZone();
 }
 
-function updateMergeModeUI(){
-  const isAuto=document.getElementById('mergeAutoRad').checked;
-  document.getElementById('mergeAutoSection').style.display=isAuto?'':'none';
-  document.getElementById('mergeManualSection').style.display=isAuto?'none':'';
+function _mergeSegA(z,gs){
+  const ov=z.segOverrides?.[gs.idx]||{};
+  return ov.areaM2??gs.areaM2??((ov.lenM??gs.lenM??0)*getHoyde(z))??0;
+}
+function _mergeOpnA(z,idxSet){
+  return (z.windows||[]).filter(w=>idxSet.has(w.segIdx)).reduce((s,w)=>{
+    const d=w.type==='dor';
+    return s+Math.max(0.1,(w.hoyMm||(d?2100:1200))/1000)*Math.max(0.1,(w.breddeMm||(d?900:1200))/1000)*(w.antal||1);
+  },0);
+}
+// Fjern veggane frå alle grupper dei ligg i; grupper med under to veggar fell bort
+function _mergeFjernSegs(z,idxs){
+  z.yvMergedGroups=(z.yvMergedGroups||[])
+    .map(g=>({...g,segs:g.segs.filter(i=>!idxs.includes(i))}))
+    .filter(g=>g.segs.length>1);
+}
+function _mergeEndra(fn){
+  snapshot();
+  fn();
+  renderMergeForZone();updateResults();renderTable();draw();
 }
 
 function renderMergeForZone(){
   const val=document.getElementById('mergeZoneSel').value;
-  if(!val)return;
+  const body=document.getElementById('mergeBody');
+  body.innerHTML='';
+  if(!val){body.innerHTML='<div class="mg-tom">Det finst ingen soner å slå saman fasadar i.</div>';return;}
   const [fi,zi]=val.split(',').map(Number);
+  _mergeVal={fi,zi};
   const z=floors[fi]?.zones[zi];
   if(!z)return;
   if(!z.yvMergedGroups)z.yvMergedGroups=[];
-  const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z));
-  const sk=z.skillevegg||new Set();
+  const segs=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
+  const labels=getFacadeLabels(z,segs);
+  const lblOf=idx=>labels[segs.findIndex(s=>s.idx===idx)]||('Vegg '+(idx+1));
+  const yv=segs.filter(s=>!(z.skillevegg||new Set()).has(s.idx)&&!isKjellervegg(z,s.idx));
+  const harSkala=!!mppForZone(z);
+  const el=(tag,cls,txt)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;};
+  const tal=(area,opn)=>harSkala?fmtM2(area)+(opn?' · '+fmtM2(opn)+' opn.':''):'—';
 
-  // Eksisterande grupper
-  const existDiv=document.getElementById('mergeExisting');
-  existDiv.innerHTML='';
-  if(z.yvMergedGroups.length){
-    const hdr=document.createElement('div');
-    hdr.style.cssText='font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px';
-    hdr.textContent='Samanslåtte grupper';
-    existDiv.appendChild(hdr);
-    z.yvMergedGroups.forEach((g,gi)=>{
-      const grpSegs=segs?segs.filter(s=>g.segs.includes(s.idx)):[];
-      const totalA=grpSegs.reduce((s,s2)=>s+(s2.areaM2||0),0);
-      const winA=grpSegs.reduce((s,s2)=>(z.windows||[]).filter(w=>w.segIdx===s2.idx).reduce((ss,w)=>ss+(w.breddeMm/1000)*(w.hoyMm/1000)*w.antal,s),0);
-      const netA=mmPerImgPx?(totalA-winA):null;
-      const meanAz=grpSegs.length?Math.round(circularMeanAz(grpSegs.map(s=>s.normalAz))):null;
-      const row=document.createElement('div');
-      row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 8px;background:#dbeafe;border:1px solid #3b82f6;border-radius:6px;margin-bottom:4px';
-      const lbl=document.createElement('span');lbl.style.cssText='font-size:12px;font-weight:700;color:#1e40af;flex:1';
-      lbl.textContent=g.name+' — '+g.segs.length+' fasadar'+(netA!=null?' · '+fmtM2(netA):'')+(meanAz!=null?' · '+meanAz+'°':'');
-      const rmBtn=document.createElement('button');
-      rmBtn.style.cssText='font-size:11px;padding:2px 8px;border:1px solid #3b82f6;border-radius:4px;background:#fff;color:#1e40af;cursor:pointer;font-family:inherit;white-space:nowrap';
-      rmBtn.textContent='× Fjern';
-      rmBtn.onclick=()=>{z.yvMergedGroups.splice(gi,1);renderMergeForZone();updateResults();renderTable();draw();};
-      row.appendChild(lbl);row.appendChild(rmBtn);
-      existDiv.appendChild(row);
-    });
-  }
-
-  // Auto-samanslå
-  document.getElementById('mergeDoAuto').onclick=()=>{
-    if(!segs)return;
-    const alreadyMerged=new Set(z.yvMergedGroups.flatMap(g=>g.segs));
-    getYvDirectionGroups(z,segs).forEach(grp=>{
-      const available=grp.filter(s=>!alreadyMerged.has(s.idx));
-      if(available.length<2)return;
-      const key=available.map(s=>s.idx).sort((a,b)=>a-b).join(',');
-      if(!z.yvMergedGroups.find(g=>g.segs.slice().sort((a,b)=>a-b).join(',')===key)){
-        z.yvMergedGroups.push({segs:available.map(s=>s.idx),name:grp[0].dir});
-        available.forEach(s=>alreadyMerged.add(s.idx));
-      }
-    });
-    renderMergeForZone();updateResults();renderTable();draw();
-  };
-
-  // Manuel fasadeliste
-  const listDiv=document.getElementById('mergeFacadeList');
-  listDiv.innerHTML='';
-  const alreadyMergedIdx=new Set(z.yvMergedGroups.flatMap(g=>g.segs));
-  const labels=segs?getFacadeLabels(z,segs):[];
-  if(segs){
-    segs.forEach((seg,si)=>{
-      if(sk.has(seg.idx)||alreadyMergedIdx.has(seg.idx))return;
-      const nm=labels[si];
-      const lbl=document.createElement('label');
-      lbl.style.cssText='display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;user-select:none';
-      lbl.onmouseenter=()=>{lbl.style.background='var(--surface2)';};
-      lbl.onmouseleave=()=>{lbl.style.background='';};
-      const cb=document.createElement('input');cb.type='checkbox';cb.dataset.segIdx=seg.idx;cb.dataset.dir=seg.dir;
-      cb.style.cssText='accent-color:var(--accent);cursor:pointer;width:14px;height:14px;flex-shrink:0';
-      cb.onchange=updateMergeWarning;
-      const txt=document.createElement('span');
-      txt.innerHTML='<span style="font-weight:700;color:var(--accent)">'+nm+'</span>'+(seg.areaM2!=null?' <span style="color:#6b7280">'+fmtM2(seg.areaM2)+'</span>':'');
-      lbl.appendChild(cb);lbl.appendChild(txt);
-      listDiv.appendChild(lbl);
-    });
-  }
-  if(!listDiv.children.length){
-    listDiv.innerHTML='<span style="font-size:12px;color:var(--text3);padding:4px">Ingen usamanslåtte YV-fasadar</span>';
-  }
-  updateMergeWarning();
-
-  document.getElementById('mergeDoManual').onclick=()=>{
-    const checked=[...listDiv.querySelectorAll('input[type=checkbox]:checked')];
-    if(checked.length<2){alert('Vel minst 2 fasadar.');return;}
-    const segIdxs=checked.map(c=>parseInt(c.dataset.segIdx));
-    const dirs=[...new Set(checked.map(c=>c.dataset.dir))];
-    const nameInput=document.getElementById('mergeGroupName');
-    const name=nameInput.value.trim()||dirs[0];
-    const key=segIdxs.slice().sort((a,b)=>a-b).join(',');
-    if(!z.yvMergedGroups.find(g=>g.segs.slice().sort((a,b)=>a-b).join(',')===key)){
-      z.yvMergedGroups.push({segs:segIdxs,name});
+  // ── Kopla soner: slå saman på tvers ──
+  const linked=getLinkedZones(z);
+  const kopla=linked.length>1&&koplaFasadarSaman(z);
+  if(linked.length>1){
+    const box=el('div','mg-kopla');
+    const lab=el('label');
+    const cb=document.createElement('input');cb.type='checkbox';cb.checked=kopla;
+    cb.onchange=()=>_mergeEndra(()=>{linked.forEach(lz=>{if(cb.checked)lz.yvKoplaSaman=true;else delete lz.yvKoplaSaman;});});
+    lab.append(cb,el('span',null,'Slå saman fasadane i dei '+linked.length+' kopla sonene — éin fasade per himmelretning'));
+    box.appendChild(lab);
+    const sub=el('div','mg-sub');
+    sub.textContent=kopla
+      ?'Ytterveggane i alle etasjane vert lagde saman etter himmelretning. Grupperingane per sone under gjeld ikkje så lenge dette er på.'
+      :'Gjeld alle etasjane «'+z.name+'» ligg i. Gavlflater og skiljekonstruksjonar står for seg som før.';
+    box.appendChild(sub);
+    if(kopla){
+      koplaFasadeGrupper(linked).forEach(g=>{
+        const r=el('div','mg-rad kopla');
+        r.append(el('span','mg-namn',g.dir),
+          el('span','mg-info',g.segs.length+' fasadar i '+new Set(g.segs.map(x=>x.lz)).size+' etasjar'),
+          el('span','mg-tal2',tal(g.area,g.opn)+' · '+g.az+'°'));
+        box.appendChild(r);
+      });
     }
-    nameInput.value='';
-    renderMergeForZone();updateResults();renderTable();draw();
-  };
-
-  updateMergeModeUI();
-}
-
-function updateMergeWarning(){
-  const listDiv=document.getElementById('mergeFacadeList');
-  const dirs=[...new Set([...listDiv.querySelectorAll('input:checked')].map(c=>c.dataset.dir))];
-  const warn=document.getElementById('mergeWarning');
-  if(dirs.length>1){
-    warn.style.display='block';
-    warn.textContent='⚠ Åtvaring: fasadane har ulik himmelretning ('+dirs.join(', ')+').';
-  } else {
-    warn.style.display='none';
+    body.appendChild(box);
+    if(kopla)return;
   }
+
+  // ── Samanslegne grupper i sona ──
+  const sekG=el('div','mg-sek');
+  const hdrG=el('div','mg-hdr','Samanslegne');
+  sekG.appendChild(hdrG);
+  if(!z.yvMergedGroups.length)sekG.appendChild(el('div','mg-tom','Ingen fasadar er slegne saman i denne sona enno.'));
+  z.yvMergedGroups.forEach((g,gi)=>{
+    const grpSegs=segs.filter(s=>g.segs.includes(s.idx));
+    const idx=new Set(g.segs);
+    const area=grpSegs.reduce((a,gs)=>a+_mergeSegA(z,gs),0);
+    const az=grpSegs.length?Math.round(circularMeanAz(grpSegs.map(s=>s.normalAz))):null;
+    const r=el('div','mg-rad gruppe');
+    const info=el('span','mg-info',g.segs.map(lblOf).join(', '));info.title=info.textContent;
+    const b=el('button',null,'Del opp');
+    b.onclick=()=>_mergeEndra(()=>{z.yvMergedGroups.splice(gi,1);});
+    r.append(el('span','mg-namn',g.name),info,el('span','mg-tal2',tal(area,_mergeOpnA(z,idx))+(az!=null?' · '+az+'°':'')),b);
+    sekG.appendChild(r);
+  });
+  if(z.yvMergedGroups.length>1){
+    const alle=el('button','dcancel','Del opp alle');alle.style.cssText='font-size:11px;padding:3px 10px;margin-top:2px';
+    alle.onclick=()=>_mergeEndra(()=>{z.yvMergedGroups=[];});
+    sekG.appendChild(alle);
+  }
+  body.appendChild(sekG);
+
+  // ── Etter himmelretning ──
+  const iGruppe=new Set(z.yvMergedGroups.flatMap(g=>g.segs));
+  const ledige=yv.filter(s=>!iGruppe.has(s.idx));
+  const perRetn={};
+  ledige.forEach(s=>{(perRetn[s.dir]=perRetn[s.dir]||[]).push(s);});
+  const nyeAuto=Object.entries(perRetn).filter(([,a])=>a.length>1);
+  const sekA=el('div','mg-sek');
+  sekA.appendChild(el('div','mg-hdr','Etter himmelretning'));
+  const bA=el('button','dok',nyeAuto.length
+    ?'Slå saman etter himmelretning ('+nyeAuto.map(([d,a])=>d+' '+a.length).join(', ')+')'
+    :'Ingen fleire fasadar med same himmelretning');
+  bA.style.width='100%';bA.disabled=!nyeAuto.length;
+  bA.onclick=()=>_mergeEndra(()=>{nyeAuto.forEach(([d,a])=>z.yvMergedGroups.push({segs:a.map(s=>s.idx),name:d}));});
+  sekA.appendChild(bA);
+  body.appendChild(sekA);
+
+  // ── Vel sjølv ──
+  const sekM=el('div','mg-sek');
+  sekM.appendChild(el('div','mg-hdr','Vel sjølv'));
+  const liste=el('div','mg-liste');
+  const warn=el('div','mg-warn');warn.style.display='none';
+  const namnI=document.createElement('input');namnI.type='text';namnI.className='big-input';namnI.placeholder='Namn (t.d. Nord)';
+  const bM=el('button','dok','Slå saman valde');bM.disabled=true;
+  const valde=()=>[...liste.querySelectorAll('input:checked')].map(c=>yv.find(s=>s.idx===+c.dataset.idx));
+  const oppdater=()=>{
+    const v=valde(),dirs=[...new Set(v.map(s=>s.dir))];
+    bM.disabled=v.length<2;
+    bM.textContent=v.length>1?'Slå saman '+v.length+' fasadar':'Slå saman valde';
+    namnI.placeholder='Namn (t.d. '+(dirs[0]||'Nord')+')';
+    warn.style.display=dirs.length>1?'':'none';
+    warn.textContent='⚠ Ulike himmelretningar ('+dirs.join(', ')+'). SIMIEN får snittretninga — soltilskotet vert grovare.';
+  };
+  ['Nord','Nordøst','Øst','Sørøst','Sør','Sørvest','Vest','Nordvest'].forEach(d=>{
+    const ds=yv.filter(s=>s.dir===d);
+    if(!ds.length)return;
+    liste.appendChild(el('div','mg-retn',d));
+    ds.forEach(s=>{
+      const lab=el('label','mg-val');
+      const cb=document.createElement('input');cb.type='checkbox';cb.dataset.idx=s.idx;cb.onchange=oppdater;
+      const g=z.yvMergedGroups.find(g=>g.segs.includes(s.idx));
+      lab.append(cb,el('span',null,lblOf(s.idx)+(g?'  ·  i «'+g.name+'»':'')),el('span','mg-tal2',tal(_mergeSegA(z,s),_mergeOpnA(z,new Set([s.idx])))));
+      liste.appendChild(lab);
+    });
+  });
+  if(!yv.length)liste.appendChild(el('div','mg-tom','Sona har ingen ytterveggar å slå saman.'));
+  bM.onclick=()=>{
+    const v=valde();if(v.length<2)return;
+    const idxs=v.map(s=>s.idx);
+    const name=namnI.value.trim()||[...new Set(v.map(s=>s.dir))][0];
+    // Ein vegg kan berre liggje i éi gruppe — flytt han frå den gamle
+    _mergeEndra(()=>{_mergeFjernSegs(z,idxs);z.yvMergedGroups.push({segs:idxs,name});});
+  };
+  const btnRad=el('div','mg-btnrad');btnRad.append(namnI,bM);
+  sekM.append(liste,warn,btnRad);
+  body.appendChild(sekM);
 }
 
 mergeBtn.onclick=()=>{
@@ -4010,6 +4450,7 @@ function undo(){
   const prev=history.pop();
   applyHistoryState(prev);
   hintText.textContent='Angra.';
+  if(listeOverlay.classList.contains('show'))renderListe();
 }
 
 function redo(){
@@ -4018,6 +4459,7 @@ function redo(){
   const next=redoStack.pop();
   applyHistoryState(next);
   hintText.textContent='Gjort om.';
+  if(listeOverlay.classList.contains('show'))renderListe();
 }
 
 // ── Nord-sjekk knapp ──────────────────────────────────────────
@@ -4138,8 +4580,42 @@ document.getElementById('upBtn').onclick=()=>fi.click();
 // Fleire filer eller ei fleirsidig PDF går til masseimporten (kvar side ein etasje)
 fi.onchange=async e=>{const l=[...e.target.files];e.target.value='';await lastInnFiler(l);};
 dropz.onclick=()=>fi.click();
-cwrap.addEventListener('dragover',e=>e.preventDefault());
-cwrap.addEventListener('drop',async e=>{e.preventDefault();await lastInnFiler(e.dataTransfer.files);});
+// Slepp-tilstand: når filer vert dregne over lerretet, skal det vere tydeleg
+// at dei kan sleppast. dragenter/dragleave fyrer for kvart barn musa passerer,
+// så vi tel inn og ut. Berre filer — ikkje tekst eller element frå sida.
+let _draDjup=0;
+const _erFiler=e=>[...(e.dataTransfer?.types||[])].includes('Files');
+function _draSlutt(){
+  _draDjup=0;
+  cwrap.classList.remove('dra-inn','over-teikning');
+  applyViewUI();   // set tilbake vanleg tekst i slippsona
+}
+cwrap.addEventListener('dragenter',e=>{
+  if(!_erFiler(e))return;
+  e.preventDefault();
+  if(_draDjup++>0)return;
+  const n=e.dataTransfer.items?e.dataTransfer.items.length:0;
+  const kva=n>1?n+' filer':'fila';
+  const tomt=getComputedStyle(dropz).display!=='none';
+  cwrap.classList.add('dra-inn');
+  cwrap.classList.toggle('over-teikning',!tomt);
+  const tekst=iFasade()?'Fasadeteikningar vert lagde inn som nye fasadeark.'
+    :n>1?'Kvar fil eller PDF-side vert ein etasje — du ser over før noko vert lagt inn.'
+    :tomt?'Ei teikning, ei fleirsidig PDF eller eit prosjekt (.entro).'
+    // Éi fil over ei teikning går til den aktive etasjen (lastInnFiler) — sei det
+    :'Eitt bilete eller ei einsida PDF byter ut teikninga på denne etasjen. Ei fleirsidig PDF vert nye etasjar.';
+  if(tomt){
+    document.getElementById('dropz-text').innerHTML='<strong>Slepp '+kva+' her</strong>'+tekst;
+  }else{
+    document.getElementById('slippTittel').textContent='Slepp '+kva+' her';
+    document.getElementById('slippTekst').textContent=tekst;
+  }
+});
+cwrap.addEventListener('dragleave',e=>{if(_erFiler(e)&&--_draDjup<=0)_draSlutt();});
+cwrap.addEventListener('dragover',e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect='copy';});
+cwrap.addEventListener('drop',async e=>{e.preventDefault();_draSlutt();await lastInnFiler(e.dataTransfer.files);});
+// Avbrote drag (Esc, eller slept utanfor vindauget)
+window.addEventListener('dragend',_draSlutt);
 // Sidebla-kontrollen høyrer til den AKTIVE etasjen — ein etasje kan ha si eiga
 // PDF (t.d. lasta inn med «+ Etasje → Last opp fil»), og ein annan ingen.
 // Difor er dette den einaste staden som styrer synlegheita, og han vert kalla
@@ -4824,9 +5300,9 @@ function showMeasureContextMenu(px,py,hitM){
   document.querySelectorAll('.ctx-menu').forEach(m=>m.remove());
   const menu=document.createElement('div');
   menu.className='ctx-menu';
-  menu.style.cssText=`position:fixed;left:${px}px;top:${py}px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 30px rgba(13,27,42,.18);z-index:600;min-width:190px;overflow:hidden;font-family:inherit;animation:ctxIn .12s ease;padding:4px`;
+  menu.style.cssText=`left:${px}px;top:${py}px`;
   const hdr=document.createElement('div');
-  hdr.style.cssText='font-size:11px;font-weight:700;color:var(--text3);padding:6px 12px 5px;letter-spacing:.03em;text-transform:uppercase';
+  hdr.className='ctx-menu-header';
   const dMm=measureLenMm(hitM.m);
   hdr.textContent='Mål: '+(dMm!=null?fmtMaal(dMm):'ukalibrert');
   menu.appendChild(hdr);
@@ -4834,7 +5310,7 @@ function showMeasureContextMenu(px,py,hitM){
   const mkBtn=(icon,txt,fn)=>{
     const b=document.createElement('button');
     b.className='ctx-menu-item';
-    b.innerHTML=`<span style="font-size:14px;width:18px;text-align:center;flex-shrink:0">${icon}</span><span>${txt}</span>`;
+    b.innerHTML=`<span class="ctx-ik">${ctxIkon(icon)}</span><span>${txt}</span>`;
     b.onclick=()=>{menu.remove();document.removeEventListener('mousedown',close);fn();};
     menu.appendChild(b);
   };
@@ -8263,13 +8739,14 @@ function updateResults(){
       }
 
       // ── Action buttons ──
-      const btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:5px;margin-top:10px;flex-wrap:wrap';
-      const eb=document.createElement('button');eb.className='card-btn';eb.textContent='Rediger geometri';
+      const btnRow=document.createElement('div');btnRow.className='card-btns';
+      const _kb=(btn,ik,txt,title)=>{btn.innerHTML=ikonSvg(ik)+(txt?'<span></span>':'');if(txt)btn.lastChild.textContent=txt;if(title)btn.title=title;};
+      const eb=document.createElement('button');eb.className='card-btn';_kb(eb,'geometri','Rediger','Rediger geometrien — dra hjørne, høgreklikk for å slette eit punkt');
       eb.onclick=()=>{
         if(fi!==activeFloor){saveFloorState();activeFloor=fi;syncFloorState();renderFloorTabs();}
         setMode('edit');editZoneIdx=zi;draw();
       };
-      const db=document.createElement('button');db.className='card-btn danger';db.textContent='Slett';
+      const db=document.createElement('button');db.className='card-btn danger ik';_kb(db,'slett','','Slett sona (kan angrast)');
       db.onclick=()=>{
         snapshot();
         // Konvertera sonekopling til skiljevegg i nabosonar når denne sona blir sletta
@@ -8295,13 +8772,12 @@ function updateResults(){
 
       // Kopier sone — opnar kopier-meny
       const cpBtn=document.createElement('button');cpBtn.className='card-btn';
-      cpBtn.textContent='⬡ Kopier sone';
+      _kb(cpBtn,'kopier','Kopier','Kopier sona — til same eller ein annan etasje');
       cpBtn.onclick=()=>showCopyZoneMenu(z,zi,f,fi);
 
       // Del sone — teikn ei klippelinje tvers gjennom
       const splitBtn=document.createElement('button');splitBtn.className='card-btn';
-      splitBtn.textContent='✂ Del sone';
-      splitBtn.title='Del sona i to med ei klippelinje — linja vert skiljekonstruksjon i begge';
+      _kb(splitBtn,'klipp','Del','Del sona i to med ei klippelinje — linja vert skiljekonstruksjon i begge');
       splitBtn.onclick=()=>{
         if(z.pts.length<3){hintText.textContent='Sona har for få punkt til å delast.';return;}
         if(fi!==activeFloor){saveFloorState();activeFloor=fi;syncFloorState();renderFloorTabs();}
@@ -8311,20 +8787,20 @@ function updateResults(){
         draw();
       };
 
-      btnRow.appendChild(eb);btnRow.appendChild(db);btnRow.appendChild(cpBtn);btnRow.appendChild(splitBtn);
+      btnRow.appendChild(eb);btnRow.appendChild(splitBtn);btnRow.appendChild(cpBtn);
       // Koble soner — alltid synleg, viser status
       const lnBtn=document.createElement('button');
       lnBtn.className='card-btn';
       if(z.groupId){
         const nLinked=floors.flatMap(fl=>fl.zones).filter(x=>x.groupId===z.groupId).length;
-        lnBtn.style.cssText='font-size:10.5px;color:#7c3aed;border-color:#ede9fe;background:#f5f3ff';
-        lnBtn.textContent=`⇌ Kopla (${nLinked} soner)`;
+        lnBtn.classList.add('kopla');
+        _kb(lnBtn,'kople','Kopla ('+nLinked+')','Sona er kopla med '+(nLinked-1)+' andre — klikk for å endre');
       } else {
-        lnBtn.style.cssText='font-size:10.5px;color:var(--text3)';
-        lnBtn.textContent='⇌ Koble soner';
+        _kb(lnBtn,'kople','Kople','Kople sona med soner i same eller andre etasjar (same bygningskategori)');
       }
       lnBtn.onclick=()=>showLinkZoneMenu(z,f,fi);
       btnRow.appendChild(lnBtn);
+      btnRow.appendChild(db);   // slett heilt til høgre, berre ikon
       // SK merge er no handtert per nabo-gruppe direkte i fasade-seksjonen
       cardBody.appendChild(btnRow);
 
@@ -8436,15 +8912,21 @@ function updateResults(){
         };
 
         // YV-samanslåing
-        const getYvMergedGroup=segIdx=>(z.yvMergedGroups||[]).find(g=>g.segs.includes(segIdx))||null;
+        // Slegne saman på tvers av kopla soner: grupperingane per sone gjeld ikkje
+        const _koplaFas=koplaFasadarSaman(z);
+        if(_koplaFas){
+          const kn=document.createElement('div');
+          kn.style.cssText='font-size:10.5px;color:#5b21b6;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:6px;padding:4px 8px;margin:0 0 4px;line-height:1.4';
+          kn.textContent='⊞ Ytterveggane vert slegne saman med dei kopla sonene i SXI — éin fasade per himmelretning.';
+          facSection.appendChild(kn);
+        }
+        const getYvMergedGroup=segIdx=>_koplaFas?null:((z.yvMergedGroups||[]).find(g=>g.segs.includes(segIdx))||null);
         const yvGroupKey=g=>g.segs.slice().sort((a,b)=>a-b).join(',');
+        // «Del opp»: fjern gruppa veggane ligg i (medlemskap, ikkje nøkkel)
         const toggleYvMerge=(dir,dirSegObjs)=>{
-          if(!z.yvMergedGroups)z.yvMergedGroups=[];
-          const newSegs=dirSegObjs.map(s=>s.idx);
-          const key=newSegs.slice().sort((a,b)=>a-b).join(',');
-          const existingIdx=z.yvMergedGroups.findIndex(g=>g.segs.slice().sort((a,b)=>a-b).join(',')===key);
-          if(existingIdx>=0){z.yvMergedGroups.splice(existingIdx,1);}
-          else{z.yvMergedGroups.push({segs:newSegs,name:dir});}
+          snapshot();
+          const idxs=dirSegObjs.map(s=>s.idx);
+          z.yvMergedGroups=(z.yvMergedGroups||[]).filter(g=>!g.segs.some(i=>idxs.includes(i)));
           updateResults();renderTable();
         };
 
@@ -8605,14 +9087,15 @@ function updateResults(){
               const winA=grpSegs.reduce((s,s2)=>{
                 return s+(z.windows||[]).filter(w=>w.segIdx===s2.idx).reduce((ss,w)=>ss+(w.breddeMm/1000)*(w.hoyMm/1000)*w.antal,0);
               },0);
-              const netA=mmPerImgPx?(totalGrossA-winA):null;
+              const _mpp=mppForZone(z);
+              const netA=_mpp?(totalGrossA-winA):null;
               const meanAz=Math.round(circularMeanAz(grpSegs.map(s=>s.normalAz)));
               const row=document.createElement('div');
               row.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;margin:2px 0;border-radius:6px;background:#dbeafe;border:1px solid #3b82f6';
               const nameTag=document.createElement('span');nameTag.style.cssText='font-size:11px;font-weight:700;color:#1e40af;white-space:nowrap';
               nameTag.textContent=yvMerged.name;
               const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:10.5px;color:#6b7280;font-family:'JetBrains Mono',monospace;flex:1";
-              statsSpan.textContent=`${grpSegs.length} fasadar · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx&&netA!=null?fmtM2(netA>0?netA:totalGrossA):'—'} · ${meanAz}°`;
+              statsSpan.textContent=`${grpSegs.length} fasadar · ${_mpp?fmtM(totalLenM):'—'} · ${_mpp&&netA!=null?fmtM2(netA>0?netA:totalGrossA):'—'} · ${meanAz}°`;
               const unmergeBtn=document.createElement('button');
               unmergeBtn.style.cssText='font-size:10px;padding:2px 6px;border:1px solid #3b82f6;border-radius:4px;background:#fff;color:#1e40af;cursor:pointer;font-family:inherit;white-space:nowrap';
               unmergeBtn.textContent='Del opp';
@@ -9904,9 +10387,9 @@ cwrap.addEventListener('contextmenu',e=>{
         document.querySelectorAll('.ctx-menu').forEach(m=>m.remove());
         const menu=document.createElement('div');
         menu.className='ctx-menu';
-        menu.style.cssText=`position:fixed;left:${e.clientX}px;top:${e.clientY}px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 30px rgba(13,27,42,.18);z-index:600;min-width:190px;overflow:hidden;font-family:inherit;animation:ctxIn .12s ease;padding:4px`;
+        menu.style.cssText=`left:${e.clientX}px;top:${e.clientY}px`;
         const hdr=document.createElement('div');
-        hdr.style.cssText='font-size:11px;font-weight:700;color:var(--text3);padding:6px 12px 5px;letter-spacing:.03em;text-transform:uppercase';
+        hdr.className='ctx-menu-header';
         const segsForLabel=calcSegments(z.pts,getHoyde(z),mppForZone(z))||[];
         const segLabel=getFacadeLabels(z,segsForLabel)[segsForLabel.findIndex(s=>s.idx===seg.idx)??0]||seg.dir;
         hdr.textContent=`Fasade: ${segLabel}`;
@@ -9914,7 +10397,7 @@ cwrap.addEventListener('contextmenu',e=>{
         const pasteBtn=document.createElement('button');
         pasteBtn.className='ctx-menu-item';
         const wLabel=winClipboard.name||(winClipboard.type==='dor'?'Dør':'Vindauge');
-        pasteBtn.innerHTML=`<span style="font-size:14px;width:18px;text-align:center;flex-shrink:0">📋</span><span>Lim inn «${wLabel}»</span>`;
+        pasteBtn.innerHTML=`<span class="ctx-ik">${ctxIkon('📋')}</span><span>Lim inn «${wLabel}»</span>`;
         pasteBtn.onclick=()=>{
           menu.remove();
           document.removeEventListener('mousedown',close);
@@ -9997,17 +10480,36 @@ function pointInPolygon(pt,pts){
 // ── Kontekstmenyar ────────────────────────────────────────────
 // Stilen vert lagd inn ved fyrste meny, uansett kva meny det er — både
 // sonemenyen og etasjemenyen brukar desse klassene.
-function _ensureCtxStyle(){
-  if(document.getElementById('ctx-style'))return;
-  const s=document.createElement('style');
-  s.id='ctx-style';
-  s.textContent=`@keyframes ctxIn{from{opacity:0;transform:scale(.95) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
-  .ctx-menu-item{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:12.5px;cursor:pointer;color:var(--text2);transition:background .1s;border:none;background:none;width:100%;text-align:left;font-family:inherit}
-  .ctx-menu-item:hover{background:var(--surface2);color:var(--text)}
-  .ctx-menu-item.danger:hover{background:var(--red-dim);color:var(--red)}
-  .ctx-menu-sep{height:1px;background:var(--border);margin:3px 0}
-  .ctx-menu-header{padding:7px 14px 4px;font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}`;
-  document.head.appendChild(s);
+function _ensureCtxStyle(){}   // stilen står i stilarket (.ctx-menu)
+
+// Monokrome ikon for menyar og knappar — same strekstil som verktøylinja.
+const IKON_SVG={
+  rediger:'<path d="M10.5 2.5l3 3L6 13H3v-3z"/>',
+  geometri:'<path d="M3 12.5 4 3.5l8.5-1 1 10z"/><circle cx="3" cy="12.5" r="1.4" fill="currentColor"/><circle cx="4" cy="3.5" r="1.4" fill="currentColor"/><circle cx="12.5" cy="2.5" r="1.4" fill="currentColor"/><circle cx="13.5" cy="12.5" r="1.4" fill="currentColor"/>',
+  klipp:'<circle cx="4" cy="4.5" r="2"/><circle cx="4" cy="11.5" r="2"/><path d="M5.7 5.6 14 12M5.7 10.4 14 4"/>',
+  kopier:'<rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.5a1 1 0 0 1 1-1h7"/>',
+  lim:'<rect x="3.5" y="3" width="9" height="11" rx="1.5"/><path d="M6 3V2h4v1M6 7h4M6 9.5h4"/>',
+  kople:'<path d="M6.5 9.5l3-3"/><path d="M7 4.5l1.2-1.2a2.6 2.6 0 0 1 3.7 3.7L10.7 8.2"/><path d="M9 11.5l-1.2 1.2a2.6 2.6 0 0 1-3.7-3.7L5.3 7.8"/>',
+  slett:'<path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 9h6.6l.7-9"/>',
+  auge:'<path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="2"/>',
+  zoom:'<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>',
+  ok:'<path d="M3 8.5 6.5 12 13 4.5"/>',
+  vindauge:'<rect x="2.5" y="2.5" width="11" height="11" rx="1"/><path d="M8 2.5v11M2.5 8h11"/>',
+  dor:'<path d="M4 14V2.5h8V14M2.5 14h11"/><circle cx="10" cy="8.5" r=".8" fill="currentColor"/>',
+  loys:'<rect x="1.5" y="5" width="3.5" height="6" rx=".6"/><rect x="6.25" y="5" width="3.5" height="6" rx=".6"/><rect x="11" y="5" width="3.5" height="6" rx=".6"/>',
+  jamn:'<path d="M2 8h12M2 8l2.5-2.5M2 8l2.5 2.5M14 8l-2.5-2.5M14 8l-2.5 2.5"/>',
+};
+function ikonSvg(namn){
+  const p=IKON_SVG[namn];
+  return p?'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>':'';
+}
+// Teikna som menyane alltid har brukt, omsette til SVG der vi har eitt.
+// Andre teikn (⇱ ⇲ ▣ …) er monokrome og står som dei er.
+const _CTX_IKON={'⊹':'geometri','✂':'klipp','🔍':'zoom','👁':'auge','⬡':'kopier','⧉':'kopier','⎘':'kopier',
+  '📋':'lim','⧈':'lim','⋮⋮':'loys','⇔':'jamn','⇌':'kople','✓':'ok','✎':'rediger','🗑':'slett','▭':'vindauge','🚪':'dor'};
+function ctxIkon(sym){
+  const n=_CTX_IKON[sym];
+  return n?ikonSvg(n):'<span class="ctx-g">'+sym+'</span>';
 }
 
 function showZoneContextMenu(clientX,clientY,z,zi,f,fi){
@@ -10016,18 +10518,14 @@ function showZoneContextMenu(clientX,clientY,z,zi,f,fi){
 
   const menu=document.createElement('div');
   menu.className='ctx-menu';
-  menu.style.cssText=`position:fixed;left:${clientX}px;top:${clientY}px;
-    background:#fff;border:1px solid var(--border);border-radius:10px;
-    box-shadow:0 8px 30px rgba(13,27,42,.18),0 2px 8px rgba(13,27,42,.1);
-    z-index:600;min-width:200px;overflow:hidden;font-family:inherit;
-    animation:ctxIn .12s ease`;
+  menu.style.cssText=`left:${clientX}px;top:${clientY}px`;
 
   _ensureCtxStyle();
 
   const mkItem=(icon,label,action,cls='')=>{
     const btn=document.createElement('button');
     btn.className='ctx-menu-item'+( cls?' '+cls:'');
-    btn.innerHTML=`<span style="font-size:14px;width:18px;text-align:center;flex-shrink:0">${icon}</span><span>${label}</span>`;
+    btn.innerHTML=`<span class="ctx-ik">${ctxIkon(icon)}</span><span>${label}</span>`;
     btn.onclick=()=>{close();action();};
     return btn;
   };
@@ -10298,34 +10796,38 @@ function showWindowContextMenu(cx,cy,hit){
   const label=w.name||(w.type==='dor'?'Dør':'Vindauge');
   const menu=document.createElement('div');
   menu.id='winCtxMenu';
-  menu.style.cssText=`position:fixed;left:${cx}px;top:${cy}px;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 24px rgba(13,27,42,.15);z-index:600;min-width:190px;padding:6px;font-family:inherit`;
+  menu.className='ctx-menu';
+  menu.style.cssText=`left:${cx}px;top:${cy}px`;
 
   const header=document.createElement('div');
-  header.style.cssText='font-size:11px;font-weight:700;color:var(--text3);padding:4px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:4px';
-  header.textContent=(w.type==='dor'?'🚪 ':'▭ ')+label+(nStk>1?' '+(inst+1)+'/'+nStk:'')+' · '+w.breddeMm+'×'+w.hoyMm+' mm';
+  header.className='ctx-menu-header';
+  header.style.textTransform='none';header.style.letterSpacing='0';header.style.fontSize='11.5px';
+  header.innerHTML='<span class="ctx-ik">'+ikonSvg(w.type==='dor'?'dor':'vindauge')+'</span><span></span>';
+  header.lastChild.textContent=label+(nStk>1?' '+(inst+1)+'/'+nStk:'')+' · '+w.breddeMm+'×'+w.hoyMm+' mm';
   menu.appendChild(header);
+  const sep0=document.createElement('div');sep0.className='ctx-menu-sep';menu.appendChild(sep0);
 
   const mkItem=(icon,txt,cb,danger=false)=>{
     const btn=document.createElement('button');
-    btn.style.cssText=`width:100%;padding:7px 10px;border:none;border-radius:6px;background:transparent;cursor:pointer;text-align:left;font-family:inherit;font-size:12.5px;color:${danger?'#dc2626':'var(--text)'};display:flex;align-items:center;gap:8px`;
-    btn.innerHTML=`<span style="font-size:13px">${icon}</span>${txt}`;
-    btn.onmouseenter=()=>{btn.style.background=danger?'#fef2f2':'var(--surface2)';};
-    btn.onmouseleave=()=>{btn.style.background='transparent';};
+    btn.className='ctx-menu-item'+(danger?' danger':'');
+    btn.innerHTML='<span class="ctx-ik">'+ctxIkon(icon)+'</span><span></span>';
+    btn.lastChild.textContent=txt;
     btn.onclick=()=>{menu.remove();cb();};
     menu.appendChild(btn);
   };
 
-  mkItem('✏️','Rediger',()=>showWindowEditDialog(w,wi,z,zi,fli));
+  mkItem('✎','Rediger',()=>showWindowEditDialog(w,wi,z,zi,fli));
   if(nStk>1){
     mkItem('⧉','Løys ut denne stk',()=>loysUtStk(w,z,inst));
     mkItem('⋮⋮','Løys opp gruppa ('+nStk+' eigne)',()=>loysOppGruppe(w,z));
   }
   if(nStk>1&&winHasPos(w))mkItem('⇔','Fordel jamnt',()=>fordelStkJamnt(w,z));
-  mkItem('📋','Kopier til fasade…',()=>{showCopyWindowMenu(w,z,zi,floors[fli],fli);});
-  mkItem('⎘','Kopier (Ctrl+C)',()=>{
+  mkItem('⧉','Kopier til fasade…',()=>{showCopyWindowMenu(w,z,zi,floors[fli],fli);});
+  mkItem('📋','Kopier (Ctrl+C)',()=>{
     winClipboard=JSON.parse(JSON.stringify(w));
     hintText.textContent='Kopierte «'+(winClipboard.name||winClipboard.type)+'» — trykk Ctrl+V for å lime inn';
   });
+  const sepS=document.createElement('div');sepS.className='ctx-menu-sep';menu.appendChild(sepS);
   mkItem('🗑','Slett',()=>{
     snapshot();const ix=z.windows.indexOf(w);if(ix>=0)z.windows.splice(ix,1);updateResults();renderTable();draw();
   },true);
@@ -10349,7 +10851,7 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   dlg.style.cssText='position:fixed;inset:0;background:rgba(13,27,42,.4);z-index:700;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
   const typeL=w.type==='dor'?'Dør':'Vindauge';
   const box=document.createElement('div');
-  box.style.cssText='background:#fff;border-radius:14px;padding:24px;width:340px;box-shadow:0 12px 40px rgba(13,27,42,.18)';
+  box.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:24px;width:400px;max-width:92vw;box-shadow:var(--shadow-lg)';
 
   const mkRow=(lbl,inp)=>{
     const row=document.createElement('div');
@@ -10398,7 +10900,7 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   brystRight.appendChild(brystCb);brystRight.appendChild(brystI);brystRight.appendChild(brystNote);
   brystRow.appendChild(brystLbl);brystRow.appendChild(brystRight);
 
-  box.innerHTML=`<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:16px">${w.type==='dor'?'🚪':'▭'} Rediger ${typeL}</div>`;
+  box.innerHTML=`<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px"><span style="width:18px;height:18px;color:var(--accent);display:inline-flex">${ikonSvg(w.type==='dor'?'dor':'vindauge')}</span>Rediger ${typeL.toLowerCase()}</div>`;
   box.appendChild(mkRow('Namn',nameI));
   box.appendChild(mkRow('Breidde (mm)',brI));
   box.appendChild(mkRow('Høgde (mm)',hoI));
@@ -10430,11 +10932,11 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   btnRow.style.cssText='display:flex;gap:8px;justify-content:flex-end;margin-top:6px';
   const cancel=document.createElement('button');
   cancel.textContent='Avbryt';
-  cancel.style.cssText='padding:8px 16px;border:1px solid var(--border2);border-radius:8px;background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;font-size:13px';
+  cancel.className='dcancel';
   cancel.onclick=()=>dlg.remove();
   const save=document.createElement('button');
-  save.textContent='Lagre ✓';
-  save.style.cssText='padding:8px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600';
+  save.textContent='Lagre';
+  save.className='dok';
   save.onclick=()=>{
     const br=parseInt(brI.value),ho=parseInt(hoI.value),ant=parseInt(antI.value);
     if(!br||br<=0||!ho||ho<=0||!ant||ant<=0){errEl.textContent='Breidde, høgde og antal må vere positive tal.';errEl.style.display='block';return;}
@@ -10455,8 +10957,9 @@ function showWindowEditDialog(w,wi,z,zi,fli){
 
   // Kopier til same fasade
   const copyBtn=document.createElement('button');
-  copyBtn.textContent='⎘ Kopier til same fasade';
-  copyBtn.style.cssText='padding:8px 12px;border:1px solid var(--border2);border-radius:8px;background:#fff;color:var(--text2);cursor:pointer;font-family:inherit;font-size:12px;';
+  copyBtn.innerHTML='<span style="width:14px;height:14px;display:inline-flex">'+ikonSvg('kopier')+'</span>Kopier på veggen';
+  copyBtn.title='Legg ein kopi av '+typeL.toLowerCase()+'et ved sida av på same fasade';
+  copyBtn.className='dcancel';copyBtn.style.cssText='display:inline-flex;align-items:center;gap:6px;margin-right:auto;white-space:nowrap';
   copyBtn.onclick=()=>{
     snapshot();
     // Breidda kjem frå breddeMm, ikkje frå lagra t1-t0 (som berre er senteret)
@@ -10469,7 +10972,7 @@ function showWindowEditDialog(w,wi,z,zi,fli){
     z.windows.push(copy);
     dlg.remove();updateResults();renderTable();draw();
   };
-  btnRow.appendChild(cancel);btnRow.appendChild(copyBtn);btnRow.appendChild(save);
+  btnRow.appendChild(copyBtn);btnRow.appendChild(cancel);btnRow.appendChild(save);
   box.appendChild(btnRow);
   dlg.appendChild(box);
   document.body.appendChild(dlg);
@@ -13233,18 +13736,14 @@ async function showFloorContextMenu(clientX,clientY,f){
   const info=await klippbordInfo();
   const menu=document.createElement('div');
   menu.className='ctx-menu';
-  menu.style.cssText='position:fixed;left:'+clientX+'px;top:'+clientY+'px;'+
-    'background:#fff;border:1px solid var(--border);border-radius:10px;'+
-    'box-shadow:0 8px 30px rgba(13,27,42,.18),0 2px 8px rgba(13,27,42,.1);'+
-    'z-index:600;min-width:240px;overflow:hidden;font-family:inherit;'+
-    'animation:ctxIn .12s ease';
+  menu.style.cssText='left:'+clientX+'px;top:'+clientY+'px;min-width:240px';
   const close=()=>{menu.remove();document.removeEventListener('mousedown',utanfor);};
   const utanfor=ev=>{if(!menu.contains(ev.target))close();};
   const mkItem=(icon,label,under,action)=>{
     const btn=document.createElement('button');
     btn.className='ctx-menu-item';
     btn.style.alignItems='flex-start';
-    btn.innerHTML='<span style="font-size:14px;width:18px;text-align:center;flex-shrink:0">'+icon+'</span><span></span>';
+    btn.innerHTML='<span class="ctx-ik">'+ctxIkon(icon)+'</span><span></span>';
     const t=btn.children[1];
     t.textContent=label;
     if(under){
@@ -16724,6 +17223,10 @@ function buildSXI(proj){
     let facXml='';
     const myLogicalIdx=zoneIdx;  // Index of this zone in logicalZones for zone_connection tracking
 
+    // Kopla soner med fasadane slegne saman på tvers: ytterveggane vert IKKJE
+    // skrivne per instans, men samla til éin <facade> per himmelretning etter
+    // løkka (koplaFasadeGrupper). SK, sonekoplingar og gavlflater går som før.
+    const koplaSaman=instances.length>1&&koplaFasadarSaman(z);
     instances.forEach(lz=>{
       const segs=calcSegments(lz.pts,getHoyde(lz),mppForZone(lz));
       if(!segs)return;
@@ -16805,6 +17308,7 @@ function buildSXI(proj){
           }
         } else {
           if(isKjellervegg(lz,seg.idx))return;   // dekt av <cellar>
+          if(koplaSaman)return;                   // skrive samla etter løkka
           // Sjekk om denne YV-fasaden er slått saman med andre av same himmelretning
           const yvMergedGroup=(lz.yvMergedGroups||[]).find(g=>g.segs.includes(seg.idx));
           if(yvMergedGroup){
@@ -16879,6 +17383,38 @@ function buildSXI(proj){
         facXml+=`    <facade id="${gavlId}" name="${gavlName}" comment="" area="${gf.area.toFixed(2)}" uvalue="${effectiveUGavl}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" exposed="no" ext_absorption_coeff="0.80" direction="${dirDeg}" horizon_sector1="9.0" horizon_sector2="9.0" horizon_sector3="9.0" horizon_sector4="9.0"></facade>\n`;
       });
     });
+    if(koplaSaman){
+      koplaFasadeGrupper(instances).forEach(g=>{
+        // U-verdi: same verdi overalt ⇒ han står som han er; ulike U-verdiar
+        // (uPerSeg) ⇒ arealvekta snitt, som gir same varmetap (U·A) som dei
+        // separate fasadane ville gitt.
+        const us=g.segs.map(x=>x.lz.uPerSeg?.['seg_'+x.seg.idx]??uVegg);
+        const effectiveU=us.every(u=>u===us[0])?us[0]
+          :(g.area>0?+(g.segs.reduce((s,x,i)=>s+us[i]*x.area,0)/g.area).toFixed(3):us[0]);
+        let openingsXml='';
+        g.segs.forEach(({lz,seg})=>{
+          const flSuffix=' ('+zoneFloorName.get(lz)+')';
+          (lz.windows||[]).filter(w=>w.segIdx===seg.idx).forEach(w=>{
+            const uW=w.type==='dor'?(w.uVerdi??lz.uDor??uDor):(w.uVerdi??lz.uVindu??uVindu);
+            const wName=xesc((w.name||(w.type==='dor'?'Dør':'Vindauge'))+flSuffix);
+            if(w.type==='dor'){
+              const dId=nextId('door');
+              const dH=Math.max(0.1,(w.hoyMm||2100)/1000);
+              const dW=Math.max(0.1,(w.breddeMm||900)/1000);
+              const dArea=(dW*dH*(w.antal||1)).toFixed(2);
+              openingsXml+=`      <door uvalue="${uW}" area="${dArea}" type="Standardvalg" gate="no" id="${dId}" name="${wName}" comment=""></door>\n`;
+            } else {
+              const wId=nextId('window');
+              const wH=Math.max(0.1,(w.hoyMm||1200)/1000).toFixed(3);
+              const wW=Math.max(0.1,(w.breddeMm||1200)/1000).toFixed(3);
+              openingsXml+=`      <window id="${wId}" name="${wName}" comment="" number="${w.antal||1}" height="${wH}" width="${wW}" given_frame_width="no" frame_width="0.08" frame_factor="0.20" total_uvalue="yes" uvalue="${uW}" window_type="Standardvalg" uvalue_pane="0.80" uvalue_frame="1.00" thermal_bridge_frame="0.10" pane_type="Standardvalg" frame_type="Standardvalg" spacer_type="Standardvalg" shading_type="konstant" const_solar_factor="0.50" const_sun_shading="Standardvalg" var_solar_factor="0.51" var_solar_factor_shaded="0.06" auto_shading="no" auto_shading_flux="100.00" var_sun_shading="Standardvalg" overhang="no" depth_overhang="1.20" distance_overhang="0.60" vert_extension_left="no" depth_extension_left="1.20" distance_extension_left="1.00" vert_extension_right="no" depth_extension_right="1.20" distance_extension_right="1.00" direction="${g.az}" horizon_sector1="9.0" horizon_sector2="9.0" horizon_sector3="9.0" horizon_sector4="9.0"></window>\n`;
+            }
+          });
+        });
+        const faceId=nextId('facade');
+        facXml+=`    <facade id="${faceId}" name="${xesc(g.dir)}" comment="" area="${g.area.toFixed(2)}" uvalue="${effectiveU}" thermal_cap="10.00" construction="Standardvalg" internal_layer="Standardvalg" exposed="no" ext_absorption_coeff="0.80" direction="${g.az}" horizon_sector1="9.0" horizon_sector2="9.0" horizon_sector3="9.0" horizon_sector4="9.0">\n${openingsXml}    </facade>\n`;
+      });
+    }
 
     // Tak og gulv — per instans, og per delflate når taket eller golvet er
     // delt opp. `eksportFlater` gir alltid minst éi oppføring, så begge vegane

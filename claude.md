@@ -675,6 +675,68 @@ Invariantar:
 - Valet er per eksport og vert **ikkje** lagra — det slepp den femdelte
   lagringsregelen.
 
+## Ikon og menyar
+
+Høgreklikkmenyane (sone, vindauge, etasje, mål, lim inn) brukar klassene
+`.ctx-menu`, `.ctx-menu-item`, `.ctx-menu-header`, `.ctx-menu-sep` i
+stilarket — inline-stilen på menyen er berre `left/top`. Ikona kjem frå
+`ctxIkon(teikn)`, som omset dei gamle teikna og emojiane til monokrome SVG-ar
+(`IKON_SVG`, `ikonSvg(namn)`). Ikkje bruk fargerike emoji i menyar eller
+knappar; legg heller eit ikon til i `IKON_SVG` og eit oppslag i `_CTX_IKON`.
+
+## Listebasert redigering
+
+«☰ Listebasert redigering» (`opneListe`, inspirert av SIMIEN) viser éin
+tabell per elementtype — vindauge, dører, ytterveggar (U-verdi), soner og
+etasjar — der verdiane vert endra rett i cellene. `LISTE_TYPAR` held
+kolonnane: `get`, og `set` for dei som kan endrast (utan `set` = utrekna,
+berre til lesing). Ny kolonne eller ny type: legg ho inn der.
+
+- **Fleire på ein gong:** er rada vald og fleire rader er valde, går
+  endringa til alle dei valde (`_liEndra`). «Vel alle» følgjer filteret.
+- Kvar endring er **eitt angre-steg** (`snapshot()` fyrst). `undo()`/`redo()`
+  teiknar lista på nytt når ho er open; valet fell bort fordi angre byter ut
+  objekta.
+- `set` må følgje dei same reglane som resten av programmet: antal gjennom
+  `winSetAntal` (med `winOpptekne`), etasjehøgd til heile `etasjeArk(f)` og
+  `fhI` for den aktive, kategori til alle `getLinkedZones` (kopla soner må ha
+  same kategori), U per vegg i `uPerSeg['seg_'+idx]`.
+- Tom celle i eit valfritt felt = standard (null/undefined); standardverdien
+  står som grå plasshaldar. Tom celle i eit påkravd felt endrar ingenting.
+- Utrekna areal/U·A brukar same uttrykk og standardverdiar som `buildSXI`.
+- Dialogen vert flytt til `<body>` ved oppstart — inne i `#cwrap`
+  (`isolation:isolate`) låg sidepanelet over han.
+
+## Slå saman fasadar (ytterveggar)
+
+`z.yvMergedGroups=[{segs:[segIdx],name}]` — YV-veggar i éi sone som vert
+éin `<facade>` i SXI-en. Same reglar som SK-samanslåinga: **medlemskap, aldri
+nøkkeloppslag**, ein vegg ligg i høgst éi gruppe (`_mergeFjernSegs` flyttar
+han), og ei gruppe med under to veggar fell bort.
+
+Dialogen (`⊞ Fasadar`, `renderMergeForZone`) er éi side: samanslegne grupper
+med fasadenamna, «Etter himmelretning» (eitt klikk) og «Vel sjølv» gruppert
+på retning. Kvar endring går gjennom `_mergeEndra` = `snapshot()` fyrst, så
+ho kan angrast. Areal og skala per sone (`mppForZone`), aldri `mmPerImgPx`.
+
+**Kopla soner slegne saman på tvers** (`z.yvKoplaSaman`, valet øvst i
+dialogen for ei kopla sone): alle ytterveggane i alle instansane vert éin
+`<facade>` per himmelretning (`koplaFasadeGrupper`). Invariantar:
+
+- Valet vert sett/fjerna på **alle** instansane; `koplaFasadarSaman(z)` er
+  sann når éin av dei har det, så ei sone som vert kopla til seinare følgjer.
+- Medan det er på, gjeld ikkje `yvMergedGroups` per sone (sonekortet viser
+  dei ikkje, eksporten hoppar over dei). Dei står lagra og kjem att om valet
+  vert slått av.
+- SK, sonekoplingar, kjellerveggar og gavlflater er **ikkje** med — dei går
+  som før. Fasaden heiter berre retninga («Nord»); vindauga ber etasjesuffikset.
+- U-verdi: lik overalt ⇒ urørt; ulik (`uPerSeg`) ⇒ arealvekta snitt, så U·A
+  er det same som for dei separate fasadane.
+- `fasadarMedForStoreOpningar` har same grein, så varselet i sonekortet
+  speglar eksporten.
+- **Utan valet er SXI-fila teikn for teikn den same som før** (verifisert med
+  full samanlikning, v5.14.0).
+
 ## Kopling av soner (groupId)
 
 - `groupId` er ein string (`'g1'`, `'g2'` osv.)
