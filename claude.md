@@ -1264,6 +1264,23 @@ SXI-eksporten er urørte — å skjule er eit visingsval, ikkje ei sletting.
   nullstiller berre det filteret som gøymer kortet, og seier frå i hintlinja.
 - «Slå saman alle» verkar på dei korta som er viste.
 
+## 3D-bakgrunn og skalafiguren
+
+- WebGL-lerretet er **gjennomsiktig** (`alpha:true`, `setClearColor(farge,0)`),
+  og `#model3dScene` har same punktrutenett og Entro-logo som `#cwrap`.
+  Berre natta i solsimuleringa er opak (`setClearColor(0x1c2740,1)`). Fargen
+  i `_bg3()`/`getBg3D()` er det tåka tonar mot — hald han lik CSS-flata.
+- Einaste underlag er planteikninga. Den grå plata (1,5× teikninga) og
+  rutenettet utan teikning er fjerna; skuggane fell på den usynlege
+  skuggefangaren (ikkje ved kjeller).
+- PNG-eksporten teiknar flata, prikkane og logoen bak modellen sjølv — elles
+  ville fila fått gjennomsiktig bakgrunn.
+- Skalafiguren («Morten») er ei loddrett flate med føtene i y=0 som berre
+  dreiar rundt loddlinja si (`onBeforeRender`), med `renderOrder=3`. Ein
+  `Sprite` vippa nedre halvdel under bakken når ein såg skrått ovanfrå, og
+  med kjeller vart han då dekt av den halvgjennomsiktige teikninga. y=0 er
+  terrenget også med kjeller — stabelen er senka med `kjellerSenking()`.
+
 ## Fasadeteikningar
 
 Eit **fasadeark** er ei teikning som berre vert målt på. Det ligg VED SIDA AV
