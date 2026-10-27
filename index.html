@@ -80,6 +80,7 @@ return mapboxgl$1;
    knappar og felt Arial midt i Inter-grensesnittet. */
 button,input,select,textarea{font-family:inherit}
 :root{
+  --entro-ikon:url(data:image/png;base64,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);
   --bg:#f3f5f7;
   --surface:#ffffff;
   --surface2:#f6f8f9;
@@ -220,7 +221,14 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 #canvasRow{flex:1;display:flex;min-height:0;min-width:0;overflow:hidden}
 /* Lerretet er gjennomsiktig (clearRect), så bakgrunnen her syner rundt arket.
    Eit svakt punktrutenett gir flata litt struktur utan å konkurrere med teikninga. */
-#cwrap{flex:1 1 0;min-width:0;position:relative;overflow:hidden;background:#ebeff3 radial-gradient(circle,rgba(16,24,40,.09) 1px,transparent 1.3px) 0 0/18px 18px;cursor:grab}
+#cwrap{flex:1 1 0;min-width:0;position:relative;overflow:hidden;background:#ebeff3 radial-gradient(circle,rgba(16,24,40,.09) 1px,transparent 1.3px) 0 0/18px 18px;cursor:grab;isolation:isolate}
+/* Entro-logoen i punktrutenettet: dei same prikkane, berre i mørkeblått der
+   logoen ligg — eit raster, ikkje eit bilete. Same rutenett (0 0/18px) som
+   #cwrap, så prikkane ligg nøyaktig oppå dei grå. z-index:-1 inne i
+   isolation:isolate legg han under lerretet, som ikkje er posisjonert. */
+#cwrap::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(circle,rgba(50,89,94,.24) 1.2px,transparent 1.6px) 0 0/18px 18px;
+  -webkit-mask:var(--entro-ikon) right 6% bottom -6%/auto 82% no-repeat;mask:var(--entro-ikon) right 6% bottom -6%/auto 82% no-repeat}
 #cv{display:block}
 
 /* ── Side om side ────────────────────────────────────────────
@@ -378,6 +386,9 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 #dropz{position:absolute;inset:0;margin:auto;width:min(560px,calc(100% - 48px));height:min(340px,calc(100% - 48px));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;cursor:pointer;border:2px dashed var(--border2);border-radius:20px;background:rgba(255,255,255,.55);backdrop-filter:blur(2px);transition:border-color .2s,background .2s}
 #dropz:hover{border-color:rgba(29,79,79,.45);background:rgba(255,255,255,.8)}
 #dropz-icon{width:68px;height:68px;border-radius:18px;background:var(--accent-dim);border:1px solid rgba(29,79,79,.15);display:flex;align-items:center;justify-content:center;font-size:26px;transition:all .2s;box-shadow:var(--shadow-sm)}
+/* Entro-ikonet (berre symbolet) som maske, farga i mørkeblått som «entro Pi»-logoen.
+   --entro-ikon er den eine kopien av biletet: opplastingsboksen, bakgrunnen og nordpila les han. */
+.entro-ikon{width:24px;height:38px;background:#32595e;-webkit-mask:var(--entro-ikon) center/contain no-repeat;mask:var(--entro-ikon) center/contain no-repeat}
 #dropz:hover #dropz-icon{background:#d7e6e4;border-color:rgba(29,79,79,.35);transform:translateY(-2px);box-shadow:var(--shadow-md)}
 #dropz-text{text-align:center;color:var(--text3);font-size:13px;line-height:1.9}
 #dropz-text strong{color:var(--text2);display:block;margin-bottom:2px;font-size:14px;font-weight:600}
@@ -689,8 +700,10 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
   <a id="logo" style="display:none"></a>
   <div id="toolbar">
     <div class="tg">
-      <button class="btn teal" id="upBtn">↑ Last opp</button>
-      <input type="file" id="fi" accept=".pdf,image/*" multiple style="display:none">
+      <button class="btn teal" id="upBtn" title="Last opp planteikningar (PDF eller bilete) eller opne eit prosjekt (.entro) (Ctrl+O)">↑ Last opp</button>
+      <!-- Éin knapp for alt som skal inn: teikningar til etasjane, eller ei .entro-fil som
+           opnar prosjektet (lastInnFiler skil dei). Den gamle «Opne prosjekt»-knappen er borte. -->
+      <input type="file" id="fi" accept=".pdf,image/*,.entro" multiple style="display:none">
       <!-- 3D-skann er ikkje klar for brukarar enno: knappen er gøymd, koden (// ── 2d.) står.
            Fjern style="display:none" for å slå han på att. -->
       <button class="btn plan-only" id="scanBtn" style="display:none" title="Importer 3D-skann: vel den utpakka MatterPak-mappa — etasjar, soner og vindauge vert laga automatisk">⬚ 3D-skann</button>
@@ -702,8 +715,10 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       </div>
       <button class="btn" id="saveBtn" title="Lagre prosjekt (Ctrl+S)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 2.5h8l2.5 2.5v8a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5z"/><path d="M5 2.5h5V6H5z"/><path d="M4.5 13.5V10h7v3.5"/></svg></button>
       <button class="btn embed-only" id="dlBtn" title="Last ned .entro-fila til maskina (Ctrl+Shift+S)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7"/><path d="M5 6.8 8 9.8l3-3"/><path d="M2.8 12.5h10.4"/></svg></button>
-      <button class="btn" id="loadBtn" title="Opne prosjekt (Ctrl+O)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 4.5a1 1 0 0 1 1-1h3.2l1.6 1.8H13a1 1 0 0 1 1 1v6.2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4.5z"/></svg></button>
-      <input type="file" id="loadFi" accept=".entro" style="display:none">
+    </div>
+    <div class="tg">
+      <button class="btn" id="undoBtn" title="Angre (Ctrl+Z)" style="opacity:.4" disabled>↩</button>
+      <button class="btn" id="redoBtn" title="Gjere om (Ctrl+Y / Ctrl+Shift+Z)" style="opacity:.4" disabled>↪</button>
     </div>
     <div class="tg">
       <button class="btn" id="calBtn" title="Kalibrer skala">⊕ Kalibrer</button>
@@ -727,19 +742,19 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div class="tg">
       <button class="btn plan-only" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ <span class="tb-full">Slå saman fasadar</span><span class="tb-short">Fasadar</span></button>
-      <button class="btn embed-only plan-only" id="sysBtn" title="Hent dei tekniske systema som ligg på bygget i EntroPi og legg dei på soner">⚙ <span class="tb-full">Hent tekniske systemer</span><span class="tb-short">Tekn. system</span> <span class="sys-beta">BETA</span></button>
-      <button class="btn embed-only plan-only" id="aiBtn" title="La KI teikne opp soner, vindauge og dører frå planteikninga — du ser forslaget før du godtek det">✦ <span class="tb-full">KI-oppteikning</span><span class="tb-short">KI</span> <span class="sys-beta">BETA</span></button>
-    </div>
-    <div class="tg">
-      <button class="btn" id="undoBtn" title="Angre (Ctrl+Z)" style="opacity:.4" disabled>↩</button>
-      <button class="btn" id="redoBtn" title="Gjere om (Ctrl+Y / Ctrl+Shift+Z)" style="opacity:.4" disabled>↪</button>
-      <button class="btn red plan-only" id="clrBtn" title="Slett alle soner og bilete på aktiv etasje">× Slett alt</button>
+      <!-- Tekniske system fungerer ikkje godt nok enno: knappen er gøymd, koden (// ── 2c.) står.
+           Set klassa embed-only tilbake og fjern style="display:none" for å slå han på att. -->
+      <button class="btn plan-only" id="sysBtn" style="display:none" title="Hent dei tekniske systema som ligg på bygget i EntroPi og legg dei på soner">⚙ <span class="tb-full">Hent tekniske systemer</span><span class="tb-short">Tekn. system</span> <span class="sys-beta">BETA</span></button>
+      <button class="btn embed-only plan-only" id="aiBtn" title="La KI teikne opp soner, vindauge og dører frå planteikninga — du ser forslaget før du godtek det">✦ <span class="tb-full">KI-oppteikning</span><span class="tb-short">KI</span></button>
     </div>
     <div class="tg">
       <button class="btn plan-only" id="btn3d" title="Opne 3D-visualisering">⬡ 3D</button>
       <button class="btn plan-only" id="nordBtn" title="Nord-sjekk — hald inne for å rotere planteikninga slik at nord peikar opp" style="user-select:none"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M10.5 5.5 9 9l-3.5 1.5L7 7z" stroke-linejoin="round"/></svg></button>
       <button class="btn plan-only" id="exportImgBtn" title="Eksporter soneinndelinga som PDF — éi side per etasje"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M9.5 1.8V5h3"/><path d="M6 8.5h4.5M6 11h4.5"/></svg></button>
       <button class="btn" id="helpBtn" title="Tastatursnarvegar (?)" style="font-weight:700">?</button>
+    </div>
+    <div class="tg">
+      <button class="btn red plan-only" id="clrBtn" title="Slett alle soner og bilete på aktiv etasje">× Slett alt</button>
     </div>
     <div class="tg" style="margin-left:auto">
       <button class="btn teal" id="sxiBtn" style="font-weight:600" title="Eksporter SXI-fil til SIMIEN">⬇ <span class="tb-full">Eksporter SXI</span><span class="tb-short">SXI</span></button>
@@ -782,8 +797,8 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
   <div id="cwrap">
     <canvas id="cv"></canvas>
     <div id="dropz">
-      <div id="dropz-icon">📐</div>
-      <div id="dropz-text"><strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp filer her — fleire filer eller sider vert kvar sin etasje</small></div>
+      <div id="dropz-icon"><span class="entro-ikon" aria-hidden="true"></span></div>
+      <div id="dropz-text"><strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG) — eller eit prosjekt (.entro)<br><small>Klikk eller slepp filer her — fleire filer eller sider vert kvar sin etasje</small></div>
     </div>
     <div id="lasteKort" role="status" aria-live="polite"><div class="lk-topp"><div class="lk-spin"></div><div style="min-width:0;flex:1"><div class="lk-tittel"></div><div class="lk-tekst"></div></div></div><div class="lk-bar"><div class="lk-fyll"></div></div></div>
     <div id="scaleBadge" class="uncal">Ikkje kalibrert</div>
@@ -1087,7 +1102,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <!-- KI-oppteikning (beta) — sjå «2e. KI-oppteikning» i JS-en -->
     <div id="aiOverlay">
       <div id="aiPanel">
-        <h3>✦ KI-oppteikning <span class="sys-beta">BETA</span></h3>
+        <h3>✦ KI-oppteikning</h3>
         <div class="aisub">Claude les planteikninga og teiknar eit forslag du ser over før du godtek det. Hjørna vert snappa til veggane i teikninga.</div>
         <div id="aiOpts">
           <div id="aiOmfangRow">
@@ -2006,7 +2021,7 @@ function applyViewUI(){
   const dz=document.getElementById('dropz-text');
   if(dz)dz.innerHTML=iFasade()
     ? '<strong>Last opp fasadeteikning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp fil her</small>'
-    : '<strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp fil her</small>';
+    : '<strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG) — eller eit prosjekt (.entro)<br><small>Klikk eller slepp fil her</small>';
 }
 
 function setViewMode(v){
@@ -2891,7 +2906,6 @@ function winSpanPx(w,segLenPx,mpp){
 // remap-funksjonane, kopieringa og deling av sone les. Når posT endrar seg må
 // ankeret følgje snittet (winSyncAnchor), elles ville gruppa hoppe tilbake til
 // den gamle staden om posT fall bort.
-const WIN_GAP_FRAC=0.02;   // minste luft når ei ny stk vert lagd til ei gruppe
 function winCount(w){const n=parseInt(w.antal);return n>0?n:1;}
 function winHasPos(w){return Array.isArray(w.posT)&&w.posT.length===winCount(w);}
 // Senterposisjon (t) for kvar stk. `width` og `segLen` i SAME eining.
@@ -2978,24 +2992,59 @@ function winSyncAnchor(w,width,segLen){
 // eksakt den jamne rekkja.
 // Returnerer posT (sortert langs veggen), eller null når stykka ikkje får
 // plass rundt det teikna — då fell gruppa tilbake til jamn fordeling.
-function winPosFraKlikk(centreT,n,width,segLen){
+//
+// `opptekne` er [{a,b}] (same eining som segLen) for andre vindauge og dører
+// som alt står på veggen. Dei nye stykka vert lagde i lukene mellom dei, aldri
+// oppå — ei luke mot eit vindauge får heil luft på den sida, mot hjørnet halv.
+function winPosFraKlikk(centreT,n,width,segLen,opptekne){
   if(n<=1||!(segLen>0)||!(width>0))return null;
   const sp=fitSpanT(centreT,width,segLen);
   const c=(sp.t0+sp.t1)/2*segLen;
-  const A=c-width/2,B=segLen-c-width/2;       // ledig vegg på kvar side
-  const luft=(len,k)=>k===0?Infinity:(len-k*width)/(k+0.5);
-  let best=null;
-  for(let kL=0;kL<n;kL++){
-    const g=Math.min(luft(A,kL),luft(B,n-1-kL));
-    if(!best||g>best.g)best={kL,kR:n-1-kL,g};
+  const nye=winFyllLuker([c],n-1,width,segLen,opptekne);
+  return nye?[c,...nye].sort((x,y)=>x-y).map(x=>x/segLen):null;
+}
+// Legg k nye stk i dei ledige lukene på veggen. `faste` er senter (i eining,
+// ikkje t) for stk i same gruppe som står i ro; `opptekne` er andre vindauge.
+// Kvar luke får sitt eige tal stk med lik luft innanfor: heil luft mot eit
+// vindauge, halv mot hjørnet — same rytme som den jamne rekkja. Fordelinga
+// mellom lukene er den som gir mest luft der det er trongast (grådig: neste
+// stk går alltid til luka som då har mest luft att, som er optimalt for
+// maks-min når lufta minkar med kvar stk). Returnerer senter, eller null når
+// det ikkje er plass utan overlapp.
+function winFyllLuker(faste,k,width,segLen,opptekne){
+  if(k<=0)return [];
+  const blokk=[...faste.map(c=>({a:c-width/2,b:c+width/2})),...(opptekne||[])]
+    .filter(o=>o.b>0&&o.a<segLen).sort((x,y)=>x.a-y.a);
+  const luker=[];let pos=0,venstreVegg=true;
+  blokk.forEach(o=>{
+    if(o.a>pos)luker.push({a:pos,b:o.a,eL:venstreVegg?0.5:1,eR:1,k:0});
+    if(o.b>pos){pos=o.b;venstreVegg=false;}
+  });
+  if(pos<segLen)luker.push({a:pos,b:segLen,eL:venstreVegg?0.5:1,eR:0.5,k:0});
+  const luft=(l,kk)=>(l.b-l.a-kk*width)/(kk-1+l.eL+l.eR);
+  for(let i=0;i<k;i++){
+    let best=null;
+    luker.forEach(l=>{const g=luft(l,l.k+1);if(!best||g>best.g)best={l,g};});
+    if(!best||!(best.g>=0))return null;
+    best.l.k++;
   }
-  if(!best||!(best.g>=0))return null;
-  const pL=width+luft(A,best.kL),pR=width+luft(B,best.kR);
   const cs=[];
-  for(let i=best.kL;i>=1;i--)cs.push((c-i*pL)/segLen);
-  cs.push(c/segLen);
-  for(let i=1;i<=best.kR;i++)cs.push((c+i*pR)/segLen);
+  luker.forEach(l=>{
+    if(!l.k)return;
+    const g=luft(l,l.k);
+    for(let j=0;j<l.k;j++)cs.push(l.a+l.eL*g+width/2+j*(width+g));
+  });
   return cs;
+}
+// Utstrekninga [{a,b}] i biletpikslar til alle ANDRE vindauge og dører på
+// same segment som w — det nye stk ikkje skal hamne oppå.
+function winOpptekne(z,w,segLen,mpp){
+  const ut=[];
+  (z.windows||[]).forEach(o=>{
+    if(o===w||o.segIdx!==w.segIdx)return;
+    winSpansPx(o,segLen,mpp).forEach(s=>ut.push({a:s.t0*segLen,b:s.t1*segLen}));
+  });
+  return ut;
 }
 // Frys den jamne fordelinga til faktiske posisjonar, slik at dei andre stykka
 // står i ro når brukaren flyttar eitt av dei.
@@ -3048,30 +3097,25 @@ function winLappStk(w,spans){
   if(winHasPos(w)&&Number.isInteger(k)&&k>=0&&k<spans.length)return k;
   return _naerastT(spans.map(s=>(s.t0+s.t1)/2),(w.t0+w.t1)/2);
 }
-function winSetAntal(w,n,width,segLen){
+// `opptekne`: andre vindauge på veggen (winOpptekne) — nye stk hamnar ikkje oppå dei.
+function winSetAntal(w,n,width,segLen,opptekne){
   n=Math.max(1,Math.round(n)||1);
   const old=winCount(w);
+  // Må lesast FØR antal endrar seg — winHasPos samanliknar posT med antal
+  const hadPos=winHasPos(w);
   w.antal=n;
 
   if(n===old)return; // Ingen endring
 
-  if(winHasPos(w)){
+  if(hadPos){
     // Allereie distribuerte stykk — endra eller legg til
     const cs=w.posT.slice();
     if(n<old){
       w.posT=cs.slice(0,n);
     } else {
-      // Legger til nye stykk etter dei som alt er der
-      const gap=Math.max(WIN_GAP_FRAC*segLen,width*0.5);
-      const stepT=(width+gap)/(segLen||1);
-      const halfT=(width/2)/(segLen||1);
-      let t=Math.max.apply(null,cs),plass=true;
-      for(let i=old;i<n;i++){
-        t+=stepT;
-        if(t+halfT>1){plass=false;break;}
-        cs.push(t);
-      }
-      w.posT=plass?cs:null;
+      // Dei som står, står i ro; dei nye vert fordelte i dei ledige lukene
+      const nye=winFyllLuker(cs.map(t=>t*segLen),n-old,width,segLen,opptekne);
+      w.posT=nye?[...cs,...nye.map(x=>x/segLen)]:null;
       // Marker nye stykk for highlight
       if(w.posT)markerNyeStk(w,Array.from({length:n-old},(_,i)=>old+i));
     }
@@ -3079,7 +3123,7 @@ function winSetAntal(w,n,width,segLen){
     // Fyrste gang antal > 1 — stykket som står der vert ståande, resten
     // vert fordelte utover veggen derifrå (winPosFraKlikk)
     const _c=(w.t0+w.t1)/2;
-    w.posT=winPosFraKlikk(_c,n,width,segLen);
+    w.posT=winPosFraKlikk(_c,n,width,segLen,opptekne);
     winMerkTeikna(w,_c);
     if(w.posT)markerNyeStk(w,Array.from({length:n},(_,i)=>i));
   }
@@ -4423,8 +4467,19 @@ async function masseLeggInn(bruk){
 // Éin eller fleire filer inn. Éi fil som er eit bilete eller ei einsida PDF
 // går til den aktive etasjen som før; alt anna til masseimporten.
 async function lastInnFiler(liste){
-  const filer=[...(liste||[])].filter(Boolean);
+  let filer=[...(liste||[])].filter(Boolean);
   if(!filer.length)return;
+  // Ei .entro-fil opnar heile prosjektet, så ho kan ikkje blandast med
+  // teikningar (dei ville hamna i prosjektet som vert bytt ut) eller med
+  // andre prosjekt. Då seier vi frå og gjer ingenting.
+  const prosj=filer.filter(f=>/\.entro$/i.test(f.name));
+  if(prosj.length){
+    if(prosj.length>1||filer.length>1){
+      alert('Ei .entro-fil opnar eit heilt prosjekt og må veljast åleine. Opne prosjektet fyrst, og last opp teikningane etterpå.');
+      return;
+    }
+    return opneProsjektfil(prosj[0]);
+  }
   // Éi teikning i full oppløysing tek òg eit par sekund — same kort, utan tal
   const enkel=async f=>{lasteVis('Opnar teikninga…',f.name,null);
     try{await lastePaus();return await handleFile(f);}finally{lasteSkjul();}};
@@ -4533,6 +4588,27 @@ function slettEtasjarDialog(){
 }
 
 // ── Compass ───────────────────────────────────────────────────
+// Entro-symbolet (--entro-ikon), farga i mørkeblått, står som ein liten fast
+// signatur nedst i skiva. Det dreiar ikkje — det er pila som peikar.
+let _kompassBilete=null,_kompassLastar=false;
+function _kompassIkon(){
+  if(_kompassBilete||_kompassLastar)return _kompassBilete;
+  const m=/url\(["']?([^"')]+)["']?\)/.exec(getComputedStyle(document.documentElement).getPropertyValue('--entro-ikon'));
+  if(!m)return null;
+  _kompassLastar=true;
+  const img=new Image();
+  img.onload=()=>{
+    // Farge inn masken éin gong
+    const c=document.createElement('canvas');c.width=img.width;c.height=img.height;
+    const x=c.getContext('2d');
+    x.drawImage(img,0,0);
+    x.globalCompositeOperation='source-in';
+    x.fillStyle='#32595e';x.fillRect(0,0,c.width,c.height);
+    _kompassBilete=c;drawCompass();
+  };
+  img.src=m[1];
+  return null;
+}
 function drawCompass(){
   const W=96,H=96,cx=48,cy=48,r=40;
   cctx.clearRect(0,0,W,H);
@@ -4545,6 +4621,15 @@ function drawCompass(){
   // Subtle ring inside
   cctx.beginPath();cctx.arc(cx,cy,r-8,0,Math.PI*2);
   cctx.strokeStyle='rgba(0,0,0,.04)';cctx.lineWidth=1;cctx.stroke();
+  // Signaturen i bandet mellom ringane, under pila — så halen (r-16) aldri
+  // ligg oppå han
+  const ikon=_kompassIkon();
+  if(ikon){
+    const ih=9,iw=ih*ikon.width/ikon.height;
+    cctx.globalAlpha=.55;
+    cctx.drawImage(ikon,cx-iw/2,cy+r-10,iw,ih);
+    cctx.globalAlpha=1;
+  }
 
   // Arrow angle: northI degrees CW from UP
   // In canvas: UP = -PI/2, CW = positive direction
@@ -7249,37 +7334,50 @@ function _finishDelSone(){
   };
   const zA=lagSone(p1,z.name);
   const zB=lagSone(p2,z.name+' B');
-  // Fordel vindauge og dører til den sona veggen deira hamna i
+  // Fordel vindauge og dører til den sona veggen deira hamna i — STK for stk.
+  // Ei gruppe som står over klippet vert delt: kvar sone får dei stykka som
+  // står på hennar vegg, som ei gruppe med antal = talet på stk der. Stykka
+  // står der dei stod; posT vert rekna om til den nye (kortare) veggen.
   let mista=0;
-  origWins.forEach(w=>{
-    const s=origSegs[w.segIdx];
-    if(!s){mista++;return;}
-    const c=(w.t0+w.t1)/2;
-    const mid={x:s.a.x+(s.b.x-s.a.x)*c,y:s.a.y+(s.b.y-s.a.y)*c};
-    const origLen=Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y);
-    let plassert=false;
+  const finnVegg=pt=>{
     for(const nz of[zA,zB]){
-      if(plassert)break;
       for(let i=0;i<nz.pts.length;i++){
         if(nz.skillevegg.has(i))continue;
         const a=nz.pts[i],b=nz.pts[(i+1)%nz.pts.length];
         const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;
         if(L2<1)continue;
-        const t=((mid.x-a.x)*dx+(mid.y-a.y)*dy)/L2;
+        const t=((pt.x-a.x)*dx+(pt.y-a.y)*dy)/L2;
         if(t<0||t>1)continue;
-        if(Math.hypot(mid.x-(a.x+dx*t),mid.y-(a.y+dy*t))>1.5)continue;
-        // Breidda kjem frå breddeMm — den nye veggen er kortare enn den opphavlege,
-        // så den lagra t1-t0 ville gitt feil utstrekning
-        const nyLen=Math.sqrt(L2);
-        const widthPx=(mmPerImgPx&&w.breddeMm>0)?w.breddeMm/mmPerImgPx:Math.max(0,(w.t1-w.t0))*origLen;
-        const _ds=fitSpanT(t,widthPx,nyLen);
-        // posT peikar på den opphavlege veggen, som no er delt — stykka vert
-        // fordelte jamnt på den nye veggen i staden for å hamne feil stad
-        nz.windows.push({...w,segIdx:i,t0:_ds.t0,t1:_ds.t1,posT:null});
-        plassert=true;break;
+        if(Math.hypot(pt.x-(a.x+dx*t),pt.y-(a.y+dy*t))>1.5)continue;
+        return{nz,i,t,len:Math.sqrt(L2)};
       }
     }
-    if(!plassert)mista++;
+    return null;
+  };
+  origWins.forEach(w=>{
+    const s=origSegs[w.segIdx];
+    if(!s){mista+=winCount(w);return;}
+    const origLen=Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y);
+    // Breidda kjem frå breddeMm — den nye veggen er kortare enn den opphavlege,
+    // så den lagra t1-t0 ville gitt feil utstrekning
+    const widthPx=(mmPerImgPx&&w.breddeMm>0)?w.breddeMm/mmPerImgPx:Math.max(0,(w.t1-w.t0))*origLen;
+    const deler=new Map();   // `${sone}|${seg}` → {nz,i,len,ts:[]}
+    winCentres(w,widthPx,origLen).forEach(c=>{
+      const v=finnVegg({x:s.a.x+(s.b.x-s.a.x)*c,y:s.a.y+(s.b.y-s.a.y)*c});
+      if(!v){mista++;return;}
+      const k=(v.nz===zA?'A':'B')+'|'+v.i;
+      if(!deler.has(k))deler.set(k,{nz:v.nz,i:v.i,len:v.len,ts:[]});
+      deler.get(k).ts.push(v.t);
+    });
+    deler.forEach(d=>{
+      const n=d.ts.length;
+      const ny={...w,segIdx:d.i,antal:n,posT:n>1?d.ts.slice():null};
+      delete ny.lappStk;
+      const _ds=fitSpanT(d.ts[0],widthPx,d.len);
+      ny.t0=_ds.t0;ny.t1=_ds.t1;
+      if(n>1)winSyncAnchor(ny,widthPx,d.len);
+      d.nz.windows.push(ny);
+    });
   });
   curFloor().zones.splice(zi,1,zA,zB);
   zones=curFloor().zones;
@@ -7308,7 +7406,7 @@ function _finishDelSone(){
   setMode('navigate');
   updateResults();renderTable();renderFloorTabs();draw();
   hintText.textContent='Delt i «'+zA.name+'» og «'+zB.name+'» — klippelinja er sett som sonekobling i begge.'
-    +(mista?' '+mista+' vindauge/dør kunne ikkje plasserast og vart fjerna.':'');
+    +(mista?' '+mista+' stk vindauge/dør kunne ikkje plasserast og vart fjerna.':'');
 }
 
 // ── Window management ─────────────────────────────────────────
@@ -7647,14 +7745,14 @@ document.getElementById('winOk').onclick=()=>{
   if(n>1){
     const g=winGeom(_z,_ny);
     const _c=(_ny.t0+_ny.t1)/2;
-    _ny.posT=winPosFraKlikk(_c,n,g.width,g.segLen);
+    _ny.posT=winPosFraKlikk(_c,n,g.width,g.segLen,winOpptekne(_z,_ny,g.segLen,g.mpp));
     winMerkTeikna(_ny,_c);
     if(_ny.posT)winSyncAnchor(_ny,g.width,g.segLen);
     hintText.textContent=(g.mpp&&winForTrongt(_ny,g.width,g.segLen))
       ?`⚠ ${n} × ${w} mm er breiare enn veggen (${(g.segLen*(g.mpp||0)/1000).toFixed(2)} m) — stykka overlappar. Sjekk breidda eller antalet.`
       :_ny.posT
         ?`${n} stk: det teikna står der du sette det, resten fordelte utover fasaden — drag ei enkelt stk for å flytte henne.`
-        :`${n} stk fordelte jamnt utover fasaden (ikkje plass rundt det teikna) — drag ei enkelt stk for å flytte henne.`;
+        :`${n} stk fordelte jamnt utover fasaden (ikkje plass rundt det teikna og vindauga som alt står der) — sjekk at dei ikkje ligg oppå kvarandre.`;
   }
 };
 document.getElementById('winCancel').onclick=()=>{winOverlay.classList.remove('show');winPts=[];pendingWin=null;draw();};
@@ -9483,7 +9581,7 @@ function renderTable(){
   });
   wrap.querySelectorAll('[data-wn]').forEach(inp=>{
     const [_fi,_zi,_wi]=inp.dataset.wn.split(',').map(Number);
-    inp.onchange=()=>{const z=floors[_fi].zones[_zi];const w=z.windows[_wi];const v=parseInt(inp.value);const g=winGeom(z,w);winSetAntal(w,v>0?v:1,g.width,g.segLen);updateResults();renderTable();draw();};
+    inp.onchange=()=>{const z=floors[_fi].zones[_zi];const w=z.windows[_wi];const v=parseInt(inp.value);const g=winGeom(z,w);winSetAntal(w,v>0?v:1,g.width,g.segLen,winOpptekne(z,w,g.segLen,g.mpp));updateResults();renderTable();draw();};
   });
 }
 
@@ -10336,7 +10434,7 @@ function showWindowEditDialog(w,wi,z,zi,fli){
     // Antalet endrar plasseringa til stykka — winSetAntal tek vare på dei som
     // alt står der og legg nye etter den siste (sjå winSetAntal)
     const _g=winGeom(z,w);
-    winSetAntal(w,ant,_g.width,_g.segLen);
+    winSetAntal(w,ant,_g.width,_g.segLen,winOpptekne(z,w,_g.segLen,_g.mpp));
     const uv=parseFloat(uI.value);w.uVerdi=isNaN(uv)?undefined:uv;
     if(w.type!=='dor'){
       if(brystCb.checked){const bv=parseInt(brystI.value);w.brystningMm=isNaN(bv)?null:bv;}
@@ -10664,7 +10762,7 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.shiftKey&&e.key==='Z'))){e.preventDefault();redo();return;}
   if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='S'||e.key==='s')){e.preventDefault();lastNedProsjektfil();return;}
   if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();document.getElementById('saveBtn').click();return;}
-  if((e.ctrlKey||e.metaKey)&&e.key==='o'){e.preventDefault();document.getElementById('loadBtn').click();return;}
+  if((e.ctrlKey||e.metaKey)&&e.key==='o'){e.preventDefault();fi.click();return;}
 
   // ── Kopier (Ctrl+C) — sone eller vindauge avhengig av kva musa er over ──
   if((e.ctrlKey||e.metaKey)&&e.key==='c'){
@@ -13246,12 +13344,12 @@ async function showFloorContextMenu(clientX,clientY,f){
       sb.title=saveLabel+' (Ctrl+S)';
       const s=labelEl();if(s)s.textContent=saveLabel;
     }
-    const lb=document.getElementById('loadBtn');
-    if(lb)lb.title='Opne ei .entro-fil frå maskina (Ctrl+O)';
+    const ub=document.getElementById('upBtn');
+    if(ub)ub.title='Last opp planteikningar (PDF eller bilete) eller opne ei .entro-fil frå maskina (Ctrl+O)';
     if(bygg&&(bygg.namn||bygg.adresse)){
       let c=document.getElementById('hostChip');
       if(!c){
-        const anchor=document.getElementById('loadBtn');
+        const anchor=document.getElementById('saveBtn');
         if(anchor&&anchor.parentNode){
           c=document.createElement('span');
           c.id='hostChip';c.className='lbl';
@@ -15601,16 +15699,15 @@ document.getElementById('saveBtn').onclick=()=>{
 };
 document.getElementById('dlBtn').onclick=()=>lastNedProsjektfil();
 
-document.getElementById('loadBtn').onclick=()=>document.getElementById('loadFi').click();
-document.getElementById('loadFi').onchange=async function(){
-  const file=this.files[0];if(!file)return;
-  this.value='';
+// Opnar ei .entro-fil — same veg som den gamle «Opne prosjekt»-knappen.
+// Kallast frå lastInnFiler (Last opp-knappen, Ctrl+O og slepp på lerretet).
+async function opneProsjektfil(file){
   try{
     await lastProsjekt(JSON.parse(await file.text()),{fit:true});
   }catch(e){
     alert('Kunne ikkje opne prosjektfil: '+e.message);
   }
-};
+}
 const KLIMA={
   'Bergen':    {lat:'60.380000',lon:'5.330000',fil:'E:\\Sites\\Climates\\TMY_Bergen_CERRA_1991-2020_tmy-no.csv',mean:'7.60',
     ds:{dt:'11.8',hum:'13.31',gr:'0.13'},

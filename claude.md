@@ -246,6 +246,15 @@ trongaste sida. Klikk midt i ei rute i den jamne rekkja gir eksakt den jamne
 rekkja. Er det ikkje plass rundt det teikna stykket, vert `posT` null og gruppa
 jamnt fordelt (hintlinja seier frå).
 
+**Nye stk vert aldri lagde oppå vindauge som alt står på veggen.**
+`winFyllLuker` deler veggen i luker mellom det som står (andre vindauge/dører
+på same segment frå `winOpptekne`, og stk i gruppa som står i ro) og fordeler
+dei nye med lik luft i kvar luke — heil luft mot eit vindauge, halv mot
+hjørnet. Neste stk går alltid til luka som då har mest luft att (maks-min).
+Utan andre vindauge er resultatet eksakt det same som før. Det gjeld både
+`winPosFraKlikk` (ny gruppe) og `winSetAntal` (auke med `posT`), som begge tek
+`opptekne` som siste argument — kallarane må sende det.
+
 Ei tidlegare utgåve klumpa stykka saman rundt klikkpunktet med ein liten
 luftavstand; det gav ein 3D-modell som ikkje likna på bygget, og på ein kort
 vegg hamna stykka oppå kvarandre. Difor vert resten **spreidde over heile
@@ -281,12 +290,14 @@ Invariantar:
 - **Alle stk ligg på same segment.** Gruppa er eitt `<window>` inne i éin
   `<facade>`; spreidde vi stykka over fleire veggar, ville det ikkje lenger
   finnast éin fasade å leggje elementet i.
-- **`posT` følgjer aldri med ein kopi.** Kopier, limeinn og «Del sone» set
+- **`posT` følgjer aldri med ein kopi.** Kopier og limeinn set
   `posT:null` — plasseringa gjeld kjeldeveggen, og ein annan vegg har annan
   lengd. Utan dette ville kopiane dessutan dele same array som originalen.
 - **Endra antal går gjennom `winSetAntal`**, aldri `w.antal=n`. Nye stk vert
-  lagde etter den siste med ei halv vindaugsbreidde i luft; er det ikkje plass,
-  fell heile gruppa tilbake til jamn fordeling.
+  lagde i dei ledige lukene (`winFyllLuker`); er det ikkje plass, fell heile
+  gruppa tilbake til jamn fordeling. `winHasPos` må lesast **før** `antal`
+  vert endra — han samanliknar `posT` med `antal`, og ei tidlegare utgåve
+  mista difor plasseringa kvar gong antalet auka.
 - **Segment-remappinga tek `posT` med** (`_mapWinPos`, same lineære omrekning
   som `t0`/`t1`). Hamnar ei stk utanfor den nye veggen, fell gruppa tilbake til
   jamn fordeling — å klemme dei inn mot kanten ville stabla dei oppå kvarandre.
@@ -680,7 +691,11 @@ Høgreklikk på ei sone (eller knappen i sidepanelet) → teikn ei linje tvers g
 
 Segmenta som kjem frå klippelinja vert automatisk skiljekonstruksjon i **begge** dei nye sonene. Kva som er klippelinje avgjerast **geometrisk** (ligg midtpunktet på ein av dei opphavlege veggane?), ikkje via indeksrekning.
 
-Vindauge fordelast til den sona veggen deira hamna i. `takflater`, `gavlflater`, `segOverrides` og samanslåtte grupper vert nullstilte — dei peikar på segmentindeksar som ikkje finst lenger.
+Vindauge fordelast **stk for stk** til den sona veggen deira hamna i. Ei
+gruppe som står over klippet vert delt: kvar ny sone får eitt element med
+`antal` = talet på stk på hennar vegg, og `posT` rekna om til den nye veggen,
+så stykka står der dei stod. Det er den eine staden `posT` vert flytt med —
+det er same vegg, berre kortare. `takflater`, `gavlflater`, `segOverrides` og samanslåtte grupper vert nullstilte — dei peikar på segmentindeksar som ikkje finst lenger.
 
 ---
 
@@ -692,6 +707,12 @@ brukar dei same to, så dei kan ikkje lenger komme i utakt. Per etasje kallar de
 `serialiserEtasje(f, opts)` / `deserialiserEtasje(f)`, som etasje-klippbordet òg
 brukar — eit nytt etasje- eller sonefelt skal difor leggjast der, ikkje i
 prosjektfunksjonane.
+
+**Opne:** det finst ingen eigen «Opne prosjekt»-knapp lenger. «↑ Last opp»
+(og Ctrl+O, og slepp på lerretet) tek både teikningar og `.entro`;
+`lastInnFiler` sender ei `.entro`-fil til `opneProsjektfil()` →
+`lastProsjekt()`, same veg som før. Ei `.entro` saman med andre filer vert
+avvist med ei melding — teikningane ville hamna i prosjektet som vert bytt ut.
 
 **Manuell (.entro):** `showSaveFilePicker` der nettlesaren støttar det, så brukaren vel mappe og namn. Framlegg til filnamn er `foreslaaFilnamn()` (adressa utan postnummer/poststad). Fallback til vanleg nedlasting.
 
@@ -747,7 +768,10 @@ Testvert som implementerer heile protokollen: `docs/entropi-test-host.html`
   `saveFloorState()`/`syncFloorState()` har gått, så `_fyllFraPi()` les
   `i===activeFloor?zones:fl.zones`. Andre løkker over alle soner har same
   fella, men vert i praksis redda av autolagringa som flusher kvart minutt.
-- **Tekniske system (beta):** «⚙ Hent tekniske systemer» opnar eit eige
+- **Tekniske system (beta) — knappen er gøymd** (`#sysBtn` har mista
+  `embed-only` og fått `display:none`, sidan `.embed-only` har `!important`).
+  Funksjonen fungerte ikkje godt nok. Koden står urørt.
+  «⚙ Hent tekniske systemer» opnar eit eige
   vindauge (`#sysOverlay`, koden under `// ── 2c.`) der systema på bygget vert
   dregne over på soner. Lista kjem frå verten (`sxi:request-systems` →
   `sxi:systems`) og vert cacha i brua; **koplinga** er vår og ligg på sona som
@@ -1230,9 +1254,9 @@ er berre til å sjå på: bilete, soner med namn og kontrollmål, med eigen zoom
 - `draw()` ber om ei omteikning av ruta via `requestAnimationFrame`, så ho vert
   teikna maks éin gong per frame. Valet vert ikkje lagra.
 
-## KI-oppteikning (beta)
+## KI-oppteikning
 
-«✦ KI-oppteikning» (`// ── 2e.`, `.embed-only`) lèt Claude teikne soner og
+«✦ KI-oppteikning» (ikkje lenger merkt beta) (`// ── 2e.`, `.embed-only`) lèt Claude teikne soner og
 deretter vindauge/dører frå planteikninga. **Berre i EntroPi:** verktøyet har
 ingen API-nøkkel — `EntroHost.askAi()` sender prompt, bilete og JSON-skjema som
 `sxi:ai-request`, verten svarar `sxi:ai-ack` (innan 15 s) og `sxi:ai-result`.
@@ -1444,8 +1468,8 @@ Viktig bughistorikk:
 - Vindaugsbreidde: bruk fitSpanT/winSpanPx, ALDRI w.t1-w.t0 (som berre er senteret)
 - Vindauge med antal>1 er EITT SIMIEN-element, men antal stk på veggen. Kvar stk
   har si plassering i w.posT; bruk winCentres/winSpansPx, og endra antal berre
-  gjennom winSetAntal. posT skal ALDRI følgje med ein kopi (kopi/limeinn/del sone
-  set posT:null) — sjå «antal er eitt SIMIEN-element og mange stk på veggen»
+  gjennom winSetAntal. posT skal ALDRI følgje med ein kopi (kopi/limeinn set
+  posT:null; «Del sone» deler gruppa stk for stk og reknar posT om) — sjå «antal er eitt SIMIEN-element og mange stk på veggen»
 - Ei ny gruppe: det teikna stykket står der det vart teikna, resten vert spreidde
   utover HEILE veggen derifrå (winPosFraKlikk). Utan posT: jamn rekkje (rute på
   segLen/n, stk midt i ruta), aldri klumpa rundt klikkpunktet. Det er den tettaste fordelinga som
