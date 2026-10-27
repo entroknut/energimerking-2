@@ -749,6 +749,15 @@ dialogen for ei kopla sone): alle ytterveggane i alle instansane vert éin
 - Berre soner med **same bygningskategori** kan koplast
 - Kvar kopla sone kan ha **eigen tak- og gulvtype**
 - Kopla soner vises med lilla boks i sidepanelet
+- To dialogar, same reglar: `showLinkZoneMenu(z,…)` frå sonekortet (avkryssing,
+  «Kople alle i kategorien») og `showKoplingsoversikt()` frå `⇌ Kople soner` i
+  verktøylinja (alle soner gruppert på kategori, gruppene synlege med
+  «Vel»/«Frikople», «Kople alle» per kategori, «Kople valde» — sperra når dei
+  valde har ulik kategori). Begge går gjennom `_kopleSoner(list)` /
+  `_ryddEinsameGrupper()`: ein groupId som alt finst blant dei valde vert
+  gjenbrukt, og ei gruppe med éi sone att vert løyst opp. Kvar handling er
+  eitt `snapshot()`. Angre medan dialogen er open: oversikta teiknar seg på
+  nytt frå `floors`, dialogen per sone lukkar seg (han held på eit soneobjekt).
 
 ---
 

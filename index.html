@@ -273,7 +273,7 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .view-sw-solo.on{background:var(--accent-dim);color:var(--accent);border-color:var(--accent);font-weight:600}
 
 /* ── Sidebar ── */
-#sidebar{width:320px;min-width:200px;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--surface);flex-shrink:0;position:relative}
+#sidebar{width:min(360px,42vw);min-width:200px;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--surface);flex-shrink:0;position:relative}
 #sidebar-resize{position:absolute;left:-3px;top:0;bottom:0;width:7px;cursor:col-resize;z-index:10;background:transparent;transition:background .15s}
 #sidebar-resize:hover,#sidebar-resize.dragging{background:var(--accent);opacity:.25}
 #stabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;padding:0 6px}
@@ -326,6 +326,28 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .zlist-filtrert button{border:none;background:none;color:var(--accent);font:inherit;font-weight:600;cursor:pointer;padding:0;text-decoration:underline}
 .zeye{flex-shrink:0;width:22px;height:22px;padding:0;display:flex;align-items:center;justify-content:center;border:none;border-radius:6px;background:none;color:var(--text3);cursor:pointer;transition:background .12s,color .12s}
 .zeye:hover{background:var(--surface3);color:var(--accent)}
+/* «Kopla med n andre» øvst i sonekortet */
+.kp-box{background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;margin-bottom:8px;font-size:11px;overflow:hidden}
+.kp-hdr{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:pointer;user-select:none;color:#4338ca;font-weight:700}
+.kp-hdr:hover{background:rgba(99,102,241,.08)}
+.kp-tit{flex:1;font-size:11px}
+.kp-sum{font-family:'JetBrains Mono',monospace;font-size:10.5px}
+.kp-box.collapsed .sub-chevron{transform:rotate(-90deg)}
+.kp-box.collapsed .kp-liste{display:none}
+.kp-liste{max-height:168px;overflow-y:auto;padding:2px 6px 6px;border-top:1px solid #c7d2fe;scrollbar-width:thin}
+.kp-rad{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:3px 6px;border-radius:5px;cursor:pointer;color:var(--text2)}
+.kp-rad:hover{background:rgba(99,102,241,.08)}
+.kp-rad.cur{background:rgba(99,102,241,.12);color:#4338ca;font-weight:700;cursor:default}
+.kp-namn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kp-etg{font-size:9.5px;color:var(--text3);font-weight:400;margin-left:5px}
+.kp-a{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--text3);flex-shrink:0}
+.kp-rad.cur .kp-a{color:#4338ca}
+/* Samla rader i Konstruksjonar (SK/YV samla, sonekopling) */
+.kgrp{display:flex;align-items:center;gap:6px;padding:4px 8px;margin:2px 0;border-radius:6px;border:1px solid}
+.kgrp-t{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35}
+.kgrp-n{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kgrp-s{font-size:10px;color:#6b7280;font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kgrp>button{flex:none}
 /* Kollapsbar underseksjon i sonekortet (vindauge/dører) */
 .sub-hdr{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
   font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;
@@ -393,6 +415,19 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .kz-snar .kz-prim span{overflow:hidden;text-overflow:ellipsis}
 .kz-fare{color:#dc2626;border-color:#fca5a5;background:#fef2f2}
 .kz-fare:hover:not(:disabled){background:#fee2e2}
+/* Oversikta (showKoplingsoversikt) */
+.kz-stor{width:540px}
+.kz-sok{width:100%;box-sizing:border-box;margin-top:10px;font-size:12px;padding:6px 10px;border:1px solid var(--border2);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;outline:none}
+.kz-sok:focus{border-color:#7c3aed}
+.kz-kat{padding-bottom:6px}
+.kz-kat+.kz-kat{border-top:1px solid var(--border);margin-top:4px}
+.kz-kat-hdr{display:flex;align-items:center;gap:8px;padding:10px 8px 6px}
+.kz-kat-namn{font-size:12px;font-weight:700;color:var(--text)}
+.kz-kat-hdr .kz-etg-n{flex:1;font-size:10.5px;color:var(--text3)}
+.kz-mini{padding:3px 9px;font-size:11px;border-radius:6px}
+.kz-mini svg{width:12px;height:12px}
+.kz-grp{display:flex;align-items:center;gap:8px;margin:2px 8px 6px;padding:6px 10px;border:1px solid #ddd6fe;border-left:3px solid var(--g,#7c3aed);background:#f5f3ff;border-radius:8px}
+.kz-sum.feil{color:#c0302a}
 /* Kontekstmenyar (høgreklikk) — alle menyane brukar desse klassene.
    Ikona kjem frå ctxIkon(): monokrome SVG-ar, aldri fargerike emoji. */
 @keyframes ctxIn{from{opacity:0;transform:scale(.96) translateY(-4px)}to{opacity:1;transform:scale(1) translateY(0)}}
@@ -934,6 +969,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div class="tg">
       <button class="btn plan-only" id="mergeBtn" title="Slå saman fasadar — kombiner fasadar med same himmelretning til eitt element i SXI-eksporten">⊞ <span class="tb-full">Slå saman fasadar</span><span class="tb-short">Fasadar</span></button>
       <button class="btn plan-only" id="listeBtn" title="Listebasert redigering — sjå og endre vindauge, dører, ytterveggar, soner og etasjar i ein tabell. Vel fleire rader for å endre alle på ein gong.">☰ <span class="tb-full">Listebasert redigering</span><span class="tb-short">Liste</span></button>
+      <button class="btn plan-only" id="kopleBtn" title="Kople soner — sjå alle soner gruppert på kategori, og kople dei saman til felles SIMIEN-soner">⇌ <span class="tb-full">Kople soner</span><span class="tb-short">Kople</span></button>
       <!-- Tekniske system fungerer ikkje godt nok enno: knappen er gøymd, koden (// ── 2c.) står.
            Set klassa embed-only tilbake og fjern style="display:none" for å slå han på att. -->
       <button class="btn plan-only" id="sysBtn" style="display:none" title="Hent dei tekniske systema som ligg på bygget i EntroPi og legg dei på soner">⚙ <span class="tb-full">Hent tekniske systemer</span><span class="tb-short">Tekn. system</span> <span class="sys-beta">BETA</span></button>
@@ -983,7 +1019,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.15.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.16.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -3485,6 +3521,8 @@ function getVolum(z){const a=getAreaM2(z);return a!=null?a*getHimling(z):null;}
 // vert framleis eksporterte som <partition>, og taket/himlinga som før.
 // Vindaugelister lengre enn dette startar samanslegne i sonekortet
 const WINLIST_AUTO_COLLAPSE=8;
+const KONSTR_AUTO_COLLAPSE=12;   // veggar — lengre lister startar samanslegne
+const KOPLA_AUTO_COLLAPSE=4;     // kopla soner — større grupper startar samanlagde
 // Tak-/golvseksjonen startar samanslegen når oppdelinga er lengre enn dette
 const FLATELIST_AUTO_COLLAPSE=2;
 
@@ -4258,6 +4296,7 @@ function _liTilTekst(){
   return [kol.map(c=>c.t+(c.ein?' ['+c.ein+']':'')).join('\t'),...ut.map(r=>kol.map(c=>fmt(c,r)).join('\t'))].join('\n');
 }
 document.getElementById('listeBtn').onclick=opneListe;
+document.getElementById('kopleBtn').onclick=()=>showKoplingsoversikt();
 document.getElementById('listeLukk').onclick=()=>listeOverlay.classList.remove('show');
 listeOverlay.addEventListener('click',e=>{if(e.target===listeOverlay)listeOverlay.classList.remove('show');});
 document.getElementById('listeKopier').onclick=async()=>{
@@ -8586,6 +8625,13 @@ function visSonekort(z){
   });
   zlist.addEventListener('mouseleave',()=>{if(_kortHover){_kortHover=null;draw();}});
 })();
+// Namn + tal for ei samla rad i Konstruksjonar (SK samla, YV samla,
+// sonekopling): to linjer som kuttar med «…» i staden for å bryte ord for ord.
+function _kgrpTekst(nameTag,statsSpan){
+  const t=document.createElement('div');t.className='kgrp-t';
+  t.appendChild(nameTag);t.appendChild(statsSpan);
+  return t;
+}
 function updateResults(){
   const allZones=floors.flatMap((f,fi)=>f.zones.map((z,zi)=>({z,zi,fi,f})));
   const hasZones=allZones.length>0;
@@ -8762,26 +8808,42 @@ function updateResults(){
 
       // ── Grouped zone badge + breakdown ──
       if(isGrouped){
+        // Éi linje med tal og sum; lista bak ein chevron. Store grupper (ti-
+        // tals soner over mange etasjar) startar samanlagde, og ei open liste
+        // rullar i staden for å strekkje kortet. Klikk på ei rad viser kortet.
+        const kpKey=`kp_${_zuk(z)}`;
+        if(!window._koplaCollapsed)window._koplaCollapsed={};
+        if(window._koplaCollapsed[kpKey]===undefined)
+          window._koplaCollapsed[kpKey]=linked.length>KOPLA_AUTO_COLLAPSE;
         const breakdown=document.createElement('div');
-        breakdown.style.cssText='background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11px';
-        const bHdr=document.createElement('div');
-        bHdr.style.cssText='font-size:10px;font-weight:700;color:#4338ca;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:5px';
-        bHdr.innerHTML=`<span>⇌</span><span>Kopla soner (${linked.length})</span>`;
+        breakdown.className='kp-box'+(window._koplaCollapsed[kpKey]?' collapsed':'');
+        const totalA=getTotalAreaM2(z);
+        const bHdr=document.createElement('div');bHdr.className='kp-hdr';
+        bHdr.title='Klikk for å vise/skjule dei kopla sonene';
+        bHdr.innerHTML='<span class="sub-chevron"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,4 6,8 10,4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'
+          +'<span class="kp-tit"></span><span class="kp-sum"></span>';
+        bHdr.querySelector('.kp-tit').textContent='Kopla med '+(linked.length-1)+' andre';
+        bHdr.querySelector('.kp-sum').textContent='Σ '+(totalA!=null?totalA.toFixed(1)+' m²':'—');
+        bHdr.onclick=()=>{
+          const ny=!window._koplaCollapsed[kpKey];
+          window._koplaCollapsed[kpKey]=ny;
+          breakdown.classList.toggle('collapsed',ny);
+        };
         breakdown.appendChild(bHdr);
+        const kl=document.createElement('div');kl.className='kp-liste';
         linked.forEach(lz=>{
           const lf=floors.find(fl=>fl.zones.includes(lz));
           const la=getAreaM2(lz);
-          const isCur=lz===z;
           const row=document.createElement('div');
-          row.style.cssText=`display:flex;justify-content:space-between;align-items:center;padding:3px 6px;border-radius:5px;margin-bottom:2px;background:${isCur?'rgba(99,102,241,.12)':'transparent'}`;
-          row.innerHTML=`<span style="font-weight:${isCur?'700':'400'};color:${isCur?'#4338ca':'var(--text2)'}">${lz.name}${lf&&floors.length>1?' <span style="font-size:9px;color:var(--text3)">('+lf.name+')</span>':''}</span><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:${isCur?'#4338ca':'var(--text3)'}">${la!=null?la.toFixed(1)+' m²':'—'}</span>`;
-          breakdown.appendChild(row);
+          row.className='kp-rad'+(lz===z?' cur':'');
+          const n=document.createElement('span');n.className='kp-namn';n.textContent=lz.name;
+          if(lf&&floors.length>1){const e=document.createElement('span');e.className='kp-etg';e.textContent=arkNamn(lf);n.appendChild(e);}
+          const a=document.createElement('span');a.className='kp-a';a.textContent=la!=null?la.toFixed(1)+' m²':'—';
+          row.appendChild(n);row.appendChild(a);
+          if(lz!==z){row.title='Vis sonekortet';row.onclick=()=>visSonekort(lz);}
+          kl.appendChild(row);
         });
-        const totalA=getTotalAreaM2(z);
-        const sumRow=document.createElement('div');
-        sumRow.style.cssText='display:flex;justify-content:space-between;margin-top:5px;padding-top:5px;border-top:1px solid #c7d2fe;font-weight:700;color:#4338ca';
-        sumRow.innerHTML=`<span>Sum</span><span style="font-family:'JetBrains Mono',monospace">${totalA!=null?totalA.toFixed(1)+' m²':'—'}</span>`;
-        breakdown.appendChild(sumRow);
+        breakdown.appendChild(kl);
         cardBody.appendChild(breakdown);
       }
 
@@ -9083,12 +9145,39 @@ function updateResults(){
 
       // ── Fasade-radar (SK-toggle, segment) ──
       if(segs){
-        const facSection=document.createElement('div');
-        facSection.style.cssText='margin-top:10px;padding-top:8px;border-top:1px solid var(--border)';
-        const facHdr=document.createElement('div');
-        facHdr.style.cssText='font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px';
-        facHdr.textContent='Konstruksjonar';
-        facSection.appendChild(facHdr);
+        // Kollapsbar som vindaugslista: ei stor sone kan ha 20–30 veggar.
+        // Overskrifta ligg utanfor facSection, som er kroppen — fleire stader
+        // under tømmer facSection før dei byggjer panelet på nytt.
+        const konstrKey=`k_${_zuk(z)}`;
+        if(!window._konstrCollapsed)window._konstrCollapsed={};
+        if(window._konstrCollapsed[konstrKey]===undefined)
+          window._konstrCollapsed[konstrKey]=segs.length>KONSTR_AUTO_COLLAPSE;
+        const facWrap=document.createElement('div');
+        facWrap.className='sub-sec'+(window._konstrCollapsed[konstrKey]?' collapsed':'');
+        facWrap.style.cssText='margin-top:8px;padding-top:8px;border-top:1px solid var(--border)';
+        const facHdr=document.createElement('div');facHdr.className='sub-hdr';
+        facHdr.title='Klikk for å slå saman/utvide lista · Alt+klikk: alle soner';
+        const facChev=document.createElement('span');facChev.className='sub-chevron';
+        facChev.innerHTML='<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,4 6,8 10,4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        const facTxt=document.createElement('span');facTxt.textContent='Konstruksjonar';
+        const facCnt=document.createElement('span');facCnt.className='sub-count';
+        const _nSk=segs.filter((_,i)=>(z.skillevegg||new Set()).has(i)).length;
+        facCnt.textContent=segs.length+(_nSk?' · '+_nSk+' SK':'');
+        facHdr.appendChild(facChev);facHdr.appendChild(facTxt);facHdr.appendChild(facCnt);
+        facHdr.onclick=e=>{
+          const ny=!window._konstrCollapsed[konstrKey];
+          if(e.altKey){
+            // Same tilstand på alle soner
+            floors.forEach(fl=>fl.zones.forEach(zz=>{window._konstrCollapsed[`k_${_zuk(zz)}`]=ny;}));
+            updateResults();return;
+          }
+          window._konstrCollapsed[konstrKey]=ny;
+          facWrap.classList.toggle('collapsed',ny);
+        };
+        facWrap.appendChild(facHdr);
+        const facSection=document.createElement('div');facSection.className='sub-body';
+        facSection.style.paddingTop='3px';
+        facWrap.appendChild(facSection);
 
         if(!z.skillevegg)z.skillevegg=new Set();
         if(!z.skMergedGroups)z.skMergedGroups=[];
@@ -9225,17 +9314,17 @@ function updateResults(){
             const totalLenM=grpSegs.reduce((s,s2)=>s+(s2.lenM||0),0);
             const totalA=grpSegs.reduce((s,s2)=>s+(s2.areaM2||0),0);
             const row=document.createElement('div');
-            row.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;margin:2px 0;border-radius:6px;background:#fef3c7;border:1px solid #d97706';
-            const nameTag=document.createElement('span');nameTag.style.cssText='font-size:11px;font-weight:700;color:#92400e;white-space:nowrap';
+            row.className='kgrp';row.style.cssText='background:#fef3c7;border-color:#d97706';
+            const nameTag=document.createElement('span');nameTag.className='kgrp-n';nameTag.style.color='#92400e';
             nameTag.textContent=mergedObj?.name||'SK';
-            const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:10.5px;color:#6b7280;font-family:'JetBrains Mono',monospace;flex:1";
-            statsSpan.textContent=`${grpSegs.length} veggar · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx?fmtM2(totalA):'—'}`;
+            const statsSpan=document.createElement('span');statsSpan.className='kgrp-s';
+            statsSpan.textContent=`${grpSegs.length} ${grpSegs.length===1?"vegg":"veggar"} · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx?fmtM2(totalA):'—'}`;
             row.title='Eitt element i SIMIEN, sett saman av: '+grpSegs.map(s2=>labels2[segs.indexOf(s2)]).join(', ');
             const unmergeBtn=document.createElement('button');
             unmergeBtn.style.cssText='font-size:10px;padding:2px 6px;border:1px solid #d97706;border-radius:4px;background:#fff;color:#92400e;cursor:pointer;font-family:inherit;white-space:nowrap';
             unmergeBtn.textContent='Del opp';
             unmergeBtn.onclick=()=>unmergeSegs(grpSegs[0]?grpSegs[0].idx:seg.idx);
-            row.appendChild(nameTag);row.appendChild(statsSpan);row.appendChild(unmergeBtn);
+            row.appendChild(_kgrpTekst(nameTag,statsSpan));row.appendChild(unmergeBtn);
             facSection.appendChild(row);
             return;
           }
@@ -9258,12 +9347,14 @@ function updateResults(){
                   const opposingZone=facingZoneIdx<zones.length?zones[facingZoneIdx]:null;
                   const grpName=(zcData.name||'Sonekobling');
                   const row=document.createElement('div');
-                  row.style.cssText='display:flex;align-items:center;gap:4px;padding:3px 6px;margin:2px 0;border-radius:4px;background:#d1fae5;border:1px solid #10b981;font-size:10px';
-                  const nameTag=document.createElement('span');nameTag.style.cssText='font-weight:700;color:#047857;white-space:nowrap;font-size:10px';
-                  nameTag.textContent=grpName;
-                  const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:9.5px;color:#6b7280;font-family:'JetBrains Mono',monospace;flex:1";
-                  statsSpan.textContent=`${zcSegs.length} veggar · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx?fmtM2(totalA):'—'}`;
-                  row.title='Sonekobling — ein <zone_connection> element i SXI-fila: '+zcSegs.map((s2,i)=>labels2[segs.indexOf(s2)]).join(', ');
+                  row.className='kgrp';row.style.cssText='background:#d1fae5;border-color:#10b981';
+                  // Namnet er «Sonekobling <denne> og <nabo>» — sona vi står i er
+                  // openberr, så lappen seier berre kven koplinga går mot
+                  const nameTag=document.createElement('span');nameTag.className='kgrp-n';nameTag.style.color='#047857';
+                  nameTag.textContent=opposingZone?'Sonekobling mot '+opposingZone.name:grpName;
+                  const statsSpan=document.createElement('span');statsSpan.className='kgrp-s';
+                  statsSpan.textContent=`${zcSegs.length} ${zcSegs.length===1?"vegg":"veggar"} · ${mmPerImgPx?fmtM(totalLenM):'—'} · ${mmPerImgPx?fmtM2(totalA):'—'}`;
+                  row.title=grpName+' — eitt <zone_connection>-element i SXI-fila: '+zcSegs.map((s2,i)=>labels2[segs.indexOf(s2)]).join(', ');
                   const remBtn=document.createElement('button');
                   remBtn.style.cssText='font-size:9px;padding:2px 5px;border:1px solid #10b981;border-radius:3px;background:#fff;color:#047857;cursor:pointer;font-family:inherit;white-space:nowrap';
                   remBtn.textContent='Fjern';
@@ -9289,7 +9380,7 @@ function updateResults(){
                     markDirty();
                     updateResults();renderTable();draw();
                   };
-                  row.appendChild(nameTag);row.appendChild(statsSpan);
+                  row.appendChild(_kgrpTekst(nameTag,statsSpan));
                   row.appendChild(remBtn);
 
                   // Høgreklikk-meny for å fjerne eller endra sonekobling
@@ -9368,16 +9459,16 @@ function updateResults(){
               const netA=_mpp?(totalGrossA-winA):null;
               const meanAz=Math.round(circularMeanAz(grpSegs.map(s=>s.normalAz)));
               const row=document.createElement('div');
-              row.style.cssText='display:flex;align-items:center;gap:6px;padding:5px 8px;margin:2px 0;border-radius:6px;background:#dbeafe;border:1px solid #3b82f6';
-              const nameTag=document.createElement('span');nameTag.style.cssText='font-size:11px;font-weight:700;color:#1e40af;white-space:nowrap';
+              row.className='kgrp';row.style.cssText='background:#dbeafe;border-color:#3b82f6';
+              const nameTag=document.createElement('span');nameTag.className='kgrp-n';nameTag.style.color='#1e40af';
               nameTag.textContent=yvMerged.name;
-              const statsSpan=document.createElement('span');statsSpan.style.cssText="font-size:10.5px;color:#6b7280;font-family:'JetBrains Mono',monospace;flex:1";
+              const statsSpan=document.createElement('span');statsSpan.className='kgrp-s';
               statsSpan.textContent=`${grpSegs.length} fasadar · ${_mpp?fmtM(totalLenM):'—'} · ${_mpp&&netA!=null?fmtM2(netA>0?netA:totalGrossA):'—'} · ${meanAz}°`;
               const unmergeBtn=document.createElement('button');
               unmergeBtn.style.cssText='font-size:10px;padding:2px 6px;border:1px solid #3b82f6;border-radius:4px;background:#fff;color:#1e40af;cursor:pointer;font-family:inherit;white-space:nowrap';
               unmergeBtn.textContent='Del opp';
               unmergeBtn.onclick=()=>toggleYvMerge(yvMerged.name,grpSegs);
-              row.appendChild(nameTag);row.appendChild(statsSpan);row.appendChild(unmergeBtn);
+              row.appendChild(_kgrpTekst(nameTag,statsSpan));row.appendChild(unmergeBtn);
               facSection.appendChild(row);
               return;
             }
@@ -9543,7 +9634,7 @@ function updateResults(){
           };
           facSection.appendChild(row);
         });
-        cardBody.appendChild(facSection);
+        cardBody.appendChild(facWrap);
       }
       cardBody.appendChild(_etterKonstr);
       };
@@ -9814,7 +9905,11 @@ function showLinkZoneMenu(z, srcFloor, srcFi){
   const overlay=document.createElement('div');overlay.className='kz-ov';
   const box=document.createElement('div');box.className='kz-box';
   overlay.appendChild(box);
-  const tast=e=>{if(e.key==='Escape'){e.stopPropagation();lukk();}};
+  const tast=e=>{
+    if(e.key==='Escape'){e.stopPropagation();lukk();}
+    // Angre byter ut soneobjekta, så dialogen ville vist ei sone som ikkje finst
+    if((e.ctrlKey||e.metaKey)&&/^[zy]$/i.test(e.key))lukk();
+  };
   const lukk=()=>{overlay.remove();document.removeEventListener('keydown',tast,true);};
   document.addEventListener('keydown',tast,true);
   overlay.onmousedown=e=>{if(e.target===overlay)lukk();};
@@ -9948,6 +10043,185 @@ function showLinkZoneMenu(z, srcFloor, srcFi){
   };
   teikn();
   document.body.appendChild(overlay);
+}
+
+// ── Kople soner — oversikt over heile prosjektet ─────────────
+// Same reglar som showLinkZoneMenu, men utan å starte frå eit sonekort: alle
+// soner gruppert på kategori, dei eksisterande gruppene synlege, og
+// «Kople alle» per kategori. Kvar handling er eitt angre-steg og dialogen
+// står open, så ein kan rydde heile bygget i éin omgang.
+function _ryddEinsameGrupper(){
+  const n={};
+  floors.forEach(f=>f.zones.forEach(z=>{if(z.groupId)n[z.groupId]=(n[z.groupId]||0)+1;}));
+  floors.forEach(f=>f.zones.forEach(z=>{if(z.groupId&&n[z.groupId]<2)delete z.groupId;}));
+}
+// Alle i lista får same groupId — ein gruppe-id som alt finst blant dei vert
+// gjenbrukt, så ei eksisterande gruppe veks i staden for å få ny id.
+function _kopleSoner(list){
+  if(list.length<2)return;
+  const gid=(list.find(x=>x.groupId)||{}).groupId||('g'+(++_nextGroupId));
+  list.forEach(x=>{x.groupId=gid;});
+  _ryddEinsameGrupper();
+}
+function showKoplingsoversikt(){
+  saveFloorState();
+  const kat=x=>x.bygkat||'Kontorbygg';
+  const valt=new Set();
+  let sok='';
+  const overlay=document.createElement('div');overlay.className='kz-ov';
+  const box=document.createElement('div');box.className='kz-box kz-stor';
+  overlay.appendChild(box);
+  const tast=e=>{
+    if(e.key==='Escape'&&e.target.tagName!=='INPUT'){e.stopPropagation();lukk();}
+    // Angre byter ut soneobjekta — teikn oversikta på nytt frå floors etterpå
+    if((e.ctrlKey||e.metaKey)&&/^[zy]$/i.test(e.key))setTimeout(()=>{valt.clear();teikn();},0);
+  };
+  const lukk=()=>{overlay.remove();document.removeEventListener('keydown',tast,true);};
+  document.addEventListener('keydown',tast,true);
+  overlay.onmousedown=e=>{if(e.target===overlay)lukk();};
+  const endre=(fn,melding)=>{
+    snapshot();fn();valt.clear();
+    updateResults();renderTable();draw();
+    hintText.textContent=melding;
+    teikn();
+  };
+
+  // Søkefeltet står utanfor det som vert teikna på nytt, så fokus står
+  const hdr=document.createElement('div');hdr.className='kz-hdr';
+  hdr.innerHTML='<div class="kz-tit"><span class="kz-ik">'+ikonSvg('kople')+'</span>Kople soner</div>'
+    +'<div class="kz-sub">Kopla soner vert éi felles sone i SIMIEN. Geometri og areal vert framleis rekna per sone. Berre soner i same kategori kan koplast.</div>';
+  const sokInp=document.createElement('input');sokInp.type='search';sokInp.className='kz-sok';
+  sokInp.placeholder='Søk etter sone…';
+  sokInp.oninput=()=>{sok=sokInp.value.trim().toLowerCase();teikn();};
+  sokInp.onkeydown=e=>{if(e.key==='Escape'&&sokInp.value){e.stopPropagation();sokInp.value='';sok='';teikn();}};
+  hdr.appendChild(sokInp);
+  box.appendChild(hdr);
+  const liste=document.createElement('div');liste.className='kz-liste';
+  box.appendChild(liste);
+  const fot=document.createElement('div');fot.className='kz-fot';
+  box.appendChild(fot);
+
+  const teikn=()=>{
+    const sTop=liste.scrollTop;
+    liste.innerHTML='';fot.innerHTML='';
+    const alle=[];
+    floors.forEach((fl,fli)=>fl.zones.forEach((z,zi)=>alle.push({z,fl,fli,zi})));
+    // Fast nummerering av gruppene i dialogen, i rekkjefølgja dei fyrst står
+    const gNr={};let nNr=0;
+    alle.forEach(e=>{if(e.z.groupId&&gNr[e.z.groupId]==null)gNr[e.z.groupId]=++nNr;});
+    const kategoriar=[...new Set(alle.map(e=>kat(e.z)))];
+    if(!alle.length){
+      const t=document.createElement('div');t.className='kz-tom';t.textContent='Prosjektet har ingen soner enno.';
+      liste.appendChild(t);
+    }
+    let vist=0;
+    kategoriar.forEach(k=>{
+      const iKat=alle.filter(e=>kat(e.z)===k);
+      const her=iKat.filter(e=>!sok||(e.z.name||'').toLowerCase().includes(sok));
+      if(!her.length)return;
+      vist+=her.length;
+      const sek=document.createElement('div');sek.className='kz-kat';
+      const kh=document.createElement('div');kh.className='kz-kat-hdr';
+      const kn=document.createElement('span');kn.className='kz-kat-namn';kn.textContent=k;
+      const kc=document.createElement('span');kc.className='kz-etg-n';kc.textContent=iKat.length+' soner';
+      const ka=document.createElement('button');ka.className='kz-btn kz-mini';
+      ka.innerHTML=ikonSvg('kople')+'<span>Kople alle</span>';
+      const eiGruppe=iKat[0].z.groupId&&iKat.every(e=>e.z.groupId===iKat[0].z.groupId);
+      ka.disabled=iKat.length<2||eiGruppe;
+      ka.title=eiGruppe?'Alle sonene i kategorien er alt éi gruppe':'Kople alle '+iKat.length+' soner i «'+k+'» til éi SIMIEN-sone';
+      ka.onclick=()=>endre(()=>_kopleSoner(iKat.map(e=>e.z)),'Alle '+iKat.length+' soner i «'+k+'» er kopla til éi SIMIEN-sone.');
+      kh.appendChild(kn);kh.appendChild(kc);kh.appendChild(ka);
+      sek.appendChild(kh);
+
+      // Eksisterande grupper i kategorien
+      const gidar=[...new Set(iKat.map(e=>e.z.groupId).filter(Boolean))];
+      gidar.forEach(g=>{
+        const medl=alle.filter(e=>e.z.groupId===g);
+        const andreKat=medl.filter(e=>kat(e.z)!==k).length;
+        const gr=document.createElement('div');gr.className='kz-grp';
+        const f0=medl[0];
+        gr.style.setProperty('--g',COLORS[zoneColorIdx(f0.fli,f0.zi,f0.z)]);
+        const gt=document.createElement('div');gt.className='kz-namn';
+        const gb=document.createElement('b');gb.textContent='Gruppe '+gNr[g]+' · '+medl.length+' soner';
+        const gs=document.createElement('span');
+        const etg=[...new Set(medl.map(e=>arkNamn(e.fl)))];
+        const ga=medl.reduce((s,e)=>s+(getAreaM2(e.z)||0),0);
+        gs.textContent=ga.toFixed(1)+' m² · '+etg.join(', ');
+        gt.appendChild(gb);gt.appendChild(gs);
+        gr.appendChild(gt);
+        if(andreKat){
+          const w=document.createElement('span');w.className='kz-chip varsel';w.textContent='Blanda kategoriar';
+          w.title=andreKat+' sone(r) i gruppa har ein annan kategori — kopla soner skal ha same kategori';
+          gr.appendChild(w);
+        }
+        const vg=document.createElement('button');vg.className='kz-btn kz-mini';vg.textContent='Vel';
+        vg.title='Kryss av sonene i gruppa — legg til fleire og trykk «Kople valde»';
+        vg.onclick=()=>{medl.filter(e=>kat(e.z)===k).forEach(e=>valt.add(e.z));teikn();};
+        const fr=document.createElement('button');fr.className='kz-btn kz-mini kz-fare';fr.textContent='Frikople';
+        fr.onclick=()=>endre(()=>medl.forEach(e=>delete e.z.groupId),'Gruppe '+gNr[g]+' er løyst opp.');
+        gr.appendChild(vg);gr.appendChild(fr);
+        sek.appendChild(gr);
+      });
+
+      her.forEach(e=>{
+        const r=document.createElement('label');r.className='kz-rad'+(valt.has(e.z)?' on':'');
+        const cb=document.createElement('input');cb.type='checkbox';cb.checked=valt.has(e.z);
+        cb.onchange=()=>{cb.checked?valt.add(e.z):valt.delete(e.z);teikn();};
+        const dot=document.createElement('span');dot.className='kz-dot';
+        dot.style.background=COLORS[zoneColorIdx(e.fli,e.zi,e.z)];
+        const nm=document.createElement('div');nm.className='kz-namn';
+        const b=document.createElement('b');b.textContent=e.z.name;
+        const s=document.createElement('span');
+        const a=getAreaM2(e.z);
+        s.textContent=[arkNamn(e.fl),a!=null?a.toFixed(1)+' m²':null,e.z.byggeaar?'byggeår '+e.z.byggeaar:null].filter(Boolean).join(' · ');
+        nm.appendChild(b);nm.appendChild(s);
+        r.appendChild(cb);r.appendChild(dot);r.appendChild(nm);
+        if(e.z.groupId){
+          const c=document.createElement('span');c.className='kz-chip kopla';c.textContent='Gruppe '+gNr[e.z.groupId];
+          r.appendChild(c);
+        }
+        sek.appendChild(r);
+      });
+      liste.appendChild(sek);
+    });
+    if(alle.length&&!vist){
+      const t=document.createElement('div');t.className='kz-tom';t.textContent='Ingen soner passar søket.';
+      liste.appendChild(t);
+    }
+    liste.scrollTop=sTop;
+
+    // Samandrag og handlingar for valet
+    const v=[...valt];
+    const kv=[...new Set(v.map(kat))];
+    const sum=document.createElement('div');sum.className='kz-sum';
+    const nGr=alle.filter(e=>e.z.groupId).length?Object.keys(gNr).length:0;
+    if(!v.length)sum.textContent='Kryss av soner for å kople dei saman. Prosjektet har '+nGr+' gruppe'+(nGr===1?'':'r')+' no.';
+    else if(kv.length>1){sum.textContent='Dei valde sonene har ulik kategori ('+kv.join(', ')+') — berre soner i same kategori kan koplast.';sum.classList.add('feil');}
+    else{
+      const sa=v.reduce((s,x)=>s+(getAreaM2(x)||0),0);
+      const gm=[...new Set(v.map(x=>x.groupId).filter(Boolean))];
+      sum.textContent=v.length+' soner valde · '+sa.toFixed(1)+' m²'
+        +(gm.length?' · vert lagde i Gruppe '+gNr[gm[0]]+(gm.length>1?' (andre grupper misser dei valde sonene)':''):'');
+    }
+    fot.appendChild(sum);
+    const knr=document.createElement('div');knr.className='kz-knr';
+    const tom=document.createElement('button');tom.className='kz-btn';tom.textContent='Fjern kryss';
+    tom.disabled=!v.length;tom.onclick=()=>{valt.clear();teikn();};
+    const fk=document.createElement('button');fk.className='kz-btn kz-fare';fk.textContent='Frikople valde';
+    fk.disabled=!v.some(x=>x.groupId);
+    fk.onclick=()=>endre(()=>{v.forEach(x=>delete x.groupId);_ryddEinsameGrupper();},v.length+' soner er tekne ut av gruppene sine.');
+    const sp=document.createElement('span');sp.style.flex='1';
+    const ok=document.createElement('button');ok.className='kz-btn kz-prim';
+    ok.innerHTML=ikonSvg('kople')+'<span></span>';ok.lastChild.textContent='Kople valde'+(v.length?' ('+v.length+')':'');
+    ok.disabled=v.length<2||kv.length>1;
+    ok.onclick=()=>endre(()=>_kopleSoner(v),v.length+' soner er kopla til éi SIMIEN-sone.');
+    const lk=document.createElement('button');lk.className='kz-btn';lk.textContent='Lukk';lk.onclick=lukk;
+    knr.appendChild(tom);knr.appendChild(fk);knr.appendChild(sp);knr.appendChild(lk);knr.appendChild(ok);
+    fot.appendChild(knr);
+  };
+  teikn();
+  document.body.appendChild(overlay);
+  sokInp.focus();
 }
 
 // ── Table panel ───────────────────────────────────────────────
