@@ -273,7 +273,7 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .view-sw-solo.on{background:var(--accent-dim);color:var(--accent);border-color:var(--accent);font-weight:600}
 
 /* ── Sidebar ── */
-#sidebar{width:min(360px,42vw);min-width:200px;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--surface);flex-shrink:0;position:relative}
+#sidebar{width:min(380px,42vw);min-width:200px;display:flex;flex-direction:column;border-left:1px solid var(--border);background:var(--surface);flex-shrink:0;position:relative}
 #sidebar-resize{position:absolute;left:-3px;top:0;bottom:0;width:7px;cursor:col-resize;z-index:10;background:transparent;transition:background .15s}
 #sidebar-resize:hover,#sidebar-resize.dragging{background:var(--accent);opacity:.25}
 #stabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;padding:0 6px}
@@ -372,7 +372,12 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .card-btn{flex:1;padding:5px 8px;font-size:11.5px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:background .12s,border-color .12s,color .12s,box-shadow .12s;font-weight:500;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;min-width:0}
 .card-btn svg{width:13px;height:13px;flex-shrink:0}
 .card-btn.ik{flex:0 0 auto;padding:5px 7px}
-.card-btns{display:flex;gap:4px;margin:12px 0 4px}
+/* Knappane er aldri smalare enn teksten sin: er panelet for smalt, går dei
+   over på ei ny rad i staden for å klippe «Kopla (14)» */
+.card-btns{display:flex;flex-wrap:wrap;gap:3px;margin:12px 0 4px}
+.card-btns .card-btn{flex:1 1 auto;min-width:max-content;padding:5px 6px;gap:4px;font-size:11px}
+.card-btns .card-btn.ik{flex:0 0 auto}
+.card-btn .cb-n{font-size:10px;font-weight:700;padding:0 5px;border-radius:999px;background:#ddd6fe;line-height:15px}
 .card-btn.kopla{color:#6d28d9;border-color:#ddd6fe;background:#f5f3ff}
 .card-btn.kopla:hover{background:#ede9fe;color:#5b21b6}
 /* Kople soner-dialogen (showLinkZoneMenu) */
@@ -1019,7 +1024,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.16.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.16.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -3519,12 +3524,13 @@ function getVolum(z){const a=getAreaM2(z);return a!=null?a*getHimling(z):null;}
 // <cellar>-element både golvet og alle ytterveggane i sona (SIMIEN
 // reknar oppfyllinga mot terreng sjølv). Skiljeveggar mot andre soner
 // vert framleis eksporterte som <partition>, og taket/himlinga som før.
-// Vindaugelister lengre enn dette startar samanslegne i sonekortet
-const WINLIST_AUTO_COLLAPSE=8;
-const KONSTR_AUTO_COLLAPSE=12;   // veggar — lengre lister startar samanslegne
-const KOPLA_AUTO_COLLAPSE=4;     // kopla soner — større grupper startar samanlagde
-// Tak-/golvseksjonen startar samanslegen når oppdelinga er lengre enn dette
-const FLATELIST_AUTO_COLLAPSE=2;
+// Seksjonane i sonekortet startar samanslegne når lista er lengre enn
+// grensa. Alle står på 0: kvar seksjon er éi linje med teljar (og varsel)
+// til brukaren opnar han, så korta held seg korte på store bygg.
+const WINLIST_AUTO_COLLAPSE=0;   // vindauge og dører
+const KONSTR_AUTO_COLLAPSE=0;    // konstruksjonar (veggar)
+const KOPLA_AUTO_COLLAPSE=0;     // kopla soner
+const FLATELIST_AUTO_COLLAPSE=0; // oppdelt tak/golv
 
 const KJELLER_GULV='Kjeller (golv + yttervegg)';
 const KJELLER_VEGGTJUKN=0.30;   // m — fast inntil vidare
@@ -9133,7 +9139,8 @@ function updateResults(){
       if(z.groupId){
         const nLinked=floors.flatMap(fl=>fl.zones).filter(x=>x.groupId===z.groupId).length;
         lnBtn.classList.add('kopla');
-        _kb(lnBtn,'kople','Kopla ('+nLinked+')','Sona er kopla med '+(nLinked-1)+' andre — klikk for å endre');
+        _kb(lnBtn,'kople','Kopla','Sona er kopla med '+(nLinked-1)+' andre — klikk for å endre');
+        const _n=document.createElement('span');_n.className='cb-n';_n.textContent=nLinked;lnBtn.appendChild(_n);
       } else {
         _kb(lnBtn,'kople','Kople','Kople sona med soner i same eller andre etasjar (same bygningskategori)');
       }

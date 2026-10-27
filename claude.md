@@ -1114,9 +1114,15 @@ Sidepanelet — plassen er knapp, så seksjonen veks med behovet:
 - **Oppdelt lag** veks til ein kollapsbar `.sub-sec` med eitt kompakt kort per
   flate (namn/areal/✂/✕, så type + U-verdi, og på tak mot det fri vinkel +
   fallretning på ei tredje rad).
-- Kollapstilstanden ligg i ``window._flateCollapsed[`fl_<fi>_<zi>_<kind>`]`` og
-  overlever dei hyppige rebuildane. Lister lengre enn `FLATELIST_AUTO_COLLAPSE`
-  startar samanslegne, så eit oppdelt lag kan vere éi linje det òg.
+- Kollapstilstanden ligg i ``window._flateCollapsed[`fl_${_zuk(z)}_<kind>`]`` og
+  overlever dei hyppige rebuildane.
+- **Alle seksjonar i sonekortet startar samanslegne** (kopla soner, tak/golv,
+  konstruksjonar, vindauge): `*_AUTO_COLLAPSE`-grensene står på 0. Teljaren og
+  varsla står i headeren, så ingenting vert gøymt. Unntak: klipp i ei flate
+  opnar seksjonen.
+- Knapperada (`.card-btns`) er aldri smalare enn teksten (`min-width:max-content`)
+  og går over på to rader om panelet er for smalt. Ved 380 px (standard) får
+  «Rediger · Del · Kopier · Kopla 14 · slett» plass på éi rad.
 - **Samandraget står i headeren** (`.sub-count`): «n flater», og gul pille med ⚠
   når flatene ikkje dekkjer sonearealet. Poenget er at ein ser kva som ligg der
   utan å opne seksjonen — elles ville det å gøyme han vore å gøyme informasjon.
