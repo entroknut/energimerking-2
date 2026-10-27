@@ -1324,8 +1324,12 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
   tvers av etasjane. Soner utan kjend kategori vert ikkje kopla — utan
   `bygkat` reknar programmet dei som kontor, og ei kopling på det grunnlaget
   ville vore ei gjetting.
-- **Kalibrering er eit krav.** Dialogen stoppar «Start» og viser ein raud
-  boks med «Kalibrer no» når eit ark i køyringa manglar skala. Ei
+- **Kalibrering er eit krav.** Dialogen seier det i innleiinga, og
+  `kiVisKalibrering` listar kvart ark køyringa les med ✓/✕ og ein
+  «Kalibrer»-knapp per ark som manglar skala (`kiKalibrerArk` går til arket,
+  òg fasadeark, og opnar kalibreringa). Planteikning utan skala: raud boks og
+  «Start» sperra. Fasadeteikning utan skala: gul boks, ikkje sperra — skalaen
+  kan hentast frå kotene, men gir grovare høgder. Ei
   KI-kalibrering (målestokk i tittelfeltet + målsette mål) vart bygd i
   v5.11.0 og fjerna i v5.11.1: ho trefte ikkje godt nok på ekte teikningar.
   Ikkje bygg ho inn att utan å ha testa på ekte teikningar fyrst.
