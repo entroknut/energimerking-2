@@ -449,6 +449,42 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .ai-etg{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
 .ai-etg button{padding:3px 9px;font-size:11.5px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);border-radius:99px;cursor:pointer;font-family:inherit}
 .ai-etg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+/* Gjennomsyn av soneforslaget, plan for plan */
+#aiOverlay.review.ki-soner #aiPanel{width:380px;max-height:calc(100% - 24px);display:flex;flex-direction:column;padding:16px}
+#aiOverlay.review.ki-soner #aiLog{max-height:72px;min-height:0;flex-shrink:0}
+#aiOverlay.review.ki-soner #aiSoneVal{flex:1;min-height:0;display:flex;flex-direction:column}
+#aiOverlay.review.ki-soner #aiSoneListe{flex:1;max-height:none;min-height:80px}
+.ki-steg{display:flex;align-items:stretch;gap:6px;margin-bottom:10px}
+.ki-steg>button{flex-shrink:0;width:34px;border:1px solid var(--border2);background:var(--surface);border-radius:var(--r);cursor:pointer;font-size:16px;color:var(--text2);font-family:inherit}
+.ki-steg>button:hover:not(:disabled){background:var(--surface2);color:var(--text)}
+.ki-steg>button:disabled{opacity:.35;cursor:default}
+.ki-etgrad{flex:1;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.ki-etgrad button{flex:1 0 auto;min-width:64px;padding:5px 8px;border:1px solid var(--border2);background:var(--surface);border-radius:var(--r);cursor:pointer;font-family:inherit;text-align:left;line-height:1.25}
+.ki-etgrad button .n{display:block;font-size:11.5px;font-weight:600;color:var(--text);white-space:nowrap}
+.ki-etgrad button .t{display:block;font-size:10.5px;color:var(--text3);white-space:nowrap}
+.ki-etgrad button.sett .t::before{content:'✓ ';color:#059669;font-weight:700}
+.ki-etgrad button.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(37,99,235,.18);background:rgba(37,99,235,.06)}
+.ki-tittel{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.ki-tittel b{font-size:15px;color:var(--text)}
+.ki-tittel span{font-size:12px;color:var(--text3)}
+.ki-kort{display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer;border-left:4px solid transparent;transition:background .1s}
+.ki-kort:last-child{border-bottom:none}
+.ki-kort:hover{background:var(--surface2)}
+.ki-kort.valt{background:rgba(37,99,235,.07)}
+.ki-kort .sw{width:22px;height:22px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;opacity:.85}
+.ki-kort .tx{flex:1;min-width:0}
+.ki-kort .nm{display:block;font-size:12.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ki-kort .sub{display:flex;align-items:center;gap:6px;margin-top:2px}
+.ki-kort select{font-size:11px;padding:1px 2px;border:1px solid var(--border);border-radius:4px;max-width:150px;font-family:inherit;color:var(--text2);background:var(--surface)}
+.ki-kort .ar{margin-left:auto;font-size:12px;color:var(--text2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ki-tom{padding:14px;font-size:12px;color:var(--text3);text-align:center}
+.ai-valhint kbd{font-family:inherit;font-size:10.5px;padding:0 4px;border:1px solid var(--border2);border-radius:3px;background:var(--surface2)}
+/* Knappane som ligg oppå teikninga: ⊕ på kvar felles vegg, og «Slå saman» ved utvalet */
+#kiHandtak{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.ki-h{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:2px solid #fff;background:#111827;color:#fff;font-size:16px;line-height:1;font-weight:700;cursor:pointer;pointer-events:auto;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:0;transition:transform .1s,background .1s}
+.ki-h:hover{transform:scale(1.25);background:#059669}
+.ki-flyt{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;padding:7px 14px;border-radius:99px;border:2px solid #fff;background:#059669;color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.3);white-space:nowrap}
+.ki-flyt:hover{background:#047857}
 
 /* ── Tekniske system frå EntroPi (beta) ── */
 /* Eige vindauge, ikkje ein .dialog-overlay: dei ligg inne i #cwrap og dekkjer
@@ -1064,7 +1100,13 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
         <div id="aiLog"></div>
         <div id="aiEtasjar" class="ai-etg" style="display:none"></div>
         <div id="aiSoneVal" style="display:none">
-          <div class="ai-valhint">Kryss av, eller klikk på sonene i teikninga, for å slå dei saman.</div>
+          <div class="ki-steg" id="kiSteg">
+            <button id="kiForre" title="Førre plan (←)">‹</button>
+            <div class="ki-etgrad" id="kiEtgRad"></div>
+            <button id="kiNeste" title="Neste plan (→)">›</button>
+          </div>
+          <div class="ki-tittel"><b id="kiEtgNamn"></b><span id="kiEtgInfo"></span></div>
+          <div class="ai-valhint">Trykk <b>⊕</b> på ein felles vegg i teikninga for å slå saman to soner. Klikk fleire soner for å slå saman mange. <kbd>←</kbd><kbd>→</kbd> byter plan, <kbd>Ctrl</kbd>+<kbd>Z</kbd> angrar.</div>
           <div id="aiSoneListe"></div>
           <div class="ai-valbtns">
             <button class="ai-skip" id="aiAngreSlaa" disabled>↶ Angre</button>
@@ -1081,6 +1123,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
           <button class="ai-go" id="aiAccept">✓ Godta</button>
         </div>
       </div>
+      <div id="kiHandtak"></div>
     </div>
   </div>
   <!-- Side om side: den andre visinga (plan eller fasade) står her, berre til
@@ -5155,7 +5198,8 @@ function draw(){
   draftZones.forEach(z=>{
     if(z.pts.length<2)return;
     const _f=(typeof kiKatFarge==='function')?kiKatFarge(z.bruk):'#d97706';
-    const _dv=z._valt,_dh=z._hover,_fh=z._forhand!=null;
+    const _ph=typeof kiParHover!=='undefined'&&kiParHover&&(kiParHover.a===z||kiParHover.b===z);
+    const _dv=z._valt,_dh=z._hover||_ph,_fh=z._forhand!=null;
     const _bl=z._blink?Math.max(0,1-(performance.now()-z._blink)/1600):0;
     const sti=()=>{ctx.beginPath();const p0=i2s(z.pts[0].x,z.pts[0].y);ctx.moveTo(p0.x,p0.y);
       z.pts.forEach((p,i)=>{if(i>0){const pp=i2s(p.x,p.y);ctx.lineTo(pp.x,pp.y);}});ctx.closePath();};
@@ -5184,6 +5228,16 @@ function draw(){
     ctx.font='bold 12px Inter,sans-serif';ctx.fillStyle='#111827';ctx.fillText(l1,cpD.x,cpD.y-7);
     ctx.font='11px Inter,sans-serif';ctx.fillStyle=_fh?'#111827':_f;ctx.fillText(l2,cpD.x,cpD.y+8);
   });
+  // Musa over ⊕ på ein felles vegg: vis sona slik ho vert etter samanslåinga
+  if(draftZones.length&&typeof kiParHover!=='undefined'&&kiParHover){
+    const p=kiParHover.pts;
+    ctx.beginPath();p.forEach((q,i)=>{const s=i2s(q.x,q.y);i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y);});ctx.closePath();
+    ctx.fillStyle='rgba(5,150,105,.18)';ctx.fill();
+    ctx.strokeStyle='#059669';ctx.lineWidth=4;ctx.setLineDash([12,6]);ctx.stroke();ctx.setLineDash([]);
+  }
+  // Berre når det finst eit forslag (eller knappar å rydde) — KI-koden og
+  // globalane hennar er ikkje initialiserte når draw() går under oppstarten
+  if(draftZones.length||(document.getElementById('kiHandtak')||{}).childElementCount)kiPlasserHandtak();
 
   // KI-forslag til vindauge og dører (sjå «2e. KI-oppteikning»)
   if(viewMode==='plan')kiDraftWins.forEach(d=>(d.spans||[d]).forEach((sp,si)=>{
@@ -10796,11 +10850,12 @@ function kiKnappar(stadfest,tekst){
   document.getElementById('aiConfirmBtns').style.display=stadfest?'flex':'none';
   if(tekst)document.getElementById('aiAccept').textContent=tekst;
   aiOverlay.classList.toggle('review',!!stadfest);
-  // Samanslåing av soner i forslaget — berre når det er fleire å slå saman
-  const val=!!stadfest&&kiSteg==='soner'&&draftZones.length>1;
+  // Soneforslaget vert sett over plan for plan (kiTeiknSoneListe)
+  const val=!!stadfest&&kiSteg==='soner';
+  aiOverlay.classList.toggle('ki-soner',val);
   document.getElementById('aiSoneVal').style.display=val?'':'none';
-  if(val)kiTeiknSoneListe();
-  kiTeiknEtasjar(!!stadfest);
+  if(val){kiSett.add(curFloor());kiTeiknSoneListe();}
+  kiTeiknEtasjar(!!stadfest&&!val);
 }
 // Knapperad med etasjane forslaget dekkjer. Eit trykk byter etasje på
 // lerretet — forslaget for etasjen kjem fram av seg sjølv (kiEtterEtasjebyte).
@@ -10886,7 +10941,7 @@ document.getElementById('aiBtn').onclick=()=>{
 function kiLukk(){
   kiKoyring++;kiSteg=null;
   draftZones=[];kiDraftWins=[];kiUtkast=null;kiFasadeInfo=null;
-  aiOverlay.classList.remove('show','review');
+  aiOverlay.classList.remove('show','review','ki-soner');
   draw();
 }
 document.getElementById('aiClose').onclick=kiLukk;
@@ -11283,9 +11338,9 @@ async function kiKoyrSoner(maal){
     return;
   }
   if(feil)logAi('\n⚠ '+feil+' etasje'+(feil===1?'':'r')+' kunne ikkje analyserast — køyr på nytt for dei.');
-  logAi('\nSjå over forslaget på lerretet'+(kiUtkast.size>1?' — byt etasje med knappane over':'')
+  logAi('\nSjå over forslaget plan for plan'+(kiUtkast.size>1?' — ‹ › eller piltastane byter plan':'')
     +'. Hjørna kan justerast etterpå med ⊹ Rediger.');
-  kiSteg='soner';kiSoneHist.clear();
+  kiSteg='soner';kiSoneHist.clear();kiSett.clear();
   // Same kategori i same etasje er som regel éi sone
   if(kiInnst.slaaKat){logAi('');kiSlaaSamanKategoriAlle(true);}
   // Vis ein etasje som har forslag — den aktive om han har det
@@ -11294,7 +11349,7 @@ async function kiKoyrSoner(maal){
   const n=[...kiUtkast.values()].reduce((s,a)=>s+a.length,0);
   kiKnappar(true,'✓ Godta '+n+' sone'+(n===1?'':'r'));
   if(kiInnst.kople)logAi('Soner med same kategori vert kopla (SIMIEN-gruppe) når du godtek.');
-  draw();
+  kiTilpassVising();
 }
 // Sonene i eitt forslag inn i den AKTIVE etasjen (zones), utan angre-steg.
 function kiLeggInnSoner(nye,laga){
@@ -11395,33 +11450,201 @@ function kiBlink(d){
 const kiSoneHist=new Map();
 const kiHist=f=>{if(!kiSoneHist.has(f))kiSoneHist.set(f,[]);return kiSoneHist.get(f);};
 const kiAreal=pts=>Math.abs(pts.reduce((a,p,i)=>{const q=pts[(i+1)%pts.length];return a+p.x*q.y-q.x*p.y;},0))/2;
+// Planane som er viste under gjennomsynet — får ✓ i stegraden
+const kiSett=new Set();
+const kiPlanar=()=>kiUtkast?[...kiUtkast.keys()]:[curFloor()];
 function kiTeiknSoneListe(){
   const el=document.getElementById('aiSoneListe');
   el.innerHTML='';
   const mpp=mppForFloor(curFloor());
+  // Stegrada: éin knapp per plan med forslag, ‹ › for å gå fram og tilbake
+  const planar=kiPlanar(),pi=planar.indexOf(curFloor());
+  const rad=document.getElementById('kiEtgRad');rad.innerHTML='';
+  planar.forEach(f=>{
+    const b=document.createElement('button');
+    const n=(f===curFloor()?draftZones:kiUtkast.get(f)||[]).length;
+    b.className=(f===curFloor()?'on ':'')+(kiSett.has(f)?'sett':'');
+    b.innerHTML='<span class="n"></span><span class="t"></span>';
+    b.querySelector('.n').textContent=arkNamn(f);
+    b.querySelector('.t').textContent=n+' sone'+(n===1?'':'r');
+    b.onclick=()=>kiGaaTilPlan(f);
+    rad.appendChild(b);
+    if(f===curFloor())requestAnimationFrame(()=>b.scrollIntoView({block:'nearest',inline:'nearest'}));
+  });
+  document.getElementById('kiSteg').style.display=planar.length>1?'':'none';
+  document.getElementById('kiForre').disabled=pi<=0;
+  document.getElementById('kiNeste').disabled=pi<0||pi>=planar.length-1;
+  const sum=mpp?draftZones.reduce((s,d)=>s+kiAreal(d.pts),0)*mpp*mpp/1e6:0;
+  document.getElementById('kiEtgNamn').textContent=arkNamn(curFloor())
+    +(planar.length>1&&pi>=0?'  ('+(pi+1)+' av '+planar.length+')':'');
+  document.getElementById('kiEtgInfo').textContent=draftZones.length+' sone'+(draftZones.length===1?'':'r')
+    +(sum?' · '+sum.toFixed(0)+' m²':'');
+  if(!draftZones.length){
+    const t=document.createElement('div');t.className='ki-tom';
+    t.textContent='Ingen soner i forslaget for denne planen.';
+    el.appendChild(t);
+  }
   draftZones.forEach(d=>{
-    const r=document.createElement('label');
-    r.className='ai-srad'+(d._valt?' valt':'');
-    const cb=document.createElement('input');cb.type='checkbox';cb.checked=!!d._valt;
-    cb.onchange=()=>{d._valt=cb.checked;r.classList.toggle('valt',cb.checked);kiOppdaterSlaa();draw();};
-    const prikk=document.createElement('span');
-    prikk.style.cssText='width:10px;height:10px;border-radius:50%;flex-shrink:0;background:'+kiKatFarge(d.bruk);
+    const r=document.createElement('div');
+    const farge=kiKatFarge(d.bruk);
+    r.className='ki-kort'+(d._valt?' valt':'');
+    r.style.borderLeftColor=d._valt?farge:'transparent';
+    const sw=document.createElement('span');sw.className='sw';
+    sw.style.background=farge;sw.textContent=d._valt?'✓':'';
+    const tx=document.createElement('div');tx.className='tx';
     const nm=document.createElement('span');nm.className='nm';nm.textContent=d.name;
+    const sub=document.createElement('div');sub.className='sub';
     // Kategorien kan rettast her — «⊕ Same kategori» slår saman etter han
     const kat=document.createElement('select');
     [...Object.keys(BYGKAT_SXI),'Ukjend'].forEach(k=>{const o=document.createElement('option');o.value=k;
-      o.textContent=k==='Ukjend'?'(ukjend)':k;if(k===(d.bruk||'Ukjend'))o.selected=true;kat.appendChild(o);});
-    kat.onclick=e=>e.preventDefault();   // label-klikk skal ikkje krysse av raden
-    kat.onchange=()=>{d.bruk=kat.value;prikk.style.background=kiKatFarge(d.bruk);kiOppdaterSlaa();draw();};
+      o.textContent=k==='Ukjend'?'(ukjend kategori)':k;if(k===(d.bruk||'Ukjend'))o.selected=true;kat.appendChild(o);});
+    kat.onclick=e=>e.stopPropagation();   // å velje kategori skal ikkje velje kortet
+    kat.onchange=()=>{d.bruk=kat.value;kiTeiknSoneListe();draw();};
+    sub.appendChild(kat);
+    if(d.byggeaar){const y=document.createElement('span');y.className='ar';y.style.marginLeft='0';y.textContent=d.byggeaar;sub.appendChild(y);}
+    tx.append(nm,sub);
     const ar=document.createElement('span');ar.className='ar';
     ar.textContent=mpp?(kiAreal(d.pts)*mpp*mpp/1e6).toFixed(1)+' m²':'';
-    r.append(cb,prikk,nm,kat,ar);
+    r.append(sw,tx,ar);
+    r.onclick=()=>{d._valt=!d._valt;kiTeiknSoneListe();draw();};
     r.onmouseenter=()=>{d._hover=true;draw();};
     r.onmouseleave=()=>{d._hover=false;draw();};
     el.appendChild(r);
   });
   kiOppdaterSlaa();
 }
+// Byt til ein plan i forslaget og vis heile forslaget for han
+function kiGaaTilPlan(f){
+  const i=floors.indexOf(f);
+  if(i<0)return;
+  draftZones.forEach(d=>{d._hover=false;});
+  if(i!==activeFloor)switchFloor(i);
+  kiSett.add(f);
+  kiTilpassVising();
+  kiKnappar(true);
+}
+function kiStegPlan(dir){
+  const planar=kiPlanar(),i=planar.indexOf(curFloor())+dir;
+  if(i>=0&&i<planar.length)kiGaaTilPlan(planar[i]);
+}
+document.getElementById('kiForre').onclick=()=>kiStegPlan(-1);
+document.getElementById('kiNeste').onclick=()=>kiStegPlan(1);
+// Zoom så forslaget for planen fyller lerretet ved sida av ruta
+function kiTilpassVising(){
+  const pts=draftZones.flatMap(d=>d.pts);
+  if(!pts.length||!bgImg){fitImage();return;}
+  const r=cwrap.getBoundingClientRect();
+  const panel=document.getElementById('aiPanel').getBoundingClientRect();
+  const hogre=Math.max(0,Math.min(r.right,panel.right+12)-Math.max(r.left,panel.left-12));
+  // På ein smal skjerm dekkjer ruta det meste — då får planen heile breidda
+  const w=r.width-hogre>r.width*0.45?r.width-hogre:r.width,pad=50;
+  const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  if(x1-x0<1||y1-y0<1)return;
+  sc=Math.max(0.02,Math.min(50,Math.min((w-pad*2)/(x1-x0),(r.height-pad*2)/(y1-y0))));
+  const d=_arkOffset();
+  offX=w/2-((x0+x1)/2+d.x)*sc;
+  offY=r.height/2-((y0+y1)/2+d.y)*sc;
+  saveFloorState();draw();
+}
+
+// Nabopar i forslaget for den aktive planen: soner som deler ein vegg og let
+// seg slå saman. Kvar får ein ⊕-knapp midt på den felles veggen. Rekna éin
+// gong per forslag (arrayen vert bytt ut ved kvar samanslåing og angring).
+// var: draw() les kiParHover, og draw() kan gå før denne linja er nådd
+var kiParMinne={arr:null,n:-1,par:[]},kiParHover=null;
+// Lengste felles stykke mellom kantane til a og b (parallelle, innanfor tol)
+function kiFellesKant(a,b,tol){
+  let best=null;
+  for(let i=0;i<a.length;i++){
+    const p=a[i],q=a[(i+1)%a.length];
+    const ux=q.x-p.x,uy=q.y-p.y,L=Math.hypot(ux,uy);
+    if(L<1)continue;
+    for(let j=0;j<b.length;j++){
+      const r=b[j],s=b[(j+1)%b.length];
+      const vx=s.x-r.x,vy=s.y-r.y,M=Math.hypot(vx,vy);
+      if(M<1||Math.abs(ux*vy-uy*vx)/(L*M)>0.09)continue;
+      const dr=Math.abs((r.x-p.x)*uy-(r.y-p.y)*ux)/L,ds=Math.abs((s.x-p.x)*uy-(s.y-p.y)*ux)/L;
+      if(dr>tol||ds>tol)continue;
+      const tr=((r.x-p.x)*ux+(r.y-p.y)*uy)/(L*L),ts=((s.x-p.x)*ux+(s.y-p.y)*uy)/(L*L);
+      const lo=Math.max(0,Math.min(tr,ts)),hi=Math.min(1,Math.max(tr,ts));
+      const len=(hi-lo)*L;
+      if(len>0&&(!best||len>best.len)){const t=(lo+hi)/2;best={len,x:p.x+ux*t,y:p.y+uy*t};}
+    }
+  }
+  return best;
+}
+function kiNabopar(){
+  if(kiParMinne.arr===draftZones&&kiParMinne.n===draftZones.length)return kiParMinne.par;
+  const par=[];
+  const mpp=mppForFloor(curFloor());
+  if(bgImg&&kiSteg==='soner'){
+    const tol=mpp?400/mpp:0.005*Math.max(bgImg.width,bgImg.height);
+    const minL=mpp?500/mpp:tol;   // under 0,5 m felles vegg er eit hjørne, ikkje ein vegg
+    for(let i=0;i<draftZones.length;i++)for(let j=i+1;j<draftZones.length;j++){
+      const a=draftZones[i],b=draftZones[j];
+      if(a.pts.length<3||b.pts.length<3)continue;
+      const k=kiFellesKant(a.pts,b.pts,tol);
+      if(!k||k.len<minL)continue;
+      const pts=kiSlaaSamanTo(a.pts,b.pts,tol);
+      if(pts)par.push({a,b,x:k.x,y:k.y,pts});
+    }
+  }
+  kiParMinne={arr:draftZones,n:draftZones.length,par};
+  return par;
+}
+// ⊕-knappane og «Slå saman (n)» oppå teikninga. Kalla frå draw(), så dei
+// følgjer zoom og panorering.
+function kiPlasserHandtak(){
+  const box=document.getElementById('kiHandtak');
+  if(!box)return;
+  if(kiSteg!=='soner'||viewMode!=='plan'||!aiOverlay.classList.contains('show')){
+    if(box.childElementCount)box.innerHTML='';kiParHover=null;return;
+  }
+  const par=kiNabopar();
+  if(box._par!==par){
+    box.innerHTML='';box._par=par;
+    par.forEach(p=>{
+      const b=document.createElement('button');b.className='ki-h';b.textContent='+';
+      b.title='Slå saman «'+p.a.name+'» og «'+p.b.name+'»';
+      b.onmouseenter=()=>{kiParHover=p;draw();};
+      b.onmouseleave=()=>{if(kiParHover===p){kiParHover=null;draw();}};
+      b.onclick=()=>{kiParHover=null;kiSlaaSamanValde([p.a,p.b]);};
+      b.onwheel=e=>{e.preventDefault();cv.dispatchEvent(new WheelEvent('wheel',e));};
+      b._p=p;box.appendChild(b);
+    });
+    const fl=document.createElement('button');fl.className='ki-flyt';fl.id='kiFlyt';
+    fl.onclick=()=>kiSlaaSamanValde();
+    box.appendChild(fl);
+  }
+  [...box.querySelectorAll('.ki-h')].forEach(b=>{
+    const s=i2s(b._p.x,b._p.y);b.style.left=s.x+'px';b.style.top=s.y+'px';
+  });
+  // «Slå saman (n)» under lappen til den største valde sona — midt i utvalet
+  // ville han ofte dekt ein ⊕ på den felles veggen
+  const fl=document.getElementById('kiFlyt'),valde=draftZones.filter(d=>d._valt);
+  if(valde.length>=2){
+    const st=valde.reduce((a,b)=>kiAreal(b.pts)>kiAreal(a.pts)?b:a);
+    const m=flateMerkepunkt(st.pts),s=i2s(m.x,m.y);
+    fl.style.display='';fl.style.left=s.x+'px';fl.style.top=(s.y+40)+'px';
+    fl.textContent='⊕ Slå saman '+valde.length+' soner';
+  } else fl.style.display='none';
+}
+// Tastatur under gjennomsynet. Fangar før resten av programmet, så Ctrl+Z
+// angrar i forslaget og ikkje i prosjektet.
+window.addEventListener('keydown',e=>{
+  if(kiSteg!=='soner'||!aiOverlay.classList.contains('show'))return;
+  const t=e.target;
+  if(t&&(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA'||t.isContentEditable))return;
+  let tok=true;
+  if(e.key==='ArrowRight'&&!e.ctrlKey)kiStegPlan(1);
+  else if(e.key==='ArrowLeft'&&!e.ctrlKey)kiStegPlan(-1);
+  else if((e.ctrlKey||e.metaKey)&&(e.key==='z'||e.key==='Z'))document.getElementById('aiAngreSlaa').click();
+  else if(e.key==='Enter'&&draftZones.filter(d=>d._valt).length>=2)kiSlaaSamanValde();
+  else if(e.key==='Escape'&&draftZones.some(d=>d._valt)){draftZones.forEach(d=>{d._valt=false;});kiTeiknSoneListe();draw();}
+  else tok=false;
+  if(tok){e.preventDefault();e.stopImmediatePropagation();}
+},true);
 function kiOppdaterSlaa(){
   const n=draftZones.filter(d=>d._valt).length,b=document.getElementById('aiSlaa');
   b.disabled=n<2;
@@ -11457,8 +11680,9 @@ function kiSlaaSamanTo(a,b,tol){
   const b2=tilpass(b,a),a2=tilpass(a,b2);
   return _slaaSamanPolygon(a2,b2);
 }
-function kiSlaaSamanValde(){
-  const valde=draftZones.filter(d=>d._valt);
+// liste: sonene som skal slåast saman (⊕ på ein felles vegg), elles dei valde
+function kiSlaaSamanValde(liste){
+  const valde=(liste||draftZones.filter(d=>d._valt)).slice();
   if(valde.length<2)return;
   const mpp=mppForFloor(curFloor());
   const tol=mpp?400/mpp:0.005*Math.max(bgImg.width,bgImg.height);
@@ -11493,7 +11717,7 @@ function kiSlaaSamanValde(){
   kiKnappar(true);
   draw();
 }
-document.getElementById('aiSlaa').onclick=kiSlaaSamanValde;
+document.getElementById('aiSlaa').onclick=()=>kiSlaaSamanValde();
 const kiKopiUtkast=arr=>arr.map(d=>({...d,pts:d.pts.map(q=>({x:q.x,y:q.y}))}));
 // Nøkkelen soner må dele for å slåast saman av seg sjølv: same kategori og
 // same byggeår. Ein uisolert eller kald del held seg for seg sjølv — han

@@ -1277,6 +1277,17 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
   igjen. Soner som ikkje deler vegg vert ikkje slegne saman — det vert meldt.
   `kiSoneHist` gir «Angre». Alt skjer i `draftZones`; fyrst «Godta» legg
   sonene inn (eitt angre-steg som før).
+- **Gjennomsynet går plan for plan** (`kiTeiknSoneListe`, klassen `ki-soner`
+  på `#aiOverlay`): stegrad med ‹ › og ein knapp per plan (✓ når planen er
+  vist, `kiSett`), og `kiGaaTilPlan` zoomar til forslaget ved sida av ruta
+  (`kiTilpassVising`). Kvar felles vegg mellom to forslagssoner får ein
+  ⊕-knapp oppå teikninga (`#kiHandtak`, plassert frå `draw()` via
+  `kiPlasserHandtak`); musa over viser den samanslegne sona, klikk slår saman.
+  Para (`kiNabopar`) vert rekna éin gong per forslagsarray — difor må ei
+  endring av geometrien i forslaget alltid lage ein ny array, ikkje endre
+  `pts` på staden. Tastatur (fanga på `window` før resten): ←/→ plan,
+  Ctrl+Z angrar i forslaget (ikkje i prosjektet), Enter slår saman valde,
+  Esc tømmer valet.
 - **Éi sone per kategori:** same bygningskategori i same etasje skal i
   hovudsak vere éi sone (prompten seier det, og leigetakarar deler ikkje
   lenger). Etter skannet slår `kiSlaaSamanKategoriAlle` saman nabosoner med
