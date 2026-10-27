@@ -381,6 +381,18 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 #dropz:hover #dropz-icon{background:#d7e6e4;border-color:rgba(29,79,79,.35);transform:translateY(-2px);box-shadow:var(--shadow-md)}
 #dropz-text{text-align:center;color:var(--text3);font-size:13px;line-height:1.9}
 #dropz-text strong{color:var(--text2);display:block;margin-bottom:2px;font-size:14px;font-weight:600}
+/* Lastekort medan teikningar vert lesne/lagde inn */
+#lasteKort{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;width:min(340px,calc(100% - 32px));padding:16px 18px 14px;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 32px rgba(13,27,42,.16);display:none;animation:dlgInn .18s ease-out;cursor:progress}
+#lasteKort.on{display:block}
+#lasteKort .lk-topp{display:flex;align-items:center;gap:11px}
+#lasteKort .lk-spin{width:20px;height:20px;flex-shrink:0;border-radius:50%;border:2.5px solid var(--accent-dim);border-top-color:var(--accent);animation:lkSpin .8s linear infinite}
+@keyframes lkSpin{to{transform:rotate(360deg)}}
+#lasteKort .lk-tittel{font-size:13.5px;font-weight:600;color:var(--text)}
+#lasteKort .lk-tekst{font-size:12px;color:var(--text3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lasteKort .lk-bar{height:4px;border-radius:2px;background:var(--accent-dim);margin-top:12px;overflow:hidden}
+#lasteKort .lk-fyll{height:100%;width:0;background:var(--accent);border-radius:2px;transition:width .25s ease-out}
+#lasteKort.uviss .lk-fyll{width:30%!important;animation:lkGli 1.2s ease-in-out infinite}
+@keyframes lkGli{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
 
 /* ── Dialogs ── */
 .dialog-overlay{display:none;position:absolute;inset:0;background:rgba(16,24,40,.38);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
@@ -773,6 +785,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
       <div id="dropz-icon">📐</div>
       <div id="dropz-text"><strong>Last opp plantegning</strong>PDF eller bilete (PNG, JPG)<br><small>Klikk eller slepp filer her — fleire filer eller sider vert kvar sin etasje</small></div>
     </div>
+    <div id="lasteKort" role="status" aria-live="polite"><div class="lk-topp"><div class="lk-spin"></div><div style="min-width:0;flex:1"><div class="lk-tittel"></div><div class="lk-tekst"></div></div></div><div class="lk-bar"><div class="lk-fyll"></div></div></div>
     <div id="scaleBadge" class="uncal">Ikkje kalibrert</div>
     <canvas id="compassCanvas" class="plan-only" width="96" height="96" title="Nordpila — dra for å justere kva veg nord peikar"></canvas>
     <button id="compassNordBtn" class="plan-only" title="Hald inne for å sjå planteikninga med nord opp (som kart)" style="position:absolute;bottom:14px;right:122px;height:28px;padding:0 10px;font-size:11px;font-weight:600;font-family:inherit;background:rgba(255,255,255,.92);border:1px solid var(--border2);border-radius:7px;color:var(--text2);cursor:pointer;box-shadow:var(--shadow-sm);backdrop-filter:blur(6px);white-space:nowrap;transition:all .12s;display:flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M10.5 5.5 9 9l-3.5 1.5L7 7z" stroke-linejoin="round"/></svg> Nord-sjekk</button>
@@ -4154,6 +4167,21 @@ document.getElementById('nextPg').onclick=async()=>{
 // (px per mm papir) som arket skalaen vart sett på. Eit ark med annan
 // tettleik får eiga kalibrering — med same målestokk føreslått når
 // referansen har ein vanleg målestokk (som ved delplanar).
+// Lastekortet midt på lerretet: spinnar, tekst og ein framdriftsstrek.
+// del=null gir ein glidande strek (ukjend lengd). Hintlinja åleine var for
+// lite — med mange teikningar såg det ut som ingenting skjedde.
+function lasteVis(tittel,tekst,del){
+  const k=document.getElementById('lasteKort');
+  k.querySelector('.lk-tittel').textContent=tittel;
+  k.querySelector('.lk-tekst').textContent=tekst||'';
+  k.classList.toggle('uviss',del==null);
+  if(del!=null)k.querySelector('.lk-fyll').style.width=Math.round(Math.max(0,Math.min(1,del))*100)+'%';
+  k.classList.add('on');
+}
+function lasteSkjul(){document.getElementById('lasteKort').classList.remove('on');}
+// Gi nettlesaren høve til å teikne kortet før eit tungt synkront steg.
+// rAF fyrer ikkje i ei bakgrunnsfane, difor setTimeout som reserve.
+const lastePaus=()=>new Promise(r=>{requestAnimationFrame(()=>setTimeout(r,0));setTimeout(r,60);});
 const MASSE_TYPAR=[['etasje','Etasje'],['del','Delplan'],['fasade','Fasade'],['hopp','Hopp over']];
 const erPdfFil=f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name);
 const masseStor=s=>s.charAt(0).toUpperCase()+s.slice(1);
@@ -4187,12 +4215,16 @@ function masseMini(kjelde,px){
 // Les filene til ei liste med ark: {fil, doc, side, n, img, mini, tekst, paperWMm, paperHMm}
 async function masseLes(filer){
   const ark=[];let ukjende=0;
-  for(const f of filer){
+  const N=filer.length,fTekst=i=>N>1?'Fil '+(i+1)+' av '+N+' · ':'';
+  for(let fi=0;fi<N;fi++){
+    const f=filer[fi];
     hintText.textContent='Les '+f.name+'…';
+    lasteVis('Les teikningar…',fTekst(fi)+f.name,fi/N);
     try{
       if(erPdfFil(f)){
         const doc=await opnePdf(await f.arrayBuffer());
         for(let p=1;p<=doc.numPages;p++){
+          if(doc.numPages>1)lasteVis('Les teikningar…',fTekst(fi)+'side '+p+' av '+doc.numPages+' · '+f.name,(fi+(p-1)/doc.numPages)/N);
           const page=await doc.getPage(p);
           const vp1=page.getViewport({scale:1});
           const s=180/Math.max(vp1.width,vp1.height),vp=page.getViewport({scale:s});
@@ -4291,7 +4323,8 @@ function masseDialog(rader,einPdf){
   });
 }
 async function masseImport(filer){
-  const {ark,ukjende}=await masseLes(filer);
+  let ark,ukjende;
+  try{({ark,ukjende}=await masseLes(filer));}finally{lasteSkjul();}
   hintText.textContent='';
   if(!ark.length){hintText.textContent='Fann ingen teikningar å leggje inn'+(ukjende?' ('+ukjende+' filer kunne ikkje lesast)':'')+'.';return;}
   // Gjett, gi namn til dei utan, og sorter etasjane nedanfrå
@@ -4307,9 +4340,13 @@ async function masseImport(filer){
   hopp.forEach(r=>{if(!r.namn)r.namn=r.k.fil.replace(/\.[^.]+$/,'')+(r.k.doc&&r.k.n>1?' s.'+r.k.side:'');});
   rader=[...etg,...fas,...hopp];
   const val=await masseDialog(rader,filer.length===1&&!!ark[0].doc);
-  if(val==='gammal'){await handleFile(filer[0]);return;}
+  if(val==='gammal'){
+    lasteVis('Opnar teikninga…',filer[0].name,null);
+    try{await lastePaus();await handleFile(filer[0]);}finally{lasteSkjul();}
+    return;
+  }
   if(!val)return;
-  await masseLeggInn(val.filter(r=>r.type!=='hopp'));
+  try{await masseLeggInn(val.filter(r=>r.type!=='hopp'));}finally{lasteSkjul();}
   if(ukjende)hintText.textContent+=' ('+ukjende+' filer kunne ikkje lesast.)';
 }
 async function masseLeggInn(bruk){
@@ -4326,6 +4363,7 @@ async function masseLeggInn(bruk){
   for(let i=0;i<bruk.length;i++){
     const r=bruk[i],k=r.k;
     hintText.textContent='Legg inn '+(i+1)+' av '+bruk.length+'…';
+    lasteVis('Legg inn teikningar…',(i+1)+' av '+bruk.length+' · '+(String(r.namn||'').trim()||k.fil),i/bruk.length);
     const img=k.doc?await loadPdfPage_with(k.doc,k.side,target):k.img;
     const felles={bgImg:img,pdfDoc:k.doc||null,pdfPage:k.side||1,totalPages:k.doc?k.n:1,
       paperWMm:k.paperWMm??null,paperHMm:k.paperHMm??null,paperSource:k.doc?'pdf':(k.paperWMm?'dpi':null)};
@@ -4354,6 +4392,8 @@ async function masseLeggInn(bruk){
     if(!del)lastHov=f;
     nye.push(f);
   }
+  lasteVis('Legg inn teikningar…','Byggjer etasjane',1);
+  await lastePaus();
   if(tomStart&&nye.length)floors.splice(0,1);
   floors.push(...nye);
   // Nye etasjar på rett plass i stabelen (Kjeller under Etasje 1 …) — men
@@ -4385,11 +4425,15 @@ async function masseLeggInn(bruk){
 async function lastInnFiler(liste){
   const filer=[...(liste||[])].filter(Boolean);
   if(!filer.length)return;
-  if(filer.length===1&&!erPdfFil(filer[0]))return handleFile(filer[0]);
+  // Éi teikning i full oppløysing tek òg eit par sekund — same kort, utan tal
+  const enkel=async f=>{lasteVis('Opnar teikninga…',f.name,null);
+    try{await lastePaus();return await handleFile(f);}finally{lasteSkjul();}};
+  if(filer.length===1&&!erPdfFil(filer[0]))return enkel(filer[0]);
   if(filer.length===1){
     let n=1;
+    lasteVis('Opnar teikninga…',filer[0].name,null);
     try{const doc=await pdfjsLib.getDocument({data:await filer[0].arrayBuffer()}).promise;n=doc.numPages;doc.destroy&&doc.destroy();}catch(e){}
-    if(n<=1)return handleFile(filer[0]);
+    if(n<=1)return enkel(filer[0]);
   }
   return masseImport(filer);
 }
