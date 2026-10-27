@@ -688,21 +688,26 @@ knappar; legg heller eit ikon til i `IKON_SVG` og eit oppslag i `_CTX_IKON`.
 
 «☰ Listebasert redigering» (`opneListe`, inspirert av SIMIEN) viser éin
 tabell per elementtype — vindauge, dører, ytterveggar (U-verdi), soner og
-etasjar — der verdiane vert endra rett i cellene. `LISTE_TYPAR` held
+etasjar. Cellene er **berre visning**: ein vel rader (klikk på rada) og
+trykkjer «Rediger» (`_liRedigerValde`), eller dobbeltklikkar ei rad. Det var
+for lett å endre verdiar ved eit uhell då cellene var felt. `LISTE_TYPAR` held
 kolonnane: `get`, og `set` for dei som kan endrast (utan `set` = utrekna,
 berre til lesing). Ny kolonne eller ny type: legg ho inn der.
 
-- **Fleire på ein gong:** er rada vald og fleire rader er valde, går
-  endringa til alle dei valde (`_liEndra`). «Vel alle» følgjer filteret.
-- Kvar endring er **eitt angre-steg** (`snapshot()` fyrst). `undo()`/`redo()`
+- **Redigeringsvindauget** viser alle felta med `set`. Har alle dei valde
+  same verdi, står han i feltet; elles «ulike verdiar». **Berre felt
+  brukaren rører vert lagra** — eit urørt felt endrar ingenting. Alle felta
+  vert sjekka før noko vert skrive (alt eller ingenting). «Vel alle» følgjer
+  filteret.
+- Kvar «Lagre» er **eitt angre-steg** (`snapshot()` fyrst). `undo()`/`redo()`
   teiknar lista på nytt når ho er open; valet fell bort fordi angre byter ut
   objekta.
 - `set` må følgje dei same reglane som resten av programmet: antal gjennom
   `winSetAntal` (med `winOpptekne`), etasjehøgd til heile `etasjeArk(f)` og
   `fhI` for den aktive, kategori til alle `getLinkedZones` (kopla soner må ha
   same kategori), U per vegg i `uPerSeg['seg_'+idx]`.
-- Tom celle i eit valfritt felt = standard (null/undefined); standardverdien
-  står som grå plasshaldar. Tom celle i eit påkravd felt endrar ingenting.
+- Valfrie felt: tomt (eller ↺) = standard (null/undefined), og
+  standardverdien står grå i tabellen. Eit påkravd felt kan ikkje lagrast tomt.
 - Utrekna areal/U·A brukar same uttrykk og standardverdiar som `buildSXI`.
 - Dialogen vert flytt til `<body>` ved oppstart — inne i `#cwrap`
   (`isolation:isolate`) låg sidepanelet over han.

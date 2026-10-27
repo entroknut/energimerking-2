@@ -502,7 +502,36 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .li-tab th.num{text-align:right}
 .li-tab th .li-pil{opacity:.5;margin-left:3px}
 .li-tab th .li-ein{font-weight:400;color:var(--text3)}
-.li-tab tr.li-alle td{position:sticky;top:33px;z-index:1;background:#5f6670;color:#fff;font-size:11.5px;padding:6px 8px}
+.li-tab tr.li-alle td{position:sticky;top:33px;z-index:1;background:#5f6670;color:#fff;font-size:11.5px;padding:5px 8px}
+.li-tab .li-vel{display:inline-flex;align-items:center;gap:8px;cursor:pointer;margin-right:14px;vertical-align:middle}
+.li-red{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:#fff;color:var(--accent);font:600 12px inherit;font-family:inherit;cursor:pointer;vertical-align:middle;margin-right:6px}
+.li-red:hover:not(:disabled){background:#e8f3f1}
+.li-red:disabled{background:transparent;color:rgba(255,255,255,.55);cursor:default}
+.li-red.sek{background:transparent;color:#fff;font-weight:500}
+.li-red.sek:hover{background:rgba(255,255,255,.12)}
+.li-red-ik{width:14px;height:14px;display:inline-flex}
+.li-red-ik svg{width:14px;height:14px}
+.li-tab tbody tr{cursor:pointer}
+.li-tab td.std{color:#a0a8b4}
+.li-tab td.endra{animation:liBlink 1.4s ease-out}
+#liRedDlg{position:fixed;inset:0;z-index:340;background:rgba(16,24,40,.32);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.li-red-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:22px 24px;width:min(520px,92vw);max-height:86vh;overflow-y:auto;animation:dlgInn .16s cubic-bezier(.2,.8,.3,1)}
+.li-red-box h3{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;margin:0 0 4px}
+.li-red-box h3 .li-red-ik{color:var(--accent)}
+.li-red-sub{font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.5}
+.li-red-grid{display:grid;grid-template-columns:150px 1fr;gap:8px 12px;align-items:center}
+.li-red-grid label{font-size:12px;color:var(--text2)}
+.li-red-grid label.endra{color:var(--accent);font-weight:600}
+.li-red-felt{display:flex;gap:6px;align-items:center}
+.li-red-felt input,.li-red-felt select{flex:1;min-width:0;padding:6px 10px;font-size:13px;border:1.5px solid var(--border2);border-radius:7px;background:var(--surface);color:var(--text);font-family:inherit;outline:none}
+.li-red-felt input.num{font-family:'JetBrains Mono',monospace;text-align:right}
+.li-red-felt input:focus,.li-red-felt select:focus{border-color:var(--accent);box-shadow:var(--ring)}
+.li-red-felt .endra{border-color:var(--accent);background:#f0faf6}
+.li-red-felt input::placeholder{color:#a0a8b4;font-family:Inter,sans-serif;font-style:italic}
+.li-std{width:30px;height:30px;flex-shrink:0;border:1px solid var(--border2);border-radius:7px;background:var(--surface2);color:var(--text3);cursor:pointer;font-size:14px}
+.li-std:hover{color:var(--accent);border-color:var(--accent)}
+.li-red-feil{font-size:12px;color:var(--red);min-height:16px;margin:10px 0 2px}
+.li-red-feil:empty{min-height:0;margin:6px 0 0}
 .li-tab td{padding:3px 8px;border-bottom:1px solid var(--border);white-space:nowrap;color:var(--text)}
 .li-tab td.num{text-align:right;font-family:'JetBrains Mono',monospace;font-size:11.5px}
 .li-tab td.les{color:var(--text3)}
@@ -901,7 +930,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.14.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:'JetBrains Mono',monospace;user-select:none;white-space:nowrap">v5.14.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -3986,9 +4015,9 @@ function renderListe(){
   const finst=new Set(LISTE_TYPAR[listeType].rader().map(r=>r.key));
   [...listeVal].forEach(k=>{if(!finst.has(k))listeVal.delete(k);});
   const nVal=rader.filter(r=>listeVal.has(r.key)).length;
-  document.getElementById('listeHint').innerHTML=nVal>1
-    ?'<b>'+nVal+' rader er valde.</b> Endrar du ein verdi i ei vald rad, gjeld han alle dei valde. Tom celle i eit valfritt felt set standardverdien.'
-    :'Klikk i ei celle for å endre verdien. Vel fleire rader for å endre alle på ein gong. Tom celle i eit valfritt felt (grå tal) set standardverdien.';
+  document.getElementById('listeHint').innerHTML=nVal
+    ?'<b>'+nVal+' '+(nVal===1?'rad er vald':'rader er valde')+'.</b> Trykk «Rediger» for å endre verdiane — det du endrar, gjeld alle dei valde.'
+    :'Vel radene du vil endre (klikk på rada eller avkryssingsboksen), og trykk «Rediger». Dobbeltklikk på ei rad for å redigere berre henne.';
   tab.innerHTML='';
   if(!rader.length){
     tab.innerHTML='<tbody><tr><td class="li-tom">'+(document.getElementById('listeFilter').value?'Ingen rader passar filteret.':'Det finst ingen '+LISTE_TYPAR[listeType].namn.toLowerCase()+' i prosjektet enno.')+'</td></tr></tbody>';
@@ -3998,64 +4027,54 @@ function renderListe(){
   const th0=document.createElement('th');th0.style.width='28px';th0.style.cursor='default';hr.appendChild(th0);
   kol.forEach(c=>{
     const th=document.createElement('th');if(c.num)th.className='num';
-    th.innerHTML='';th.append(c.t);
+    th.append(c.t);
     if(c.ein){const e=document.createElement('span');e.className='li-ein';e.textContent=' ['+c.ein+']';th.appendChild(e);}
     if(listeSort&&listeSort.k===c.k){const p=document.createElement('span');p.className='li-pil';p.textContent=listeSort.dir>0?'▲':'▼';th.appendChild(p);}
     th.onclick=()=>{listeSort=listeSort&&listeSort.k===c.k?{k:c.k,dir:-listeSort.dir}:{k:c.k,dir:1};renderListe();};
     hr.appendChild(th);
   });
   thead.appendChild(hr);
-  // «Vel alle»-rad, som i SIMIEN
+  // «Vel alle»-rad med «Rediger», som i SIMIEN
   const ar=document.createElement('tr');ar.className='li-alle';
   const atd=document.createElement('td');atd.colSpan=kol.length+1;
   const acb=document.createElement('input');acb.type='checkbox';
   acb.checked=nVal===rader.length;acb.indeterminate=nVal>0&&nVal<rader.length;
   acb.onchange=()=>{rader.forEach(r=>{if(acb.checked)listeVal.add(r.key);else listeVal.delete(r.key);});renderListe();};
-  const al=document.createElement('label');al.style.cssText='display:inline-flex;align-items:center;gap:8px;cursor:pointer';
+  const al=document.createElement('label');al.className='li-vel';
   al.append(acb,' Vel alle'+(nVal?'  ·  '+nVal+' av '+rader.length+' valde':'  ·  '+rader.length+' rader'));
-  atd.appendChild(al);ar.appendChild(atd);thead.appendChild(ar);
+  const red=document.createElement('button');red.className='li-red';red.disabled=!nVal;
+  red.innerHTML='<span class="li-red-ik">'+ikonSvg('rediger')+'</span>Rediger'+(nVal?' ('+nVal+')':'');
+  red.title=nVal?'Endre verdiane for dei valde radene':'Vel ei eller fleire rader fyrst';
+  red.onclick=()=>_liRedigerValde();
+  const ingen=document.createElement('button');ingen.className='li-red sek';ingen.textContent='Fjern valet';
+  ingen.style.display=nVal?'':'none';
+  ingen.onclick=()=>{listeVal.clear();renderListe();};
+  atd.append(al,red,ingen);ar.appendChild(atd);thead.appendChild(ar);
   tab.appendChild(thead);
 
   const tb=document.createElement('tbody');
   rader.forEach(r=>{
     const tr=document.createElement('tr');if(listeVal.has(r.key))tr.className='vald';
+    const veksle=()=>{if(listeVal.has(r.key))listeVal.delete(r.key);else listeVal.add(r.key);renderListe();};
     const td0=document.createElement('td');
     const cb=document.createElement('input');cb.type='checkbox';cb.checked=listeVal.has(r.key);
-    cb.onchange=()=>{if(cb.checked)listeVal.add(r.key);else listeVal.delete(r.key);renderListe();};
+    cb.onclick=e=>e.stopPropagation();
+    cb.onchange=veksle;
     td0.appendChild(cb);tr.appendChild(td0);
+    // Klikk på rada vel henne; dobbeltklikk opnar redigeringa for berre denne
+    tr.onclick=veksle;
+    tr.ondblclick=()=>{listeVal.clear();listeVal.add(r.key);renderListe();_liRedigerValde();};
     kol.forEach(c=>{
       const td=document.createElement('td');if(c.num)td.className='num';
       const v=c.get(r);
-      if(!c.set){
-        td.classList.add('les');
-        td.textContent=c.num?_liNum(v,c.des):(v??'');
-      }else if(c.opt){
-        const sel=document.createElement('select');sel.className='li-inp';
-        c.opt.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;sel.appendChild(op);});
-        sel.value=v;
-        sel.onchange=()=>_liEndra(r,c,sel.value,rader);
-        td.appendChild(sel);
-      }else{
-        const inp=document.createElement('input');inp.className='li-inp '+(c.num?'num':'txt');
-        inp.value=c.num?_liNum(v,c.des):(v??'');
-        if(c.valfri&&c.ph){const p=c.ph(r);inp.placeholder=typeof p==='number'?_liNum(p,c.des):p;}
-        inp.dataset.k=c.k;
-        inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=c.num?_liNum(v,c.des):(v??'');inp.blur();}};
-        inp.onchange=()=>{
-          let nv;
-          if(c.num){
-            if(inp.value.trim()===''){
-              if(!c.valfri){inp.value=_liNum(v,c.des);return;}   // påkravd felt: tom = ingen endring
-              nv=null;
-            }else{
-              nv=_liPos(inp.value,c.heil);
-              if(nv==null){inp.value=_liNum(v,c.des);hintText.textContent='Ugyldig verdi — må vere eit tal større enn 0.';return;}
-            }
-          }else nv=inp.value;
-          _liEndra(r,c,nv,rader);
-        };
-        td.appendChild(inp);
-      }
+      if(!c.set)td.classList.add('les');
+      if(c.set&&c.valfri&&(v==null||v==='')&&c.ph){
+        // Standardverdien står grå, så det er tydeleg at han ikkje er sett for hand
+        const p=c.ph(r);td.classList.add('std');
+        td.textContent=typeof p==='number'?_liNum(p,c.des):p;
+        td.title='Standardverdi';
+      }else td.textContent=c.num?_liNum(v,c.des):(v??'');
+      td.dataset.k=c.k;
       tr.appendChild(td);
     });
     tb.appendChild(tr);
@@ -4067,30 +4086,116 @@ function renderListe(){
   if(sumK.length){
     const tf=document.createElement('tfoot'),ftr=document.createElement('tr');
     ftr.appendChild(document.createElement('td'));
+    const sumRader=nVal?rader.filter(r=>listeVal.has(r.key)):rader;
     kol.forEach((c,i)=>{
       const td=document.createElement('td');if(c.num)td.className='num';
-      if(i===0)td.textContent='Sum'+(nVal>1?' (alle '+rader.length+')':'');
-      else if(sumK.includes(c))td.textContent=_liNum(rader.reduce((s,r)=>s+(+c.get(r)||0),0),c.des);
+      if(i===0)td.textContent=nVal?'Sum (valde '+nVal+')':'Sum (alle '+rader.length+')';
+      else if(sumK.includes(c))td.textContent=_liNum(sumRader.reduce((s,r)=>s+(+c.get(r)||0),0),c.des);
       ftr.appendChild(td);
     });
     tf.appendChild(ftr);tab.appendChild(tf);
   }
 }
-// Éi endring: til rada åleine, eller til alle valde om rada er vald og fleire er det
-function _liEndra(r,c,v,rader){
-  const mange=listeVal.has(r.key)&&listeVal.size>1;
-  const maal=mange?LISTE_TYPAR[listeType].rader().filter(x=>listeVal.has(x.key)):[r];
-  snapshot();
-  maal.forEach(x=>c.set(x,v));
-  markDirty();
-  updateResults();renderTable();draw();
-  renderListe();
-  // Vis kva som vart endra
-  const synlege=_liRader().rader,endra=new Set(maal.map(x=>x.key));
-  document.querySelectorAll('#listeTab tbody tr').forEach((tr,i)=>{
-    if(synlege[i]&&endra.has(synlege[i].key)){const e=tr.querySelector('[data-k="'+c.k+'"]');if(e)e.classList.add('endra');}
+
+// «Rediger»: eitt vindauge med alle felta som kan endrast for dei valde radene.
+// Har alle dei valde same verdi, står han i feltet; elles står feltet tomt
+// med «ulike verdiar». Berre felt brukaren faktisk endrar vert lagra — eit
+// felt som står urørt, endrar ingenting, same kva det inneheld.
+function _liRedigerValde(){
+  const T=LISTE_TYPAR[listeType],kol=T.kol().filter(c=>c.set);
+  const maal=T.rader().filter(r=>listeVal.has(r.key));
+  if(!maal.length)return;
+  document.getElementById('liRedDlg')?.remove();
+  const ov=document.createElement('div');ov.id='liRedDlg';
+  const box=document.createElement('div');box.className='li-red-box';
+  const tittel=document.createElement('h3');
+  tittel.innerHTML='<span class="li-red-ik">'+ikonSvg('rediger')+'</span><span></span>';
+  tittel.lastChild.textContent='Rediger '+(maal.length===1?'«'+String(kol[0]?.get(maal[0])??'')+'»':maal.length+' '+T.namn.toLowerCase().replace(/ \(.*\)$/,''));
+  const sub=document.createElement('div');sub.className='li-red-sub';
+  sub.textContent=maal.length>1
+    ?'Felt du endrar, vert sette på alle '+maal.length+'. Felt du ikkje rører, står som dei er.'
+    :'Felt du ikkje rører, står som dei er.';
+  box.append(tittel,sub);
+  const grid=document.createElement('div');grid.className='li-red-grid';
+  const endra=new Map();   // k → {c, inp, std:true|undefined}
+  const fmt=(c,v)=>v==null||v===''?'':(c.num?_liNum(v,c.des):String(v));
+  kol.forEach(c=>{
+    const verdiar=maal.map(r=>c.get(r));
+    const lik=verdiar.every(v=>fmt(c,v)===fmt(c,verdiar[0]));
+    const lab=document.createElement('label');lab.textContent=c.t+(c.ein?' ['+c.ein+']':'');
+    let inp;
+    if(c.opt){
+      inp=document.createElement('select');
+      if(!lik){const o=document.createElement('option');o.value='';o.textContent='— ulike verdiar —';inp.appendChild(o);}
+      c.opt.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;inp.appendChild(op);});
+      inp.value=lik?verdiar[0]:'';
+    }else{
+      inp=document.createElement('input');inp.type='text';
+      if(c.num){inp.inputMode='decimal';inp.classList.add('num');}
+      inp.value=lik?fmt(c,verdiar[0]):'';
+      const ph=c.valfri&&c.ph?c.ph(maal[0]):null;
+      inp.placeholder=!lik?'ulike verdiar':(c.valfri?(typeof ph==='number'?'standard ('+_liNum(ph,c.des)+')':'standard'):'');
+    }
+    const merk=()=>{endra.set(c.k,{c,inp});lab.classList.add('endra');inp.classList.add('endra');};
+    inp.addEventListener('input',merk);inp.addEventListener('change',merk);
+    const celle=document.createElement('div');celle.className='li-red-felt';
+    celle.appendChild(inp);
+    if(c.valfri&&!c.opt){
+      const std=document.createElement('button');std.type='button';std.className='li-std';std.textContent='↺';
+      std.title='Set standardverdien';
+      std.onclick=()=>{inp.value='';merk();endra.get(c.k).std=true;inp.placeholder='standard';inp.focus();};
+      celle.appendChild(std);
+    }
+    grid.append(lab,celle);
   });
-  hintText.textContent=(mange?maal.length+' '+LISTE_TYPAR[listeType].namn.toLowerCase()+' endra':'Endra')+': '+c.t.toLowerCase()+'. Ctrl+Z angrar.';
+  box.appendChild(grid);
+  const feil=document.createElement('div');feil.className='li-red-feil';box.appendChild(feil);
+  const knappar=document.createElement('div');knappar.className='dbtns';
+  const avbryt=document.createElement('button');avbryt.className='dcancel';avbryt.textContent='Avbryt';
+  const lagre=document.createElement('button');lagre.className='dok';lagre.textContent=maal.length>1?'Bruk på '+maal.length:'Lagre';
+  knappar.append(avbryt,lagre);box.appendChild(knappar);
+  ov.appendChild(box);document.body.appendChild(ov);
+  const lukk=()=>ov.remove();
+  avbryt.onclick=lukk;
+  ov.onclick=e=>{if(e.target===ov)lukk();};
+  ov.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();lukk();}if(e.key==='Enter'&&e.target.tagName!=='SELECT'){e.preventDefault();lagre.click();}};
+  lagre.onclick=()=>{
+    // Les og sjekk alle endra felt fyrst — anten vert alt lagra, eller ingenting
+    const nye=[];
+    for(const {c,inp} of endra.values()){
+      let v;
+      if(c.opt){if(inp.value==='')continue;v=inp.value;}
+      else if(c.num){
+        if(inp.value.trim()===''){
+          if(!c.valfri){feil.textContent=c.t+' kan ikkje stå tomt.';inp.focus();return;}
+          v=null;
+        }else{
+          v=_liPos(inp.value,c.heil);
+          if(v==null){feil.textContent=c.t+': må vere eit tal større enn 0.';inp.focus();return;}
+        }
+      }else{
+        if(!inp.value.trim())continue;   // tomt namn = ingen endring
+        v=inp.value;
+      }
+      nye.push({c,v});
+    }
+    lukk();
+    if(!nye.length){hintText.textContent='Ingen endringar.';return;}
+    snapshot();
+    maal.forEach(r=>nye.forEach(({c,v})=>c.set(r,v)));
+    markDirty();
+    updateResults();renderTable();draw();
+    renderListe();
+    // Vis kva som vart endra
+    const synlege=_liRader().rader,ks=new Set(maal.map(x=>x.key));
+    document.querySelectorAll('#listeTab tbody tr').forEach((tr,i)=>{
+      if(!synlege[i]||!ks.has(synlege[i].key))return;
+      nye.forEach(({c})=>{const td=tr.querySelector('td[data-k="'+c.k+'"]');if(td)td.classList.add('endra');});
+    });
+    hintText.textContent=(maal.length>1?maal.length+' '+T.namn.toLowerCase().replace(/ \(.*\)$/,'')+' endra':'Endra')+': '
+      +nye.map(({c})=>c.t.toLowerCase()).join(', ')+'. Ctrl+Z angrar.';
+  };
+  setTimeout(()=>{const f=box.querySelector('input,select');if(f){f.focus();if(f.select)f.select();}},30);
 }
 function _liTilTekst(){
   const {kol,rader}=_liRader();
