@@ -1098,7 +1098,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.20.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.20.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -20494,10 +20494,10 @@ function printFasadeView(){
   // knappane går gjennom BT. Vert hugsa i nettlesaren (klipsTrond).
   let trond=lsHent('klipsTrond')==='1';
   const TR=(nn,tr)=>trond?tr:nn;
-  const BT={'Kjekt å vite':'Kjekt å veit','Kalibrer no':'Kalibrer no, gutt','Gå til arket':'Gå tel arke',
+  const BT={'Kjekt å vite':'Det va greit å vit','Kalibrer no':'Kalibrer no, gutt','Gå til arket':'Gå tel arke',
     'Vis sonekortet':'Vis sonekorte','Det er kontor':'Det e kontor','Legg til vindauge':'Legg tel vindu','Det stemmer':'Det stemme',
-    'Nord stemmer alt':'Nord stemme alt','Opne KI-oppteikning':'Opn KI-oppteikning','Opne Kople soner':'Opn Kople soner',
-    'Takk':'Takk skal du ha','Fleire tips':'Mer tips','Seinare':'Seinar','Slå av Klips':'Skru\'n av','Takk, Klips':'Takk, Klips — rai-rai!'};
+    'Nord stemmer alt':'Nord stemme alt','Opne KI-oppteikning':'Åpn KI-oppteikning','Opne Kople soner':'Åpn Kople soner',
+    'Takk':'Takk skal du ha','Fleire tips':'Fler tips','Seinare':'Seinar','Slå av Klips':'Skru\'n av','Takk, Klips':'Takk, Klips, rai-rai!'};
   const bt=t=>trond&&BT[t]||t;
 
   // Prioritert: den fyrste regelen som slår til vert vist. `key` skil mellom
@@ -20507,12 +20507,12 @@ function printFasadeView(){
     {id:'helsa',sjekk:()=>!lsHent('klipsHelsa')&&{key:'helsa',
       tittel:TR('Hei, eg er Klips!','Æ e han Klips!'),
       tekst:TR('Eg er energimerkingsassistenten til Entro. Eg seier frå når noko kan gjere energimerket feil, og elles held eg meg i ro. Klikk på meg om du vil ha eit tips.',
-        'Æ e energimerkingshjelpar\'n tel Entro, rett frå Trondhjæm. Æ sei ifrå når nåkka kan gjør energimerke feil, og ellers e æ still som ei kjerkemus. Klikk på mæ om du vil ha et tips.'),
+        'Æ e energimerkingshjelpern tel Entro, rett fra Trondhjæm. Æ sei ifra når nåkka kan gjør energimerke feil, og ellers e æ still som ei kjerkemus. Klikk på mæ om du vil ha et tips.'),
       knappar:[{t:'Kjekt å vite',hovud:true,gjer:()=>lsSet('klipsHelsa','1')}],utanSeinare:true}},
     {id:'skala',sjekk:()=>bgImg&&!mmPerImgPx&&mode!=='calibrate'&&{key:'skala:'+viewMode+':'+(viewMode==='plan'?curFloor().id:activeFasade),
-      tittel:TR('Det ser ut som du har lasta opp ei teikning!','Sjø dær, ei teikning!'),
+      tittel:TR('Det ser ut som du har lasta opp ei teikning!','Nei se, ei tegning!'),
       tekst:TR((viewMode==='fasade'?'Fasadearket':'Teikninga')+' manglar skala, så alle areal og veggengder vert feil i energimerket. Kalibrer fyrst. Det tek ti sekund.',
-        (viewMode==='fasade'?'Fasadearke':'Teikning\'n')+' mangle skala, og da blir all areal og vegglengd feil i energimerke. Kalibrer først, det tar ti sekund. Rai-rai!'),
+        (viewMode==='fasade'?'Fasadearke':'Tegninga')+' mangle skala, og da blir alle areala og vegglengdan feil i energimerke. Kalibrer først, det tar ti sekund. Rai-rai!'),
       knappar:[{t:'Kalibrer no',hovud:true,gjer:()=>trykk('calBtn')}]}},
     {id:'arkSkala',sjekk:()=>{
       if(viewMode!=='plan')return null;
@@ -20529,7 +20529,7 @@ function printFasadeView(){
         const a=g[0].opn.toFixed(1).replace('.',',')+' m² mot '+g[0].area.toFixed(1).replace('.',',')+' m²';
         return {key:'opn:'+_zuk(z),tittel:TR('Vindauga får ikkje plass','Vinduan får itj plass'),
           tekst:TR('I «'+z.name+'» er opningane større enn fasaden '+g[0].namn+' ('+a+'). SXI-eksporten stoppar til det er retta.',
-            'I «'+z.name+'» e opningan større enn fasaden '+g[0].namn+' ('+a+'). Det får du itj inn sjøl med vinsjan på kaia. SXI-eksporten stoppe tel det e retta.'),
+            'I «'+z.name+'» e åpningan større enn fasaden '+g[0].namn+' ('+a+'). Det får du itj inn sjøl med vinsjan på kaia. SXI-eksporten stoppe tel det e retta.'),
           knappar:[{t:'Vis sona',hovud:true,gjer:()=>tilSone(z)}]};
       }
       return null;}},
@@ -20537,19 +20537,19 @@ function printFasadeView(){
       const s=alleSoner();if(!s.length||s.some(z=>z.bygkat))return null;
       return {key:'kat',tittel:TR('Kva slags bygg er dette?','Ka slags bygg e dette her?'),
         tekst:TR('Ingen av sonene har fått bygningskategori, så alle går til SIMIEN som kontorbygg. Er det ikkje eit kontorbygg, vert energimerket feil.',
-          'Ingen tå sonan har fått bygningskategori, så alt går tel SIMIEN som kontorbygg. E det itj kontor, blir energimerke feil, og det e itj kjekt.'),
+          'Ingen tå sonan har fått bygningskategori, så alt går tel SIMIEN som kontorbygg. E det itj kontor, blir energimerke feil, og det e itj bra.'),
         knappar:[{t:'Vis sonekortet',hovud:true,gjer:()=>tilSone(s[0])},{t:'Det er kontor',gjer:()=>utsett.add('kat')}],utanSeinare:true};}},
     {id:'vindauge',sjekk:()=>{
       const s=alleSoner();if(s.length<1||s.some(z=>(z.windows||[]).length)||mode==='window')return null;
-      return {key:'vindauge',tittel:TR('Neste steg: vindauge og dører','Neste steg: vindu og dør'),
+      return {key:'vindauge',tittel:TR('Neste steg: vindauge og dører','Neste steg: vindu og dørr'),
         tekst:TR('Sonene er på plass. Legg inn vindauge og dører på fasadane, så får SIMIEN rett glasandel og varmetap.',
-          'Sonan e på plass. Legg inn vindu og dør på fasadan, så får SIMIEN rett glasandel og varmetap. Det handle jo om lys og varme, som Åge sa.'),
+          'Sonan e på plass. Legg inn vindu og dørr på fasadan, så får SIMIEN rett glassandel og varmetap. Det handle jo om lys og varme, som Åge sa.'),
         knappar:[{t:'Legg til vindauge',hovud:true,gjer:()=>trykk('winBtn')}]};}},
     {id:'nord',sjekk:()=>{
       if(globalNorth!==0||!alleSoner().some(z=>(z.windows||[]).length))return null;
       return {key:'nord',tittel:TR('Peikar nord rett opp?','Pæke nord rett opp?'),
         tekst:TR('Nordpila står på 0°. Fasaderetningane, og dermed soltilskotet i SIMIEN, følgjer pila. Dra kompasset nede til høgre om teikninga ikkje har nord opp.',
-          'Nordpila står på 0°. Fasaderetningan, og dermed soltilskotte i SIMIEN, følge pila. Dra kompasse nede tel høgre om teikning\'n itj har nord opp.'),
+          'Nordpila står på 0°. Fasaderetningan, og dermed soltilskudde i SIMIEN, følge pila. Dra kompasse nede tel høyre om tegninga itj har nord opp.'),
         knappar:[{t:'Det stemmer',hovud:true,gjer:()=>utsett.add('nord')}],utanSeinare:true};}},
   ];
   // Tips knytte til det brukaren held på med. Vert viste av seg sjølv ÉIN
@@ -20559,106 +20559,115 @@ function printFasadeView(){
   // `tr` = [tittel, tekst] på trøndersk.
   const kal=()=>!!(bgImg&&mmPerImgPx);
   const hovudEtasjar=()=>floors.filter(f=>!erDelplan(f)).length;
+  // fyrst:true = vert vist før problema i REGLAR (men etter helsinga), éin
+  // gong. KI-oppteikninga er det fyrste tipset i EntroPi — ho tek seg av
+  // mykje av det dei andre tipsa seier, og dialogen hjelper med skalaen.
   const KONTEKST=[
+    {id:'ki-start',fyrst:true,naar:()=>inPi()&&viewMode==='plan'&&!!bgImg&&!alleSoner().length,tittel:'La KI-en teikne for deg',
+      get tekst(){return '✦ KI-oppteikning teiknar soner, vindauge og dører frå planteikninga på nokre minutt. Du ser forslaget på lerretet og rettar eller godtek det før noko vert lagt inn.'
+        +(kal()?'':' Teikninga må vere kalibrert fyrst, og dialogen hjelper deg med det.');},
+      get tr(){return ['La KI-en tegn for dæ','✦ KI-oppteikning tegne sona, vindu og dørr fra plantegninga på nån minutta. Du ser forslage på lerrete og rette eller godtar det før nåkka blir lagt inn.'
+        +(kal()?' Sett på litt Åge mens du vente.':' Tegninga må vær kalibrert først, og dialogen hjelpe dæ med det.')];},
+      knappar:[{t:'Opne KI-oppteikning',hovud:true,gjer:()=>trykk('aiBtn')}]},
     {id:'teikn',naar:()=>mode==='draw'&&viewMode==='plan',tittel:'Teiknetips',
       tekst:'Klikk hjørna langs innsida av ytterveggen. Enter eller dobbeltklikk avsluttar, Esc avbryt. Hald Shift for rette vinklar, og ⌖ Snap festar punktet til veggkryss i teikninga.',
-      tr:['Teiknetips','Klikk hjørnan langs innsida tå ytterveggen. Enter eller dobbeltklikk avslutte, Esc avbryt. Hold Shift for rette vinkla, og ⌖ Snap feste punkte tel veggkryss i teikning\'n.']},
+      tr:['Tegnetips','Klikk hjørnan langs innsida tå ytterveggen. Enter eller dobbeltklikk avslutte, Esc avbryt. Hold Shift for rette vinkla, og ⌖ Snap feste punkte tel veggkryss i tegninga.']},
     {id:'nabo',naar:()=>mode==='draw'&&viewMode==='plan'&&alleSoner().length>0,tittel:'Teikn inntil nabosona',
       tekst:'Legg du den nye sona kant i kant med ei som finst, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.',
-      tr:['Teikn inntil nabosona','Legg du den nye sona kant i kant med ei som fins, blir den felles veggen skiljekonstruksjon i begge sonan tå sæ sjøl. Fali lettvint.']},
+      tr:['Tegn inntil nabosona','Legg du den nye sona kant i kant med ei som fins, blir den felles veggen skillekonstruksjon i begge sonan tå sæ sjøl. Fali lettvint.']},
     {id:'vindauge',naar:()=>mode==='window',tittel:'Vindaugstips',
       tekst:'Klikk to punkt langs ein fasadevegg for breidda. Har veggen fleire like vindauge, set antal i staden for å teikne kvart: det blir éitt element i SIMIEN. Ctrl+C og Ctrl+V kopierer eit vindauge til ein annan vegg.',
-      tr:['Vindustips','Klikk to punkt langs en fasadevegg for breidd\'n. Har veggen fleir like vindu, sett antal i staden for å teikn kvart eitt, så blir det ett element i SIMIEN. Ctrl+C og Ctrl+V kopiere et vindu tel en anna vegg.']},
+      tr:['Vindustips','Klikk to punkt langs en fasadevegg for bredda. Har veggen fler like vindu, sett antall istedenfor å tegn dæm ett og ett, så blir det ett element i SIMIEN. Ctrl+C og Ctrl+V kopiere et vindu tel en anna vegg.']},
     {id:'rediger',naar:()=>mode==='edit',tittel:'Redigere ei sone',
       tekst:'Dra hjørna for å flytte dei, og høgreklikk på eit hjørne for å slette det. Vindauge og skiljeveggar følgjer med.',
-      tr:['Redigér ei sone','Dra hjørnan for å flytt dæm, og høgreklikk på et hjørne for å slett det. Vinduan og skiljeveggan følge med.']},
+      tr:['Rediger ei sone','Dra hjørnan for å flytt dæm, og høyreklikk på et hjørne for å slett det. Vinduan og skilleveggan følge med.']},
     {id:'maal',naar:()=>mode==='measure',tittel:'Kontrollmål',
       tekst:'Mål ein avstand du kjenner frå teikninga. Stemmer han, stemmer kalibreringa. Måla påverkar ikkje SXI-fila.',
-      tr:['Kontrollmål','Mål en avstand du kjenne frå teikning\'n. Stemme han, så stemme kalibreringa. Måla påverke itj SXI-fila.']},
+      tr:['Kontrollmål','Mål en avstand du kjenne fra tegninga. Stemme han, så stemme kalibreringa. Måla påverke itj SXI-fila.']},
     {id:'fasadevising',naar:()=>viewMode==='fasade',tittel:'Fasadeteikningar',
       tekst:'Fasadearket har sin eigen skala, så kalibrer det for seg. «Side om side» viser plan og fasade samstundes, så du kan måle høgder medan du ser planen.',
-      tr:['Fasadeteikninga','Fasadearke har sin eigen skala, så kalibrer det for sæ sjøl. «Side om side» vise plan og fasade på én gong, så du kan mål høgd mens du ser planen.']},
+      tr:['Fasadetegninga','Fasadearke har sin egen skala, så kalibrer det for sæ sjøl. «Side om side» vise plan og fasade på én gong, så du kan mål høyda mens du ser planen.']},
     {id:'nord-fyrst',naar:()=>viewMode==='plan'&&kal()&&!alleSoner().length&&globalNorth===0,tittel:'Set himmelretninga før du teiknar',
       tekst:'Skalaen er på plass. Neste steg: dra nordpila nede til høgre så ho peikar mot nord i teikninga. Fasaderetningane og soltilskotet i SIMIEN følgjer ho, og det er lettare å få rett no enn når alt er teikna.',
-      tr:['Sett himmelretning\'n før du teikne','Skalaen e på plass. Neste steg: dra nordpila nede tel høgre så ho pæke mot nord i teikning\'n. Fasaderetningan og soltilskotte i SIMIEN følge ho, og det e lettar å få rett no enn når alt e teikna.'],
+      tr:['Sett himmelretninga før du tegne','Skalaen e på plass. Neste steg: dra nordpila nede tel høyre så ho pæke mot nord i tegninga. Fasaderetningan og soltilskudde i SIMIEN følge ho, og det e lettar å få rett no enn når alt e tegna.'],
       knappar:[{t:'Nord stemmer alt',hovud:true,gjer:()=>utsett.add('nord')}]},
-    {id:'ki-start',naar:()=>inPi()&&viewMode==='plan'&&kal()&&!alleSoner().length,tittel:'La KI-en teikne for deg',
-      tekst:'✦ KI-oppteikning teiknar soner, vindauge og dører frå planteikninga på nokre minutt. Du ser forslaget på lerretet og rettar eller godtek det før noko vert lagt inn.',
-      tr:['La KI-en teikn for dæ','✦ KI-oppteikning teikne sona, vindu og dør frå planteikning\'n på nokka minutt. Du ser forslage på lerrete og rette eller godtar det før nåkka blir lagt inn. Sett på litt Åge mens du vente.'],
-      knappar:[{t:'Opne KI-oppteikning',hovud:true,gjer:()=>trykk('aiBtn')}]},
     {id:'ki-fasade',naar:()=>inPi()&&viewMode==='plan'&&kal()&&!alleSoner().length&&!fasadar.length,tittel:'Har du fasadeteikningar?',
       tekst:'Last dei opp òg. KI-oppteikninga les høgd og brystning på vindauga og etasjehøgdene frå fasadane, så du slepp å taste dei inn.',
-      tr:['Har du fasadeteikninga?','Last dæm opp og. KI-oppteikninga les høgd og brystning på vinduan og etasjehøgdan frå fasadan, så du slepp å tast dæm inn.']},
+      tr:['Har du fasadetegninga?','Last dæm opp og. KI-en lese høyde og brystning på vinduan og etasjehøydan fra fasadan, så slepp du å tast dæm inn.']},
     {id:'mange',naar:()=>!!bgImg&&floors.length===1&&!fasadar.length,tittel:'Har bygget fleire teikningar?',
       tekst:'Du kan dra alle inn på lerretet samstundes: planar, delplanar, fasadar og PDF-ar med mange sider. Programmet gjettar etasje og type frå teksten i teikninga, og du rettar før noko vert lagt inn. Same val ligg under «+ Etasje» → «Legg inn mange teikningar».',
-      tr:['Har bygge fleir teikninga?','Du kan dra alle inn på lerrete på én gong: plana, delplana, fasada og PDF-a med mange sie. Programme gjette etasje og type frå teksten i teikning\'n, og du rette før nåkka blir lagt inn. Same val ligg under «+ Etasje» → «Legg inn mange teikningar».']},
+      tr:['Har bygge fler tegninga?','Du kan dra alle inn på lerrete på én gong: plana, delplana, fasada og PDF-a med mange sie. Programme gjette etasje og type fra teksten i tegninga, og du rette før nåkka blir lagt inn. Samme valg ligg under «+ Etasje» → «Legg inn mange teikningar».']},
     {id:'kople',naar:()=>viewMode==='plan'&&hovudEtasjar()>1&&alleSoner().length>1&&!alleSoner().some(z=>z.groupId),tittel:'Same bruk over fleire etasjar?',
       tekst:'⇌ Kople soner gjer soner med same kategori til éi SIMIEN-sone. Areal og geometri vert framleis rekna per etasje.',
-      tr:['Same bruk over fleir etasja?','⇌ Kople soner gjør sona med same kategori tel ei SIMIEN-sone. Areal og geometri blir framleis rekna per etasje.'],
+      tr:['Samme bruk over fler etasja?','⇌ Kople soner gjør sona med samme kategori tel ei SIMIEN-sone. Areal og geometri blir fortsatt rekna per etasje.'],
       knappar:[{t:'Opne Kople soner',hovud:true,gjer:()=>trykk('kopleBtn')}]},
     {id:'eksport',naar:()=>alleSoner().filter(z=>(z.windows||[]).length).length>=2,tittel:'Før du eksporterer',
       tekst:'Sjekk kategori, byggeår og etasjehøgd i sonekorta, og at nordpila stemmer. I eksportdialogen kan du òg leggje inn tiltak, som etterisolering og vindaugsbyte, så reknar SIMIEN lønnsemda.',
-      tr:['Før du eksportere','Sjekk kategori, byggeår og etasjehøgd i sonekortan, og at nordpila stemme. I eksportdialogen kan du og legg inn tiltak, som etterisolering og vindusbytte, så rekne SIMIEN lønnsomheta.']},
+      tr:['Før du eksportere','Sjekk kategori, byggeår og etasjehøyde i sonekortan, og at nordpila stemme. I eksportdialogen kan du og legg inn tiltak, som etterisolering og vindusbytte, så rekne SIMIEN ut lønnsomheta.']},
   ];
   const sett=new Set((()=>{try{return JSON.parse(lsHent('klipsSett')||'[]');}catch(e){return [];}})());
   const merkSett=id=>{sett.add(id);lsSet('klipsSett',JSON.stringify([...sett]));};
   const passar=k=>{try{return !!k.naar();}catch(e){return false;}};
   const kTittel=k=>trond&&k.tr?k.tr[0]:k.tittel,kTekst=k=>trond&&k.tr?k.tr[1]:k.tekst;
+  const fyrstTips=sett=>KONTEKST.find(k=>k.fyrst&&!sett.has(k.id)&&passar(k));
   const kontekstTips=k=>({naar:k.naar,tittel:kTittel(k),tekst:kTekst(k),knappar:k.knappar||[{t:'Takk',hovud:true,gjer:()=>{}}]});
 
   // pi:true = berre i EntroPi (KI-oppteikninga finst berre der).
   // tr = trøndersk; berreTr:true = berre i trønder-modus.
+  // KI-tipsa står fyrst, så det fyrste «visste du» i EntroPi handlar om KI-oppteikninga.
   const VISSTE_DU=[
-    {t:'Rekkjefølgja som sparer mest arbeid: kalibrer fyrst, set nordpila etterpå, og teikn så. Areal, fasaderetning og glasandel byggjer alle på desse to.',
-     tr:'Rekkefølgja som spare mest arbeid: kalibrer først, sett nordpila etterpå, og teikn så. Areal, fasaderetning og glasandel bygge alle på dæm to.'},
-    {t:'Du kan sleppe mange teikningar på lerretet samstundes, òg fasadeteikningar. Dei vert sorterte i etasjar, delplanar og fasadar, og du rettar før noko vert lagt inn.',
-     tr:'Du kan slepp mange teikninga på lerrete på én gong, og fasadeteikninga. Dæm blir sortert i etasja, delplana og fasada, og du rette før nåkka blir lagt inn.'},
-    {t:'Ei PDF med mange sider vert éin etasje per side. Vil du berre ha den fyrste, vel «Berre side 1 her».',
-     tr:'Ei PDF med mange sie blir én etasje per side. Vil du berre ha den første, vel «Berre side 1 her».'},
+    {t:'✦ KI-oppteikning teiknar soner, vindauge og dører frå planteikninga for deg. Du ser forslaget før noko vert lagt inn.',pi:true,
+     tr:'✦ KI-oppteikning tegne sona, vindu og dørr fra plantegninga for dæ. Du ser forslage før nåkka blir lagt inn.'},
     {t:'KI-oppteikninga krev skala på planteikningane. Fasadeteikningar utan skala går, men gir grovare høgder.',pi:true,
-     tr:'KI-oppteikninga krev skala på planteikningan. Fasadeteikninga uten skala går, men gir grovar høgd.'},
+     tr:'KI-en krev skala på plantegningan. Fasadetegninga uten skala går, men da blir høydan grovar.'},
     {t:'Med «Heile bygget» les KI-oppteikninga alle etasjane og fasadane i éi køyring.',pi:true,
-     tr:'Med «Heile bygget» les KI-oppteikninga alle etasjan og fasadan i éi køyring. Fortar enn å sitt bakerst i bussen tel Steinkjer.'},
+     tr:'Med «Heile bygget» lese KI-en alle etasjan og fasadan i én kjøring. Fortar enn å sitt bakerst i bussen tel Steinkjer.'},
     {t:'I KI-forslaget slår du saman to soner med ⊕ på den felles veggen, eller alle like med «⊕ Same kategori».',pi:true,
-     tr:'I KI-forslage slår du saman to sona med ⊕ på den felles veggen, eller alle like med «⊕ Same kategori».'},
+     tr:'I KI-forslage slår du sammen to sona med ⊕ på den felles veggen, eller alle like med «⊕ Same kategori».'},
     {t:'Gå gjennom KI-forslaget plan for plan med ← og →. Ctrl+Z angrar berre i forslaget, og ingenting vert lagt inn før du trykkjer «Godta».',pi:true,
-     tr:'Gå gjennom KI-forslage plan for plan med ← og →. Ctrl+Z angre berre i forslage, og ingenting blir lagt inn før du trykke «Godta».'},
+     tr:'Gå gjennom KI-forslage plan for plan med ← og →. Ctrl+Z angre bare i forslage, og ingenting blir lagt inn før du trykke «Godta».'},
     {t:'KI-en hentar namn, bruk og byggeår frå teksten i teikninga. Sjekk kategorien i forslaget, han går rett inn i energimerket.',pi:true,
-     tr:'KI-en hent namn, bruk og byggeår frå teksten i teikning\'n. Sjekk kategorien i forslage, han går rett inn i energimerke.'},
+     tr:'KI-en hente navn, bruk og byggeår fra teksten i tegninga. Sjekk kategorien i forslage, han går rett inn i energimerke.'},
+    {t:'Rekkjefølgja som sparer mest arbeid: kalibrer fyrst, set nordpila etterpå, og teikn så. Areal, fasaderetning og glasandel byggjer alle på desse to.',
+     tr:'Rekkefølgja som spare mest arbeid: kalibrer først, sett nordpila etterpå, og tegn så. Areal, fasaderetning og glassandel bygge alle på dæm to.'},
+    {t:'Du kan sleppe mange teikningar på lerretet samstundes, òg fasadeteikningar. Dei vert sorterte i etasjar, delplanar og fasadar, og du rettar før noko vert lagt inn.',
+     tr:'Du kan slepp mange tegninga på lerrete på én gong, fasadetegninga og. Dæm blir sortert i etasja, delplana og fasada, og du rette før nåkka blir lagt inn.'},
+    {t:'Ei PDF med mange sider vert éin etasje per side. Vil du berre ha den fyrste, vel «Berre side 1 her».',
+     tr:'Ei PDF med mange sie blir én etasje per side. Vil du bare ha den første, vel «Berre side 1 her».'},
     {t:'Hald Shift medan du teiknar, så låser linja seg til 90° og 45°.',
-     tr:'Hold Shift mens du teikne, så låse linja sæ tel 90° og 45°. Rett som muran på Nidarosdomen.'},
+     tr:'Hold Shift mens du tegne, så låse linja sæ tel 90° og 45°. Rett som muran på Nidarosdomen.'},
     {t:'Teikn sonekanten langs innsida av ytterveggen.',
-     tr:'Teikn sonekanten langs innsida tå ytterveggen. Itj utsida, gutt.'},
+     tr:'Tegn sonekanten langs innsida tå ytterveggen. Itj utsida, gutt.'},
     {t:'Teiknar du ei sone inntil ei anna, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.',
-     tr:'Teikne du ei sone inntil ei anna, blir den felles veggen skiljekonstruksjon i begge sonan tå sæ sjøl.'},
+     tr:'Tegne du ei sone inntil ei anna, blir den felles veggen skillekonstruksjon i begge sonan tå sæ sjøl.'},
     {t:'Klikk på ei sone i teikninga, så finn du sonekortet hennar i sidepanelet.',
-     tr:'Klikk på ei sone i teikning\'n, så finn du sonekorte hennes i sidepanele.'},
+     tr:'Klikk på ei sone i tegninga, så finn du sonekorte hennes i sidepanele.'},
     {t:'Alt+klikk på ein seksjon i sonekortet opnar eller lukkar han i alle sonene samstundes.',
-     tr:'Alt+klikk på en seksjon i sonekorte opne eller lukke han i alle sonan på én gong.'},
+     tr:'Alt+klikk på en seksjon i sonekorte åpne eller lukke han i alle sonan på én gong.'},
     {t:'⌖ Snap festar punktet til veggkryss i planteikninga. Slå han av om han tek feil hjørne.',
-     tr:'⌖ Snap feste punkte tel veggkryss i planteikning\'n. Skru\'n av om han tar feil hjørne.'},
+     tr:'⌖ Snap feste punkte tel veggkryss i plantegninga. Skru\'n av om han tar feil hjørne.'},
     {t:'«Rett ut» rettar ei skeiv eller fotografert teikning med to kjende mål eller eit rektangel.',
-     tr:'«Rett ut» rette ei skeiv eller fotografert teikning med to kjente mål eller et rektangel.'},
+     tr:'«Rett ut» rette ei skeiv eller fotografert tegning med to kjente mål eller et rektangel.'},
     {t:'Har ein etasje fleire teikningar, til dømes éi per fløy, legg dei inn som delplanar og plasser dei med ⌖.',
-     tr:'Har en etasje fleir teikninga, tel dømes ei per fløy, legg dæm inn som delplana og plasser dæm med ⌖.'},
+     tr:'Har en etasje fler tegninga, for eksempel ei per fløy, legg dæm inn som delplana og plasser dæm med ⌖.'},
     {t:'Tak og golv kan delast i flater med eigen type, til dømes halve taket mot det fri og resten mot kaldt loft (✂ i sonekortet).',
-     tr:'Tak og golv kan delas i flate med eigen type, tel dømes halve take mot det fri og resten mot kaldt loft (✂ i sonekorte).'},
+     tr:'Tak og gulv kan deles i flate med egen type, for eksempel halve take mot det fri og resten mot kaldt loft (✂ i sonekorte).'},
     {t:'⊞ Fasadar slår saman ytterveggar med same himmelretning til éin fasade i SIMIEN.',
-     tr:'⊞ Fasadar slår saman ytterveggan med same himmelretning tel én fasade i SIMIEN.'},
+     tr:'⊞ Fasadar slår sammen ytterveggan med samme himmelretning tel én fasade i SIMIEN.'},
     {t:'«Del sone» i høgreklikkmenyen deler ei sone langs ei linje du teiknar, og vindauga følgjer med.',
-     tr:'«Del sone» i høgreklikkmenyen dele ei sone langs ei linje du teikne, og vinduan følge med.'},
+     tr:'«Del sone» i høyreklikkmenyen dele ei sone langs ei linje du tegne, og vinduan følge med.'},
     {t:'☰ Listebasert redigering lèt deg endre mange vindauge eller soner på ein gong.',
      tr:'☰ Listebasert redigering la dæ endre mange vindu eller sona på én gong.'},
     {t:'Høgreklikk på etasjefana for å kopiere ein heil etasje over i eit anna prosjekt.',
-     tr:'Høgreklikk på etasjefana for å kopier en heil etasje over i et anna prosjekt.'},
+     tr:'Høyreklikk på etasjefana for å kopier en heil etasje over i et anna prosjekt.'},
     {t:'Ei SXI-fil med vindauge som er større enn fasaden vert stoppa. Eg seier frå før du kjem så langt.',
-     tr:'Ei SXI-fil med vindu som e større enn fasaden blir stoppa. Æ sei ifrå før du kjæm så langt.'},
+     tr:'Ei SXI-fil med vindu som e større enn fasaden blir stoppa. Æ sei ifra før du kjæm så langt.'},
     {t:'Ctrl+O opnar filveljaren, Ctrl+S lagrar, og «?» viser alle snarvegane.',
-     tr:'Ctrl+O opne filveljaren, Ctrl+S lagre, og «?» vise alle snarveian.'},
-    {berreTr:true,tr:'Åge Aleksandersen sang om lys og varme. Det e akkurat det SIMIEN rekne på, men vinduan må du nok teikn sjøl.'},
-    {berreTr:true,tr:'Rai-rai! Ei godt kalibrert teikning e det finaste æ veit, nest etter DDE på Steinkjer en laurdagskveld.'},
+     tr:'Ctrl+O åpne filvelgeren, Ctrl+S lagre, og «?» vise alle snarveian.'},
+    {berreTr:true,tr:'Åge Aleksandersen sang om lys og varme. Det e akkurat det SIMIEN rekne på, men vinduan må du nok tegn sjøl.'},
+    {berreTr:true,tr:'Rai-rai! Ei godt kalibrert tegning e det finaste æ veit, nest etter DDE på Steinkjer en lørdagskveld.'},
     {berreTr:true,tr:'Levva livet, men kalibrer først.'},
-    {berreTr:true,tr:'Kor mange trøndera trengs for å teikn ei sone? Én. Resten står og sei «itj sånn, gutt».'},
+    {berreTr:true,tr:'Kor mange trøndera trengs for å tegn ei sone? Én. Resten står og sei «itj sånn, gutt».'},
   ];
 
   function aktivtTips(){
@@ -20716,7 +20725,10 @@ function printFasadeView(){
     // Eit kontekst-tips går bort når brukaren har gått vidare (t.d. ut av teiknemodus)
     if(vist&&vist.naar){if(!passar(vist))skjul();return;}
     if(vist||Date.now()-sistTips<KLIPS_PAUSE||!roleg())return;
-    const t=aktivtTips();if(t){vis(t,true);return;}
+    const t=aktivtTips();
+    const kf=fyrstTips(sett);
+    if(kf&&(!t||t.key!=='helsa')){merkSett(kf.id);vis(kontekstTips(kf),true);return;}
+    if(t){vis(t,true);return;}
     const k=KONTEKST.find(k=>!sett.has(k.id)&&passar(k));
     if(k){merkSett(k.id);vis(kontekstTips(k),true);}
   },KLIPS_TAKT);
@@ -20728,6 +20740,8 @@ function printFasadeView(){
   vedKlikk(()=>{
     if(vist){skjul();return;}
     const t=aktivtTips();
+    const kf=fyrstTips(sett);
+    if(kf&&(!t||t.key!=='helsa')){merkSett(kf.id);vistNo.add(kf.id);vis(kontekstTips(kf),false);return;}
     if(t){vis(t,false);return;}
     const fleire={t:'Fleire tips',hovud:true,gjer:()=>setTimeout(klikkFig,0)};
     // Fyrst det som passar til det brukaren held på med, så dei generelle
@@ -20782,9 +20796,9 @@ function printFasadeView(){
   trondKnapp.onclick=e=>{
     e.stopPropagation();
     trond=!trond;lsSet('klipsTrond',trond?'1':null);brukTrond();
-    vis({key:null,tittel:TR('Tilbake til nynorsk','Æ e han Klips!'),
+    vis({key:null,tittel:TR('Tilbake til nynorsk','Hei på dæ!'),
       tekst:TR('Bart og vest er lagde bort. Eg snakkar nynorsk att.',
-        'No har æ fått på mæ skinnvesten og barten, og no ska du få høre ordentle språk. Sett på «Lys og varme», så teikne vi nåkka fint. Rai-rai!'),
+        'No har æ fått på mæ barten og skinnvesten, så no blir det trøndersk. Sett på litt Åge, så tegne vi nåkka fint i lag. Rai-rai!'),
       knappar:[{t:'Takk',hovud:true,gjer:()=>{}}]},false);
     spel(trond?'snurr':'vift');
   };
@@ -20830,7 +20844,7 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
     const visSvar=s=>vis({key:null,svar:true,tittel:TR('Klips svarar','Klips svare'),tekst:s,knappar:[]},false);
     if(svarMinne.has(nokkel)){sporIn.value='';visSvar(svarMinne.get(nokkel));return;}
     spurde=true;sporForm.querySelector('button').disabled=true;rot.classList.add('tenk');
-    vis({key:null,tittel:TR('Augneblink …','Vent litt, æ tænke …'),tekst:'«'+q+'»',knappar:[]},false);
+    vis({key:null,tittel:TR('Augneblink …','Vent litt, æ tenke …'),tekst:'«'+q+'»',knappar:[]},false);
     let r;
     try{
       r=await window.EntroHost.askAi({oppgave:'hjelp',maxTokens:700,images:[],meta:{sporsmal:q.length},
@@ -20838,12 +20852,12 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
           properties:{omProgrammet:{type:'boolean'},svar:{type:'string'}}},
         prompt:'Du er Klips, hjelpefiguren i SXI-generatoren frå Entro AS. Svar BERRE på spørsmål om korleis ein brukar dette programmet, eller om energimerking slik programmet gjer det. '
           +'Er spørsmålet om noko anna, set omProgrammet=false og svar med éi kort setning om at du berre kan hjelpe med SXI-generatoren. '
-          +(trond?'Svar på overdriven, stereotypisk trøndersk dialekt (Æ, itj, mæ, dæ, sæ, fali, gutt, apokope), gjerne med ei lita tilvising til DDE eller Åge Aleksandersen, men hald innhaldet korrekt. Byrj gjerne med «Æ e han Klips». Kort og konkret (høgst 4 setningar eller ei kort punktliste), med namna på knappane slik dei står under. Finst ikkje svaret i grunnlaget, seier du det i staden for å gjette.\n\n'
+          +(trond?'Svar på overdriven, stereotypisk trøndersk dialekt med bokmål som grunnlag, ikkje nynorsk (tegning, høyde, gulv, fra, bare, samme; Æ, itj, mæ, dæ, sæ, fali, gutt, apokope), gjerne med ei lita tilvising til DDE eller Åge Aleksandersen, men hald innhaldet korrekt. Byrj gjerne med «Æ e han Klips». Kort og konkret (høgst 4 setningar eller ei kort punktliste), med namna på knappane slik dei står under. Finst ikkje svaret i grunnlaget, seier du det i staden for å gjette.\n\n'
             :'Svar på nynorsk, kort og konkret (høgst 4 setningar eller ei kort punktliste), med namna på knappane slik dei står under. Finst ikkje svaret i grunnlaget, seier du det i staden for å gjette.\n\n')
           +'GRUNNLAG:\n'+KLIPS_KUNNSKAP+'\n\n'+tilstand()+'\n\nSPØRSMÅL: '+q});
     }catch(err){r={ok:false,message:err.message};}
     spurde=false;sporForm.querySelector('button').disabled=false;rot.classList.remove('tenk');
-    if(!r.ok){vis({key:null,tittel:TR('Det gjekk ikkje','Det gjekk itj'),tekst:r.message||TR('Fekk ikkje svar frå EntroPi.','Fekk itj svar frå EntroPi.'),knappar:[]},false);return;}
+    if(!r.ok){vis({key:null,tittel:TR('Det gjekk ikkje','Det gikk itj'),tekst:r.message||TR('Fekk ikkje svar frå EntroPi.','Fikk itj svar fra EntroPi.'),knappar:[]},false);return;}
     const svar=String(r.result.svar||'').trim()||TR('Det veit eg dessverre ikkje.','Det veit æ itj, gutt.');
     svarMinne.set(nokkel,svar);sporIn.value='';
     visSvar(svar);
