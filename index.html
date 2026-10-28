@@ -1098,7 +1098,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.20.2</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.20.3</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -20471,7 +20471,7 @@ function printFasadeView(){
 (function(){
   const rot=document.getElementById('klips');if(!rot)return;
   const fig=document.getElementById('klipsFig'),boble=document.getElementById('klipsBoble');
-  const k3=lagKlips3D();
+  const k3=lagKlips3D(()=>Date.now()-sistAktiv);
   if(k3){rot.insertBefore(k3.el,fig);rot.classList.add('k3d');}
   // Figuren som faktisk står framme: 3D-lerretet, eller SVG-en som reserve
   const figEl=()=>k3&&rot.classList.contains('k3d')?k3.el:fig;
@@ -20552,120 +20552,60 @@ function printFasadeView(){
           'Nordpila står på 0°. Fasaderetningan, og dermed soltilskudde i SIMIEN, følge pila. Dra kompasse nede tel høyre om tegninga itj har nord opp.'),
         knappar:[{t:'Det stemmer',hovud:true,gjer:()=>utsett.add('nord')}],utanSeinare:true};}},
   ];
-  // Tips knytte til det brukaren held på med. Vert viste av seg sjølv ÉIN
-  // gong per nettlesar (klipsSett), etter problema i REGLAR og med same
-  // pause- og rolegreglar. Boblen går bort når situasjonen er over
-  // (naar() vert usann). Klikk på figuren viser dei att, sett eller ikkje.
+  // Tips knytte til det brukaren held på med. Dei kjem BERRE når brukaren
+  // klikkar på figuren — av seg sjølv seier Klips berre frå om problem
+  // (REGLAR). Få og konkrete med vilje: ei lang liste vart mas.
   // `tr` = [tittel, tekst] på trøndersk.
   const kal=()=>!!(bgImg&&mmPerImgPx);
-  const hovudEtasjar=()=>floors.filter(f=>!erDelplan(f)).length;
-  // fyrst:true = vert vist før problema i REGLAR (men etter helsinga), éin
-  // gong. KI-oppteikninga er det fyrste tipset i EntroPi — ho tek seg av
-  // mykje av det dei andre tipsa seier, og dialogen hjelper med skalaen.
   const KONTEKST=[
-    {id:'ki-start',fyrst:true,naar:()=>inPi()&&viewMode==='plan'&&!!bgImg&&!alleSoner().length,tittel:'La KI-en teikne for deg',
+    {id:'ki-start',naar:()=>inPi()&&viewMode==='plan'&&!!bgImg&&!alleSoner().length,tittel:'La KI-en teikne for deg',
       get tekst(){return '✦ KI-oppteikning teiknar soner, vindauge og dører frå planteikninga på nokre minutt. Du ser forslaget på lerretet og rettar eller godtek det før noko vert lagt inn.'
         +(kal()?'':' Teikninga må vere kalibrert fyrst, og dialogen hjelper deg med det.');},
       get tr(){return ['La KI-en tegn for dæ','✦ KI-oppteikning tegne sona, vindu og dørr fra plantegninga på nån minutta. Du ser forslage på lerrete og rette eller godtar det før nåkka blir lagt inn.'
         +(kal()?' Sett på litt Åge mens du vente.':' Tegninga må vær kalibrert først, og dialogen hjelpe dæ med det.')];},
       knappar:[{t:'Opne KI-oppteikning',hovud:true,gjer:()=>trykk('aiBtn')}]},
+    {id:'nord-fyrst',naar:()=>viewMode==='plan'&&kal()&&!alleSoner().length&&globalNorth===0,tittel:'Set himmelretninga før du teiknar',
+      tekst:'Dra nordpila nede til høgre så ho peikar mot nord i teikninga. Fasaderetningane og soltilskotet i SIMIEN følgjer ho, og det er lettare å få rett no enn når alt er teikna.',
+      tr:['Sett himmelretninga før du tegne','Dra nordpila nede tel høyre så ho pæke mot nord i tegninga. Fasaderetningan og soltilskudde i SIMIEN følge ho, og det e lettar å få rett no enn når alt e tegna.']},
     {id:'teikn',naar:()=>mode==='draw'&&viewMode==='plan',tittel:'Teiknetips',
       tekst:'Klikk hjørna langs innsida av ytterveggen. Enter eller dobbeltklikk avsluttar, Esc avbryt. Hald Shift for rette vinklar, og ⌖ Snap festar punktet til veggkryss i teikninga.',
       tr:['Tegnetips','Klikk hjørnan langs innsida tå ytterveggen. Enter eller dobbeltklikk avslutte, Esc avbryt. Hold Shift for rette vinkla, og ⌖ Snap feste punkte tel veggkryss i tegninga.']},
-    {id:'nabo',naar:()=>mode==='draw'&&viewMode==='plan'&&alleSoner().length>0,tittel:'Teikn inntil nabosona',
-      tekst:'Legg du den nye sona kant i kant med ei som finst, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.',
-      tr:['Tegn inntil nabosona','Legg du den nye sona kant i kant med ei som fins, blir den felles veggen skillekonstruksjon i begge sonan tå sæ sjøl. Fali lettvint.']},
     {id:'vindauge',naar:()=>mode==='window',tittel:'Vindaugstips',
       tekst:'Klikk to punkt langs ein fasadevegg for breidda. Har veggen fleire like vindauge, set antal i staden for å teikne kvart: det blir éitt element i SIMIEN. Ctrl+C og Ctrl+V kopierer eit vindauge til ein annan vegg.',
       tr:['Vindustips','Klikk to punkt langs en fasadevegg for bredda. Har veggen fler like vindu, sett antall istedenfor å tegn dæm ett og ett, så blir det ett element i SIMIEN. Ctrl+C og Ctrl+V kopiere et vindu tel en anna vegg.']},
-    {id:'rediger',naar:()=>mode==='edit',tittel:'Redigere ei sone',
-      tekst:'Dra hjørna for å flytte dei, og høgreklikk på eit hjørne for å slette det. Vindauge og skiljeveggar følgjer med.',
-      tr:['Rediger ei sone','Dra hjørnan for å flytt dæm, og høyreklikk på et hjørne for å slett det. Vinduan og skilleveggan følge med.']},
-    {id:'maal',naar:()=>mode==='measure',tittel:'Kontrollmål',
-      tekst:'Mål ein avstand du kjenner frå teikninga. Stemmer han, stemmer kalibreringa. Måla påverkar ikkje SXI-fila.',
-      tr:['Kontrollmål','Mål en avstand du kjenne fra tegninga. Stemme han, så stemme kalibreringa. Måla påverke itj SXI-fila.']},
-    {id:'fasadevising',naar:()=>viewMode==='fasade',tittel:'Fasadeteikningar',
-      tekst:'Fasadearket har sin eigen skala, så kalibrer det for seg. «Side om side» viser plan og fasade samstundes, så du kan måle høgder medan du ser planen.',
-      tr:['Fasadetegninga','Fasadearke har sin egen skala, så kalibrer det for sæ sjøl. «Side om side» vise plan og fasade på én gong, så du kan mål høyda mens du ser planen.']},
-    {id:'nord-fyrst',naar:()=>viewMode==='plan'&&kal()&&!alleSoner().length&&globalNorth===0,tittel:'Set himmelretninga før du teiknar',
-      tekst:'Skalaen er på plass. Neste steg: dra nordpila nede til høgre så ho peikar mot nord i teikninga. Fasaderetningane og soltilskotet i SIMIEN følgjer ho, og det er lettare å få rett no enn når alt er teikna.',
-      tr:['Sett himmelretninga før du tegne','Skalaen e på plass. Neste steg: dra nordpila nede tel høyre så ho pæke mot nord i tegninga. Fasaderetningan og soltilskudde i SIMIEN følge ho, og det e lettar å få rett no enn når alt e tegna.'],
-      knappar:[{t:'Nord stemmer alt',hovud:true,gjer:()=>utsett.add('nord')}]},
-    {id:'ki-fasade',naar:()=>inPi()&&viewMode==='plan'&&kal()&&!alleSoner().length&&!fasadar.length,tittel:'Har du fasadeteikningar?',
-      tekst:'Last dei opp òg. KI-oppteikninga les høgd og brystning på vindauga og etasjehøgdene frå fasadane, så du slepp å taste dei inn.',
-      tr:['Har du fasadetegninga?','Last dæm opp og. KI-en lese høyde og brystning på vinduan og etasjehøydan fra fasadan, så slepp du å tast dæm inn.']},
-    {id:'mange',naar:()=>!!bgImg&&floors.length===1&&!fasadar.length,tittel:'Har bygget fleire teikningar?',
-      tekst:'Du kan dra alle inn på lerretet samstundes: planar, delplanar, fasadar og PDF-ar med mange sider. Programmet gjettar etasje og type frå teksten i teikninga, og du rettar før noko vert lagt inn. Same val ligg under «+ Etasje» → «Legg inn mange teikningar».',
-      tr:['Har bygge fler tegninga?','Du kan dra alle inn på lerrete på én gong: plana, delplana, fasada og PDF-a med mange sie. Programme gjette etasje og type fra teksten i tegninga, og du rette før nåkka blir lagt inn. Samme valg ligg under «+ Etasje» → «Legg inn mange teikningar».']},
-    {id:'kople',naar:()=>viewMode==='plan'&&hovudEtasjar()>1&&alleSoner().length>1&&!alleSoner().some(z=>z.groupId),tittel:'Same bruk over fleire etasjar?',
-      tekst:'⇌ Kople soner gjer soner med same kategori til éi SIMIEN-sone. Areal og geometri vert framleis rekna per etasje.',
-      tr:['Samme bruk over fler etasja?','⇌ Kople soner gjør sona med samme kategori tel ei SIMIEN-sone. Areal og geometri blir fortsatt rekna per etasje.'],
-      knappar:[{t:'Opne Kople soner',hovud:true,gjer:()=>trykk('kopleBtn')}]},
     {id:'eksport',naar:()=>alleSoner().filter(z=>(z.windows||[]).length).length>=2,tittel:'Før du eksporterer',
       tekst:'Sjekk kategori, byggeår og etasjehøgd i sonekorta, og at nordpila stemmer. I eksportdialogen kan du òg leggje inn tiltak, som etterisolering og vindaugsbyte, så reknar SIMIEN lønnsemda.',
       tr:['Før du eksportere','Sjekk kategori, byggeår og etasjehøyde i sonekortan, og at nordpila stemme. I eksportdialogen kan du og legg inn tiltak, som etterisolering og vindusbytte, så rekne SIMIEN ut lønnsomheta.']},
   ];
-  const sett=new Set((()=>{try{return JSON.parse(lsHent('klipsSett')||'[]');}catch(e){return [];}})());
-  const merkSett=id=>{sett.add(id);lsSet('klipsSett',JSON.stringify([...sett]));};
   const passar=k=>{try{return !!k.naar();}catch(e){return false;}};
   const kTittel=k=>trond&&k.tr?k.tr[0]:k.tittel,kTekst=k=>trond&&k.tr?k.tr[1]:k.tekst;
-  const fyrstTips=sett=>KONTEKST.find(k=>k.fyrst&&!sett.has(k.id)&&passar(k));
-  const kontekstTips=k=>({naar:k.naar,tittel:kTittel(k),tekst:kTekst(k),knappar:k.knappar||[{t:'Takk',hovud:true,gjer:()=>{}}]});
 
   // pi:true = berre i EntroPi (KI-oppteikninga finst berre der).
   // tr = trøndersk; berreTr:true = berre i trønder-modus.
-  // KI-tipsa står fyrst, så det fyrste «visste du» i EntroPi handlar om KI-oppteikninga.
+  // Kvart tips skal vere eit råd ein kan gjere noko med, ikkje ei funksjonsliste.
   const VISSTE_DU=[
     {t:'Du kan la ✦ KI-oppteikning teikne opp soner, vindauge og dører for deg. Kalibrer teikninga og set nordpila fyrst, så får forslaget rette mål og fasaderetningar.',pi:true,
      tr:'Du kan la ✦ KI-oppteikning tegn opp sona, vindu og dørr for dæ. Kalibrer tegninga og sett nordpila først, så får forslage rette mål og fasaderetninga.'},
-    {t:'Med «Heile bygget» les KI-oppteikninga alle etasjane og fasadane i éi køyring.',pi:true,
-     tr:'Med «Heile bygget» lese KI-en alle etasjan og fasadan i én kjøring. Fortar enn å sitt bakerst i bussen tel Steinkjer.'},
-    {t:'I KI-forslaget slår du saman to soner med ⊕ på den felles veggen, eller alle like med «⊕ Same kategori».',pi:true,
-     tr:'I KI-forslage slår du sammen to sona med ⊕ på den felles veggen, eller alle like med «⊕ Same kategori».'},
-    {t:'Gå gjennom KI-forslaget plan for plan med ← og →. Ctrl+Z angrar berre i forslaget, og ingenting vert lagt inn før du trykkjer «Godta».',pi:true,
-     tr:'Gå gjennom KI-forslage plan for plan med ← og →. Ctrl+Z angre bare i forslage, og ingenting blir lagt inn før du trykke «Godta».'},
-    {t:'KI-en hentar namn, bruk og byggeår frå teksten i teikninga. Sjekk kategorien i forslaget, han går rett inn i energimerket.',pi:true,
-     tr:'KI-en hente navn, bruk og byggeår fra teksten i tegninga. Sjekk kategorien i forslage, han går rett inn i energimerke.'},
-    {t:'Rekkjefølgja som sparer mest arbeid: kalibrer fyrst, set nordpila etterpå, og teikn så. Areal, fasaderetning og glasandel byggjer alle på desse to.',
-     tr:'Rekkefølgja som spare mest arbeid: kalibrer først, sett nordpila etterpå, og tegn så. Areal, fasaderetning og glassandel bygge alle på dæm to.'},
-    {t:'Du kan sleppe mange teikningar på lerretet samstundes, òg fasadeteikningar. Dei vert sorterte i etasjar, delplanar og fasadar, og du rettar før noko vert lagt inn.',
-     tr:'Du kan slepp mange tegninga på lerrete på én gong, fasadetegninga og. Dæm blir sortert i etasja, delplana og fasada, og du rette før nåkka blir lagt inn.'},
-    {t:'Ei PDF med mange sider vert éin etasje per side. Vil du berre ha den fyrste, vel «Berre side 1 her».',
-     tr:'Ei PDF med mange sie blir én etasje per side. Vil du bare ha den første, vel «Berre side 1 her».'},
+    {t:'Gå gjennom KI-forslaget plan for plan med ← og →, og slå saman soner med ⊕ på den felles veggen. Ingenting vert lagt inn før du trykkjer «Godta».',pi:true,
+     tr:'Gå gjennom KI-forslage plan for plan med ← og →, og slå sammen sona med ⊕ på den felles veggen. Ingenting blir lagt inn før du trykke «Godta».'},
+    {t:'Kalibrer på det lengste målet du finn i teikninga. 1 cm feil på ein strek på 10 m gir 0,2 % feil i arealet, men på ein strek på 1 m gir han 2 %.',
+     tr:'Kalibrer på det lengste måle du finn i tegninga. 1 cm feil på en strek på 10 m gir 0,2 % feil i areale, men på en strek på 1 m gir det 2 %.'},
+    {t:'Mål ei dør eller eit anna kjent mål med «Mål» etter kalibreringa. Bommar det med meir enn nokre centimeter, er skalaen feil, og alle areala med han.',
+     tr:'Mål ei dør eller et anna kjent mål med «Mål» etter kalibreringa. Bomme det med mer enn nån centimeter, e skalaen feil, og alle areala med han.'},
+    {t:'Teikn sonekanten langs innsida av ytterveggen. Det er oppvarma BRA SIMIEN skal ha, og langs utsida vert arealet for stort.',
+     tr:'Tegn sonekanten langs innsida tå ytterveggen. Det e oppvarma BRA SIMIEN skal ha, og langs utsida blir areale for stort. Itj utsida, gutt.'},
     {t:'Hald Shift medan du teiknar, så låser linja seg til 90° og 45°.',
      tr:'Hold Shift mens du tegne, så låse linja sæ tel 90° og 45°. Rett som muran på Nidarosdomen.'},
-    {t:'Teikn sonekanten langs innsida av ytterveggen.',
-     tr:'Tegn sonekanten langs innsida tå ytterveggen. Itj utsida, gutt.'},
-    {t:'Teiknar du ei sone inntil ei anna, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.',
-     tr:'Tegne du ei sone inntil ei anna, blir den felles veggen skillekonstruksjon i begge sonan tå sæ sjøl.'},
-    {t:'Klikk på ei sone i teikninga, så finn du sonekortet hennar i sidepanelet.',
-     tr:'Klikk på ei sone i tegninga, så finn du sonekorte hennes i sidepanele.'},
-    {t:'Alt+klikk på ein seksjon i sonekortet opnar eller lukkar han i alle sonene samstundes.',
-     tr:'Alt+klikk på en seksjon i sonekorte åpne eller lukke han i alle sonan på én gong.'},
-    {t:'⌖ Snap festar punktet til veggkryss i planteikninga. Slå han av om han tek feil hjørne.',
-     tr:'⌖ Snap feste punkte tel veggkryss i plantegninga. Skru\'n av om han tar feil hjørne.'},
-    {t:'«Rett ut» rettar ei skeiv eller fotografert teikning med to kjende mål eller eit rektangel.',
-     tr:'«Rett ut» rette ei skeiv eller fotografert tegning med to kjente mål eller et rektangel.'},
-    {t:'Har ein etasje fleire teikningar, til dømes éi per fløy, legg dei inn som delplanar og plasser dei med ⌖.',
-     tr:'Har en etasje fler tegninga, for eksempel ei per fløy, legg dæm inn som delplana og plasser dæm med ⌖.'},
-    {t:'Tak og golv kan delast i flater med eigen type, til dømes halve taket mot det fri og resten mot kaldt loft (✂ i sonekortet).',
-     tr:'Tak og gulv kan deles i flate med egen type, for eksempel halve take mot det fri og resten mot kaldt loft (✂ i sonekorte).'},
-    {t:'⊞ Fasadar slår saman ytterveggar med same himmelretning til éin fasade i SIMIEN.',
-     tr:'⊞ Fasadar slår sammen ytterveggan med samme himmelretning tel én fasade i SIMIEN.'},
-    {t:'«Del sone» i høgreklikkmenyen deler ei sone langs ei linje du teiknar, og vindauga følgjer med.',
-     tr:'«Del sone» i høyreklikkmenyen dele ei sone langs ei linje du tegne, og vinduan følge med.'},
-    {t:'☰ Listebasert redigering lèt deg endre mange vindauge eller soner på ein gong.',
-     tr:'☰ Listebasert redigering la dæ endre mange vindu eller sona på én gong.'},
-    {t:'Høgreklikk på etasjefana for å kopiere ein heil etasje over i eit anna prosjekt.',
-     tr:'Høyreklikk på etasjefana for å kopier en heil etasje over i et anna prosjekt.'},
-    {t:'Ei SXI-fil med vindauge som er større enn fasaden vert stoppa. Eg seier frå før du kjem så langt.',
-     tr:'Ei SXI-fil med vindu som e større enn fasaden blir stoppa. Æ sei ifra før du kjæm så langt.'},
-    {t:'Ctrl+O opnar filveljaren, Ctrl+S lagrar, og «?» viser alle snarvegane.',
-     tr:'Ctrl+O åpne filvelgeren, Ctrl+S lagre, og «?» vise alle snarveian.'},
+    {t:'Teikn den neste sona kant i kant med den førre. Då blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv, og han går ikkje til SIMIEN som yttervegg.',
+     tr:'Tegn den neste sona kant i kant med den forrige. Da blir den felles veggen skillekonstruksjon i begge sonan tå sæ sjøl, og han går itj tel SIMIEN som yttervegg.'},
+    {t:'Er det fleire like vindauge på same vegg, teikn eitt og set antal. Det blir éitt element i SIMIEN, og stykka vert spreidde jamt utover veggen.',
+     tr:'E det fler like vindu på samme vegg, tegn ett og sett antall. Det blir ett element i SIMIEN, og stykkan blir spredd jamt utover veggen.'},
+    {t:'Har sona mange ytterveggar mot same himmelretning, slå dei saman med ⊞ Fasadar. Då vert SXI-fila langt enklare å gå gjennom i SIMIEN.',
+     tr:'Har sona mange yttervegga mot samme himmelretning, slå dæm sammen med ⊞ Fasadar. Da blir SXI-fila mye enklar å gå gjennom i SIMIEN.'},
+    {t:'Ctrl+S lagrar, Ctrl+Z angrar, og «?» viser alle snarvegane.',
+     tr:'Ctrl+S lagre, Ctrl+Z angre, og «?» vise alle snarveian.'},
     {berreTr:true,tr:'Åge Aleksandersen sang om lys og varme. Det e akkurat det SIMIEN rekne på, men vinduan må du nok tegn sjøl.'},
-    {berreTr:true,tr:'Rai-rai! Ei godt kalibrert tegning e det finaste æ veit, nest etter DDE på Steinkjer en lørdagskveld.'},
     {berreTr:true,tr:'Levva livet, men kalibrer først.'},
-    {berreTr:true,tr:'Kor mange trøndera trengs for å tegn ei sone? Én. Resten står og sei «itj sånn, gutt».'},
   ];
 
   function aktivtTips(){
@@ -20689,12 +20629,13 @@ function printFasadeView(){
     const av=document.createElement('button');av.className='k-av';av.textContent=bt('Slå av Klips');av.onclick=()=>settAv(true);knappEl.appendChild(av);
     document.getElementById('klipsLukk').onclick=()=>{if(t.key==='helsa')lsSet('klipsHelsa','1');if(t.key)utsett.add(t.key);skjul();};
     rot.classList.add('prat');
-    spel(auto?'inn':'vift');
+    spel(auto?'inn':['vift','nikk','vift','kortsnu'][Math.floor(Math.random()*4)]);
     sjaaPaa(1,-1,1400);   // ser opp mot boblen ei stund
   }
   function skjul(){vist=null;rot.classList.remove('prat');}
   function spel(k){
     if(k3&&rot.classList.contains('k3d')){k3.spel(k);return;}
+    if(!['inn','vift','feir'].includes(k))return;   // SVG-reserven har berre desse tre
     rot.classList.remove('inn','vift','feir');void rot.offsetWidth;rot.classList.add(k);
   }
 
@@ -20713,8 +20654,18 @@ function printFasadeView(){
     return Date.now()-sistAktiv>KLIPS_ROLEG&&!dragging&&!curPts.length&&!calPts.length&&!measurePts.length
       &&document.visibilityState==='visible'&&!dekt();
   }
+  // Han reagerer på det brukaren får til, utan boble: nikkar når ei ny sone
+  // kjem til, og tek ein snurr når teikninga vert kalibrert.
+  let sistSoner=-1,sistKal=null;
+  function reager(){
+    const n=alleSoner().length,k=!!(bgImg&&mmPerImgPx);
+    if(!vist&&sistKal===false&&k)spel('snurr');
+    else if(!vist&&sistSoner>=0&&n>sistSoner)spel('nikk');
+    sistSoner=n;sistKal=k;
+  }
   setInterval(()=>{
     if(rot.classList.contains('av'))return;
+    try{reager();}catch(e){}
     if(vist&&vist.key){
       // Problemet er løyst (t.d. kalibrert) — boblen går bort av seg sjølv
       const no=aktivtTips();if(!no||no.key!==vist.key){if(vist.key!=='helsa')skjul();}
@@ -20722,13 +20673,10 @@ function printFasadeView(){
     }
     // Eit kontekst-tips går bort når brukaren har gått vidare (t.d. ut av teiknemodus)
     if(vist&&vist.naar){if(!passar(vist))skjul();return;}
+    // Av seg sjølv: berre helsinga og problem. Tips kjem når ein klikkar.
     if(vist||Date.now()-sistTips<KLIPS_PAUSE||!roleg())return;
     const t=aktivtTips();
-    const kf=fyrstTips(sett);
-    if(kf&&(!t||t.key!=='helsa')){merkSett(kf.id);vis(kontekstTips(kf),true);return;}
-    if(t){vis(t,true);return;}
-    const k=KONTEKST.find(k=>!sett.has(k.id)&&passar(k));
-    if(k){merkSett(k.id);vis(kontekstTips(k),true);}
+    if(t)vis(t,true);
   },KLIPS_TAKT);
 
   ['pointerdown','keydown','wheel'].forEach(ev=>window.addEventListener(ev,e=>{if(!rot.contains(e.target))sistAktiv=Date.now();},true));
@@ -20737,14 +20685,14 @@ function printFasadeView(){
   const vedKlikk=fn=>{fig.addEventListener('click',fn);if(k3)k3.el.addEventListener('click',fn);};
   vedKlikk(()=>{
     if(vist){skjul();return;}
+    // Eitt klikk er nok: helsinga vert hoppa over, og vi går rett til eit tips
+    lsSet('klipsHelsa','1');
     const t=aktivtTips();
-    const kf=fyrstTips(sett);
-    if(kf&&(!t||t.key!=='helsa')){merkSett(kf.id);vistNo.add(kf.id);vis(kontekstTips(kf),false);return;}
     if(t){vis(t,false);return;}
     const fleire={t:'Fleire tips',hovud:true,gjer:()=>setTimeout(klikkFig,0)};
     // Fyrst det som passar til det brukaren held på med, så dei generelle
     const k=KONTEKST.find(k=>!vistNo.has(k.id)&&passar(k));
-    if(k){vistNo.add(k.id);merkSett(k.id);
+    if(k){vistNo.add(k.id);
       vis({tittel:kTittel(k),tekst:kTekst(k),knappar:k.knappar?[...k.knappar,{...fleire,hovud:false}]:[fleire]},false);return;}
     vistNo.clear();
     const liste=VISSTE_DU.filter(v=>(!v.pi||inPi())&&(!v.berreTr||trond));
@@ -20813,6 +20761,7 @@ function printFasadeView(){
       spel('feir');
     },
     vis:klikkFig,
+    spel,   // spel ei rørsle ved namn (til testing frå konsollen)
   };
 
   // ── Spør Klips (berre i EntroPi) ──
@@ -20873,7 +20822,8 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
   // (prat, tenk, mus over), og éin handling om gongen (`akt`). Alt går
   // gjennom fjører, så overgangane vert mjuke utan at kvar handling må
   // tenkje på kvar den førre slutta.
-  function lagKlips3D(){
+  // stille() = ms sidan brukaren sist gjorde noko (til døsinga).
+  function lagKlips3D(stille){
     if(typeof THREE==='undefined')return null;
     const cv=document.createElement('canvas');cv.id='klipsGL';
     cv.setAttribute('role','img');cv.setAttribute('aria-label','Klips — klikk for eit tips');cv.title='Klips — klikk for eit tips';
@@ -21088,7 +21038,8 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
     const fj=(x,k,d)=>({x,v:0,m:x,k,d});
     const steg=(f,dt)=>{f.v+=(f.k*(f.m-f.x)-f.d*f.v)*dt;f.x+=f.v*dt;};
     const F={yaw:fj(0,60,11),lean:fj(0,80,9),sq:fj(1,260,9),arm:fj(0,90,11),kort:fj(0,160,10),
-      bryn:fj(0,140,12),skeiv:fj(0,120,12),auge:fj(1,220,18),eu:fj(0,160,16),ev:fj(0,160,16),tilt:fj(0,90,7),vipp:fj(0,110,9)};
+      bryn:fj(0,140,12),skeiv:fj(0,120,12),auge:fj(1,220,18),eu:fj(0,160,16),ev:fj(0,160,16),tilt:fj(0,90,7),vipp:fj(0,110,9),
+      bukk:fj(0,90,10)};
     const glatt=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
     const hald=(e,a,b,r)=>glatt(a,a+r,e)*(1-glatt(b-r,b,e));
     const hopp=(e,a,b,h)=>{if(e<a||e>b)return 0;const p=(e-a)/(b-a);return 4*h*p*(1-p);};
@@ -21140,14 +21091,41 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
       strekk(e,o){ // strekk og gjesp
         const h=hald(e,.1,1.4,.4);o.sq=1+.13*h;o.arm-=.6*h;o.auge=1-.85*h;o.bryn+=.1*h;
         return e<1.7;},
+      nikk(e,o){   // eit lite bukk, når noko gjekk bra
+        o.bukk=.2*hald(e,.05,.45,.12)+.14*hald(e,.5,.9,.12);o.auge=.8;o.bryn+=.08*hald(e,0,1,.2);
+        return e<1.2;},
+      dans(e,o){   // ein liten dans på staden
+        const h=hald(e,.1,3.1,.35),b=e*7.5;
+        o.lean+=.16*Math.sin(b)*h;o.y+=.28*Math.abs(Math.sin(b))*h;o.yaw+=.35*Math.sin(b/2)*h;
+        o.arm-=(.55+.35*Math.sin(b*2))*h;o.kort+=.3*Math.sin(b*2)*h;o.sq+=.05*Math.sin(b*2)*h;
+        o.auge=1-.25*h;o.bryn+=.1*h;
+        return e<3.3;},
+      kortsnu(e,o){   // kastar energimerket opp, det snurrar, og han fangar det
+        o.arm-=.5*hald(e,0,1.3,.15);o.ev=.5*hald(e,.15,1.1,.1);
+        o.kortY=hopp(e,.25,1.05,2.4);o.kortSnu=Math.PI*4*glatt(.25,1.05,e);
+        if(e<.25)o.sq=.94;lande(e,1.05,'a',2.5);
+        if(e>1.05&&e<1.6){o.bryn+=.12;o.auge=1.15;}
+        return e<1.7;},
+      hikk(e,o){   // hikke, tre gonger
+        for(let i=0;i<3;i++){const t=.2+i*.6;o.y+=hopp(e,t,t+.2,.32);if(e>t&&e<t+.25){o.auge=1.25;o.bryn+=.14;}lande(e,t+.2,'h'+i,2);}
+        return e<2;},
+      kikk(e,o){   // lener seg ut og kikkar på teikninga
+        const h=hald(e,.15,2.2,.35);o.lean-=.2*h;o.eu=.6*h;o.ev=.15*h;o.yaw+=.35*h;o.skeiv=.1*h;o.bukk=.06*h;
+        return e<2.5;},
+      sov(e,o){   // døser av når ingen gjer noko, og skvett opp att
+        const h=hald(e,.2,3.6,.7);
+        if(e<3.6){o.auge=1-.94*h;o.bukk=.16*h;o.lean+=.05*h;o.sq+=.03*Math.sin(e*2.4)*h;}
+        else{o.y+=hopp(e,3.6,3.95,.6);o.auge=1.3;o.bryn+=.16;o.hjelmLyft=.5*hald(e,3.6,3.9,.05);}
+        lande(e,3.95,'a',3);
+        return e<4.5;},
     };
-    const RO_AKT=['hatt','sjaa','kort','snurr','strekk'];
+    const RO_AKT=['hatt','sjaa','kort','snurr','strekk','dans','kortsnu','hikk','kikk'];
     function start(n){if(RO||!AKT[n])return;akt={n,t:0};landa=[];konfLaus=false;sistAkt=n;}
 
     function ramme(dt){
       T+=dt;
       const prat=rot.classList.contains('prat'),tenk=rot.classList.contains('tenk');
-      const o={yaw:0,lean:0,sq:1,y:0,arm:0,kort:0,bryn:0,skeiv:0,auge:1,eu:0,ev:0,hjelmLyft:0,hjelmSnu:0,hjelmVipp:0,spin:0,flip:0};
+      const o={yaw:0,lean:0,sq:1,y:0,arm:0,kort:0,bryn:0,skeiv:0,auge:1,eu:0,ev:0,hjelmLyft:0,hjelmSnu:0,hjelmVipp:0,spin:0,flip:0,bukk:0,kortY:0,kortSnu:0};
       // Mus: auga følgjer peikaren, kroppen snur seg litt etter
       const hode=augeL.g.getWorldPosition(new THREE.Vector3()).project(cam),r=rekt||(rekt=cv.getBoundingClientRect());
       const hx=r.left+(hode.x+1)/2*r.width,hy=r.top+(1-hode.y)/2*r.height;
@@ -21162,13 +21140,15 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
         if(hover){o.auge=1.1;o.bryn+=.08;o.lean-=.04;}
         if(akt){akt.t+=dt;if(!AKT[akt.n](akt.t,o))akt=null;}
         else if(!prat&&!tenk&&!hover&&T>nesteRo){
-          const val=RO_AKT.filter(n=>n!==sistAkt);start(val[Math.floor(Math.random()*val.length)]);nesteRo=T+9+Math.random()*9;}
+          // Har ingen gjort noko på eit minutt, døser han av (éin gong om gongen)
+          const doser=stille&&stille()>60000&&sistAkt!=='sov';
+          const val=RO_AKT.filter(n=>n!==sistAkt);start(doser?'sov':val[Math.floor(Math.random()*val.length)]);nesteRo=T+9+Math.random()*9;}
         // Blunk, av og til to gonger
         if(T>nesteBlunk){blunkT=0;nesteBlunk=T+2.2+Math.random()*4+(Math.random()<.2?-1.95:0);}
       }
       let blunk=1;if(blunkT>=0){blunkT+=dt;blunk=blunkT<.14?1-Math.sin(Math.PI*blunkT/.14)*.95:1;if(blunkT>=.14)blunkT=-1;}
       F.yaw.m=o.yaw;F.lean.m=o.lean;F.sq.m=o.sq;F.arm.m=o.arm;F.kort.m=o.kort;F.bryn.m=o.bryn;F.skeiv.m=o.skeiv;
-      F.auge.m=o.auge;F.eu.m=o.eu;F.ev.m=o.ev;F.vipp.m=o.hjelmVipp;
+      F.auge.m=o.auge;F.eu.m=o.eu;F.ev.m=o.ev;F.vipp.m=o.hjelmVipp;F.bukk.m=o.bukk;
       for(const k in F)steg(F[k],dt);
       // Kroppen: y direkte (hopp er ballistiske), alt anna gjennom fjørene
       const nyY=o.y,nyV=(nyY-kroppY)/Math.max(dt,1e-3),akk=Math.max(-250,Math.min(250,(nyV-kroppV)/Math.max(dt,1e-3)));
@@ -21177,9 +21157,10 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
       const px=-.9,cf=Math.cos(o.flip),sf=Math.sin(o.flip);   // midt mellom kortet og binderset
       rotG.position.set(FOT.x+px-(px*cf-c*sf),FOT.y+kroppY+c-(px*sf+c*cf),0);
       rotG.rotation.set(0,F.yaw.x+o.spin,o.flip,'ZYX');
-      hallG.rotation.z=F.lean.x;
+      hallG.rotation.set(F.bukk.x,0,F.lean.x);
       const sq=Math.max(.6,F.sq.x);sqG.scale.set(1/Math.sqrt(sq),sq,1/Math.sqrt(sq));
       skulder.rotation.z=F.arm.x;handG.rotation.z=F.kort.x;
+      kort.position.y=-.46+o.kortY;kort.rotation.y=o.kortSnu;
       const ay=Math.max(.04,F.auge.x*blunk);
       augeL.g.scale.set(.34,.42*ay,.22);augeR.g.scale.set(.34,.42*ay,.22);
       const eu=Math.max(-.6,Math.min(.6,F.eu.x)),ev=Math.max(-.55,Math.min(.55,F.ev.x));
@@ -21255,7 +21236,8 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
     return {
       el:cv,
       midt:[.55,.62],   // kroppen sin plass i lerretet, til dekt()
-      spel(k){if(k==='vift'&&akt&&akt.n==='inn')return;start(k);},
+      // Inngangen og feiringa vert ikkje avbrotne av noko mindre
+      spel(k){if(akt&&(akt.n==='inn'||akt.n==='feir')&&k!=='feir')return;start(k);},
       trond(paa){trondG.visible=!!paa;},
       sjaa(dx,dy,ms){laastTil=performance.now()+ms;laasU=dx*.5;laasV=-dy*.45;},
     };
