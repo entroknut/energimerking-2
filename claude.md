@@ -1550,6 +1550,28 @@ under `// ── 2f.`), inspirert av Clippy. Logoen er `--entro-ikon` spora til
 ein vektorbane (`#kLogo`), så han er skarp i alle storleikar. Med begge
 modusane.
 
+- **Figuren er 3D** (`lagKlips3D()` nedst i IIFE-en, eigen `WebGLRenderer` på
+  `#klipsGL`): binderset er eit metallrøyr langs same bane som `#kTraad`,
+  same koordinatar som SVG-en (`P(x,y)`). SVG-en står att som reserve — utan
+  WebGL, eller ved `webglcontextlost` — og `.k3d` på `#klips` avgjer kven som
+  syner. `figEl()` gir den som står framme; klikk går via `vedKlikk`.
+  - **Hex-fargar må gjennom `lin()`** (`convertSRGBToLinear`). r128 les dei
+    som lineære, og med sRGB-utdata vart alt bleikt.
+  - Lerretet er mykje større enn figuren (hopp, hjulslag, konfetti), men har
+    `pointer-events:none` utanom når ein stråletest (`treffTest`) treffer
+    figuren. Elles ville det stole klikk frå planteikninga. `dekt()` slår
+    pointer-events på eit augneblink, elles ser `elementFromPoint` forbi.
+  - Rørsla er lag: ro (pust, svai, blunk), tilstand (`prat`, `tenk`, mus
+    over), og éi handling i `AKT` om gongen (`inn`, `vift`, `feir`, og dei
+    som kjem av seg sjølv i ro: `hatt`, `sjaa`, `kort`, `snurr`, `strekk`).
+    Alt går gjennom fjører (`F`), berre hopp-høgda er direkte. Hjelmen ligg
+    laus: kroppen sin akselerasjon dyttar han, han kan ikkje gå gjennom
+    hovudet. Hjulslaget roterer rundt midten av figuren, ikkje føtene.
+  - Hjelmen har to ryggar, éin på kvar side — ein midt over dekte logoen.
+  - Stråletesten ser ikkje på `.visible`, så trønder-vesten ligg i
+    `treffTrond`, ikkje `treff`.
+  - 30 bilete/s i ro, 60 når noko skjer; `prefers-reduced-motion` gir berre
+    auga, og teiknar ikkje når ingenting rører seg.
 - **Berre visning.** Han les tilstanden og trykkjer på dei same knappane som
   brukaren (`calBtn`, `winBtn`, `visSonekort`, `switchFloor`) — han endrar
   aldri prosjektet sjølv.
@@ -1569,7 +1591,15 @@ modusane.
   vist av seg sjølv éin gong per nettlesar (`klipsSett`) og går bort når
   `naar()` vert usann (t.d. ut av teiknemodus). Klikk på figuren går gjennom
   dei som passar no, så «visste du».
-- `localStorage`: `klipsAv` (slått av → mini-knapp), `klipsHelsa` og `klipsSett`.
+- **Trønder-modus** (av som standard; ein liten bart-knapp ved × i toppen
+  av boblen, `klipsTrond` i `localStorage`): bart og svart skinnvest med frynser på 3D-figuren (`trondG`,
+  ikkje på SVG-reserven), og stereotypisk trøndersk med DDE/Åge-glimt.
+  Kvar tekst har ein trønder-variant ved sida av seg: `TR(nn,tr)` i
+  `REGLAR`, `tr:[tittel,tekst]` i `KONTEKST`, `tr` i `VISSTE_DU`
+  (`berreTr:true` = berre i trønder-modus), og knappane via `BT`/`bt()`.
+  Ny tekst ⇒ skriv trønder-varianten med, elles dukkar nynorsken opp midt i.
+  Spør Klips får eiga språkinstruks, og svarMinne-nøkkelen tek med modusen.
+- `localStorage`: `klipsAv` (slått av → mini-knapp), `klipsHelsa`, `klipsSett` og `klipsTrond`.
   Ingenting i prosjektfila.
 - `Klips.feir()` vert kalla etter vellukka SXI-eksport.
 - **Spør Klips (berre EntroPi, `#klipsSpor.embed-only`)**: fritekst-spørsmål via

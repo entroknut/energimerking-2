@@ -531,7 +531,10 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .k-topp{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-bottom:6px}
 .k-topp b{color:#32595e;font-weight:600;font-size:12px}
 .k-topp .entro-ikon{width:9px;height:14px}
-.k-lukk{margin-left:auto;border:none;background:none;color:var(--text3);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;font-family:inherit}
+.k-trond{margin-left:auto;border:none;background:none;color:var(--text3);opacity:.5;cursor:pointer;padding:2px 4px;border-radius:5px;display:flex;align-items:center;line-height:0}
+.k-trond:hover{opacity:1;background:#f1f3f5}
+.k-trond[aria-pressed="true"]{opacity:1;color:#5e3d22}
+.k-lukk{border:none;background:none;color:var(--text3);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;font-family:inherit}
 .k-lukk:hover{color:var(--text)}
 .k-tittel{font-size:13px;font-weight:600;margin-bottom:4px}
 .k-tekst{font-size:12px;line-height:1.5;color:var(--text2)}
@@ -553,6 +556,13 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 #klips.av #klipsFig,#klips.av #klipsBoble{display:none!important}
 #klips.av #klipsMini{display:flex}
 @media (prefers-reduced-motion:reduce){#klipsFig,#klipsFig *,#klipsBoble{animation:none!important;transition:none!important}}
+/* 3D-utgåva: lerretet er større enn figuren (plass til hopp og konfetti), men
+   tek berre imot musa når peikaren står på sjølve figuren (stråletest i JS). */
+#klipsGL{position:absolute;left:-54px;bottom:-18px;width:240px;height:270px;pointer-events:none;cursor:pointer;display:none}
+#klips.k3d{width:92px;height:128px}
+#klips.k3d #klipsGL{display:block}
+#klips.k3d #klipsFig{display:none}
+#klips.av #klipsGL{display:none!important}
 /* ── Scale badge ── */
 #scaleBadge{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.92);border:1px solid var(--border);border-radius:999px;padding:4px 12px;font-size:11px;color:var(--text2);pointer-events:none;box-shadow:var(--shadow-sm);backdrop-filter:blur(8px);font-weight:500;font-family:inherit;font-variant-numeric:tabular-nums;transition:all .2s}
 #scaleBadge.uncal{color:#92400e;border-color:#fcd34d;background:#fffbeb;pointer-events:all;cursor:pointer;font-size:12px;font-weight:600;padding:6px 14px;box-shadow:0 1px 4px rgba(245,158,11,.25);animation:pulseWarn 2.5s ease-in-out infinite}
@@ -1088,7 +1098,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.19.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.20.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -1102,7 +1112,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div id="scaleBadge" class="uncal">Ikkje kalibrert</div>
     <div id="klips" class="av">
       <div id="klipsBoble" role="status" aria-live="polite">
-        <div class="k-topp"><span class="entro-ikon" aria-hidden="true"></span><b>Klips</b>· Entro energimerking<button class="k-lukk" id="klipsLukk" title="Lukk">×</button></div>
+        <div class="k-topp"><span class="entro-ikon" aria-hidden="true"></span><b>Klips</b>· <span id="klipsUnder">Entro energimerking</span><button class="k-trond" id="klipsTrond" title="Trønder-modus" aria-pressed="false"><svg width="20" height="10" viewBox="0 0 36 18" aria-hidden="true"><path d="M18 4c-3-3-8-3-11 0-2 2-3 6-5 9-1 2-1 4 1 4 2-1 3-4 5-6 2-2 5-3 7-2 1 .5 2 1 3 1s2-.5 3-1c2-1 5 0 7 2 2 2 3 5 5 6 2 0 2-2 1-4-2-3-3-7-5-9-3-3-8-3-11 0z" fill="currentColor"/></svg></button><button class="k-lukk" id="klipsLukk" title="Lukk">×</button></div>
         <div class="k-tittel" id="klipsTittel"></div>
         <div class="k-tekst" id="klipsTekst"></div>
         <div class="k-knappar" id="klipsKnappar"></div>
@@ -20461,6 +20471,10 @@ function printFasadeView(){
 (function(){
   const rot=document.getElementById('klips');if(!rot)return;
   const fig=document.getElementById('klipsFig'),boble=document.getElementById('klipsBoble');
+  const k3=lagKlips3D();
+  if(k3){rot.insertBefore(k3.el,fig);rot.classList.add('k3d');}
+  // Figuren som faktisk står framme: 3D-lerretet, eller SVG-en som reserve
+  const figEl=()=>k3&&rot.classList.contains('k3d')?k3.el:fig;
   const tittelEl=document.getElementById('klipsTittel'),tekstEl=document.getElementById('klipsTekst'),knappEl=document.getElementById('klipsKnappar');
   const KLIPS_ROLEG=2500,KLIPS_PAUSE=20000,KLIPS_TAKT=1500;
   const lsHent=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
@@ -20475,114 +20489,176 @@ function printFasadeView(){
   const tilSone=z=>{if(viewMode==='plan')saveFloorState();visSonekort(z);};
   const trykk=id=>{const b=document.getElementById(id);if(b)b.click();};
 
+  // Trønder-modus (bart-knappen i toppen av boblen): bart, skinnvest og
+  // stereotypisk trøndersk. Kvar tekst har ein `tr`-variant ved sida av seg;
+  // knappane går gjennom BT. Vert hugsa i nettlesaren (klipsTrond).
+  let trond=lsHent('klipsTrond')==='1';
+  const TR=(nn,tr)=>trond?tr:nn;
+  const BT={'Kjekt å vite':'Kjekt å veit','Kalibrer no':'Kalibrer no, gutt','Gå til arket':'Gå tel arke',
+    'Vis sonekortet':'Vis sonekorte','Det er kontor':'Det e kontor','Legg til vindauge':'Legg tel vindu','Det stemmer':'Det stemme',
+    'Nord stemmer alt':'Nord stemme alt','Opne KI-oppteikning':'Opn KI-oppteikning','Opne Kople soner':'Opn Kople soner',
+    'Takk':'Takk skal du ha','Fleire tips':'Mer tips','Seinare':'Seinar','Slå av Klips':'Skru\'n av','Takk, Klips':'Takk, Klips — rai-rai!'};
+  const bt=t=>trond&&BT[t]||t;
+
   // Prioritert: den fyrste regelen som slår til vert vist. `key` skil mellom
   // ulike tilfelle av same regel (eitt ark, éi sone), så eit nytt problem
   // kjem fram sjølv om brukaren har utsett eit liknande.
   const REGLAR=[
     {id:'helsa',sjekk:()=>!lsHent('klipsHelsa')&&{key:'helsa',
-      tittel:'Hei, eg er Klips!',
-      tekst:'Eg er energimerkingsassistenten til Entro. Eg seier frå når noko kan gjere energimerket feil, og elles held eg meg i ro. Klikk på meg om du vil ha eit tips.',
+      tittel:TR('Hei, eg er Klips!','Æ e han Klips!'),
+      tekst:TR('Eg er energimerkingsassistenten til Entro. Eg seier frå når noko kan gjere energimerket feil, og elles held eg meg i ro. Klikk på meg om du vil ha eit tips.',
+        'Æ e energimerkingshjelpar\'n tel Entro, rett frå Trondhjæm. Æ sei ifrå når nåkka kan gjør energimerke feil, og ellers e æ still som ei kjerkemus. Klikk på mæ om du vil ha et tips.'),
       knappar:[{t:'Kjekt å vite',hovud:true,gjer:()=>lsSet('klipsHelsa','1')}],utanSeinare:true}},
     {id:'skala',sjekk:()=>bgImg&&!mmPerImgPx&&mode!=='calibrate'&&{key:'skala:'+viewMode+':'+(viewMode==='plan'?curFloor().id:activeFasade),
-      tittel:'Det ser ut som du har lasta opp ei teikning!',
-      tekst:(viewMode==='fasade'?'Fasadearket':'Teikninga')+' manglar skala, så alle areal og veggengder vert feil i energimerket. Kalibrer fyrst. Det tek ti sekund.',
+      tittel:TR('Det ser ut som du har lasta opp ei teikning!','Sjø dær, ei teikning!'),
+      tekst:TR((viewMode==='fasade'?'Fasadearket':'Teikninga')+' manglar skala, så alle areal og veggengder vert feil i energimerket. Kalibrer fyrst. Det tek ti sekund.',
+        (viewMode==='fasade'?'Fasadearke':'Teikning\'n')+' mangle skala, og da blir all areal og vegglengd feil i energimerke. Kalibrer først, det tar ti sekund. Rai-rai!'),
       knappar:[{t:'Kalibrer no',hovud:true,gjer:()=>trykk('calBtn')}]}},
     {id:'arkSkala',sjekk:()=>{
       if(viewMode!=='plan')return null;
       const i=floors.findIndex((f,j)=>j!==activeFloor&&(f.bgImg||f.bgImgData)&&!mppForFloor(f));
       if(i<0)return null;const f=floors[i];
-      return {key:'arkSkala:'+f.id,tittel:arkNamn(f)+' manglar skala',
-        tekst:'Areala på det arket vert ikkje rekna rett før det er kalibrert, og dei går rett inn i energimerket.',
+      return {key:'arkSkala:'+f.id,tittel:arkNamn(f)+TR(' manglar skala',' mangle skala'),
+        tekst:TR('Areala på det arket vert ikkje rekna rett før det er kalibrert, og dei går rett inn i energimerket.',
+          'Areala på det arke blir itj rekna rett før det e kalibrert, og dæm går rett inn i energimerke.'),
         knappar:[{t:'Gå til arket',hovud:true,gjer:()=>switchFloor(i)}]};}},
     {id:'opningar',sjekk:()=>{
       for(const z of alleSoner()){
         const g=fasadarMedForStoreOpningar(z);
-        if(g.length)return {key:'opn:'+_zuk(z),tittel:'Vindauga får ikkje plass',
-          tekst:'I «'+z.name+'» er opningane større enn fasaden '+g[0].namn+' ('+g[0].opn.toFixed(1).replace('.',',')+' m² mot '+g[0].area.toFixed(1).replace('.',',')+' m²). SXI-eksporten stoppar til det er retta.',
+        if(!g.length)continue;
+        const a=g[0].opn.toFixed(1).replace('.',',')+' m² mot '+g[0].area.toFixed(1).replace('.',',')+' m²';
+        return {key:'opn:'+_zuk(z),tittel:TR('Vindauga får ikkje plass','Vinduan får itj plass'),
+          tekst:TR('I «'+z.name+'» er opningane større enn fasaden '+g[0].namn+' ('+a+'). SXI-eksporten stoppar til det er retta.',
+            'I «'+z.name+'» e opningan større enn fasaden '+g[0].namn+' ('+a+'). Det får du itj inn sjøl med vinsjan på kaia. SXI-eksporten stoppe tel det e retta.'),
           knappar:[{t:'Vis sona',hovud:true,gjer:()=>tilSone(z)}]};
       }
       return null;}},
     {id:'kategori',sjekk:()=>{
       const s=alleSoner();if(!s.length||s.some(z=>z.bygkat))return null;
-      return {key:'kat',tittel:'Kva slags bygg er dette?',
-        tekst:'Ingen av sonene har fått bygningskategori, så alle går til SIMIEN som kontorbygg. Er det ikkje eit kontorbygg, vert energimerket feil.',
+      return {key:'kat',tittel:TR('Kva slags bygg er dette?','Ka slags bygg e dette her?'),
+        tekst:TR('Ingen av sonene har fått bygningskategori, så alle går til SIMIEN som kontorbygg. Er det ikkje eit kontorbygg, vert energimerket feil.',
+          'Ingen tå sonan har fått bygningskategori, så alt går tel SIMIEN som kontorbygg. E det itj kontor, blir energimerke feil, og det e itj kjekt.'),
         knappar:[{t:'Vis sonekortet',hovud:true,gjer:()=>tilSone(s[0])},{t:'Det er kontor',gjer:()=>utsett.add('kat')}],utanSeinare:true};}},
     {id:'vindauge',sjekk:()=>{
       const s=alleSoner();if(s.length<1||s.some(z=>(z.windows||[]).length)||mode==='window')return null;
-      return {key:'vindauge',tittel:'Neste steg: vindauge og dører',
-        tekst:'Sonene er på plass. Legg inn vindauge og dører på fasadane, så får SIMIEN rett glasandel og varmetap.',
+      return {key:'vindauge',tittel:TR('Neste steg: vindauge og dører','Neste steg: vindu og dør'),
+        tekst:TR('Sonene er på plass. Legg inn vindauge og dører på fasadane, så får SIMIEN rett glasandel og varmetap.',
+          'Sonan e på plass. Legg inn vindu og dør på fasadan, så får SIMIEN rett glasandel og varmetap. Det handle jo om lys og varme, som Åge sa.'),
         knappar:[{t:'Legg til vindauge',hovud:true,gjer:()=>trykk('winBtn')}]};}},
     {id:'nord',sjekk:()=>{
       if(globalNorth!==0||!alleSoner().some(z=>(z.windows||[]).length))return null;
-      return {key:'nord',tittel:'Peikar nord rett opp?',
-        tekst:'Nordpila står på 0°. Fasaderetningane, og dermed soltilskotet i SIMIEN, følgjer pila. Dra kompasset nede til høgre om teikninga ikkje har nord opp.',
+      return {key:'nord',tittel:TR('Peikar nord rett opp?','Pæke nord rett opp?'),
+        tekst:TR('Nordpila står på 0°. Fasaderetningane, og dermed soltilskotet i SIMIEN, følgjer pila. Dra kompasset nede til høgre om teikninga ikkje har nord opp.',
+          'Nordpila står på 0°. Fasaderetningan, og dermed soltilskotte i SIMIEN, følge pila. Dra kompasse nede tel høgre om teikning\'n itj har nord opp.'),
         knappar:[{t:'Det stemmer',hovud:true,gjer:()=>utsett.add('nord')}],utanSeinare:true};}},
   ];
   // Tips knytte til det brukaren held på med. Vert viste av seg sjølv ÉIN
   // gong per nettlesar (klipsSett), etter problema i REGLAR og med same
   // pause- og rolegreglar. Boblen går bort når situasjonen er over
   // (naar() vert usann). Klikk på figuren viser dei att, sett eller ikkje.
+  // `tr` = [tittel, tekst] på trøndersk.
   const kal=()=>!!(bgImg&&mmPerImgPx);
   const hovudEtasjar=()=>floors.filter(f=>!erDelplan(f)).length;
   const KONTEKST=[
     {id:'teikn',naar:()=>mode==='draw'&&viewMode==='plan',tittel:'Teiknetips',
-      tekst:'Klikk hjørna langs innsida av ytterveggen. Enter eller dobbeltklikk avsluttar, Esc avbryt. Hald Shift for rette vinklar, og ⌖ Snap festar punktet til veggkryss i teikninga.'},
+      tekst:'Klikk hjørna langs innsida av ytterveggen. Enter eller dobbeltklikk avsluttar, Esc avbryt. Hald Shift for rette vinklar, og ⌖ Snap festar punktet til veggkryss i teikninga.',
+      tr:['Teiknetips','Klikk hjørnan langs innsida tå ytterveggen. Enter eller dobbeltklikk avslutte, Esc avbryt. Hold Shift for rette vinkla, og ⌖ Snap feste punkte tel veggkryss i teikning\'n.']},
     {id:'nabo',naar:()=>mode==='draw'&&viewMode==='plan'&&alleSoner().length>0,tittel:'Teikn inntil nabosona',
-      tekst:'Legg du den nye sona kant i kant med ei som finst, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.'},
+      tekst:'Legg du den nye sona kant i kant med ei som finst, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.',
+      tr:['Teikn inntil nabosona','Legg du den nye sona kant i kant med ei som fins, blir den felles veggen skiljekonstruksjon i begge sonan tå sæ sjøl. Fali lettvint.']},
     {id:'vindauge',naar:()=>mode==='window',tittel:'Vindaugstips',
-      tekst:'Klikk to punkt langs ein fasadevegg for breidda. Har veggen fleire like vindauge, set antal i staden for å teikne kvart: det blir éitt element i SIMIEN. Ctrl+C og Ctrl+V kopierer eit vindauge til ein annan vegg.'},
+      tekst:'Klikk to punkt langs ein fasadevegg for breidda. Har veggen fleire like vindauge, set antal i staden for å teikne kvart: det blir éitt element i SIMIEN. Ctrl+C og Ctrl+V kopierer eit vindauge til ein annan vegg.',
+      tr:['Vindustips','Klikk to punkt langs en fasadevegg for breidd\'n. Har veggen fleir like vindu, sett antal i staden for å teikn kvart eitt, så blir det ett element i SIMIEN. Ctrl+C og Ctrl+V kopiere et vindu tel en anna vegg.']},
     {id:'rediger',naar:()=>mode==='edit',tittel:'Redigere ei sone',
-      tekst:'Dra hjørna for å flytte dei, og høgreklikk på eit hjørne for å slette det. Vindauge og skiljeveggar følgjer med.'},
+      tekst:'Dra hjørna for å flytte dei, og høgreklikk på eit hjørne for å slette det. Vindauge og skiljeveggar følgjer med.',
+      tr:['Redigér ei sone','Dra hjørnan for å flytt dæm, og høgreklikk på et hjørne for å slett det. Vinduan og skiljeveggan følge med.']},
     {id:'maal',naar:()=>mode==='measure',tittel:'Kontrollmål',
-      tekst:'Mål ein avstand du kjenner frå teikninga. Stemmer han, stemmer kalibreringa. Måla påverkar ikkje SXI-fila.'},
+      tekst:'Mål ein avstand du kjenner frå teikninga. Stemmer han, stemmer kalibreringa. Måla påverkar ikkje SXI-fila.',
+      tr:['Kontrollmål','Mål en avstand du kjenne frå teikning\'n. Stemme han, så stemme kalibreringa. Måla påverke itj SXI-fila.']},
     {id:'fasadevising',naar:()=>viewMode==='fasade',tittel:'Fasadeteikningar',
-      tekst:'Fasadearket har sin eigen skala, så kalibrer det for seg. «Side om side» viser plan og fasade samstundes, så du kan måle høgder medan du ser planen.'},
+      tekst:'Fasadearket har sin eigen skala, så kalibrer det for seg. «Side om side» viser plan og fasade samstundes, så du kan måle høgder medan du ser planen.',
+      tr:['Fasadeteikninga','Fasadearke har sin eigen skala, så kalibrer det for sæ sjøl. «Side om side» vise plan og fasade på én gong, så du kan mål høgd mens du ser planen.']},
     {id:'nord-fyrst',naar:()=>viewMode==='plan'&&kal()&&!alleSoner().length&&globalNorth===0,tittel:'Set himmelretninga før du teiknar',
       tekst:'Skalaen er på plass. Neste steg: dra nordpila nede til høgre så ho peikar mot nord i teikninga. Fasaderetningane og soltilskotet i SIMIEN følgjer ho, og det er lettare å få rett no enn når alt er teikna.',
+      tr:['Sett himmelretning\'n før du teikne','Skalaen e på plass. Neste steg: dra nordpila nede tel høgre så ho pæke mot nord i teikning\'n. Fasaderetningan og soltilskotte i SIMIEN følge ho, og det e lettar å få rett no enn når alt e teikna.'],
       knappar:[{t:'Nord stemmer alt',hovud:true,gjer:()=>utsett.add('nord')}]},
     {id:'ki-start',naar:()=>inPi()&&viewMode==='plan'&&kal()&&!alleSoner().length,tittel:'La KI-en teikne for deg',
       tekst:'✦ KI-oppteikning teiknar soner, vindauge og dører frå planteikninga på nokre minutt. Du ser forslaget på lerretet og rettar eller godtek det før noko vert lagt inn.',
+      tr:['La KI-en teikn for dæ','✦ KI-oppteikning teikne sona, vindu og dør frå planteikning\'n på nokka minutt. Du ser forslage på lerrete og rette eller godtar det før nåkka blir lagt inn. Sett på litt Åge mens du vente.'],
       knappar:[{t:'Opne KI-oppteikning',hovud:true,gjer:()=>trykk('aiBtn')}]},
     {id:'ki-fasade',naar:()=>inPi()&&viewMode==='plan'&&kal()&&!alleSoner().length&&!fasadar.length,tittel:'Har du fasadeteikningar?',
-      tekst:'Last dei opp òg. KI-oppteikninga les høgd og brystning på vindauga og etasjehøgdene frå fasadane, så du slepp å taste dei inn.'},
+      tekst:'Last dei opp òg. KI-oppteikninga les høgd og brystning på vindauga og etasjehøgdene frå fasadane, så du slepp å taste dei inn.',
+      tr:['Har du fasadeteikninga?','Last dæm opp og. KI-oppteikninga les høgd og brystning på vinduan og etasjehøgdan frå fasadan, så du slepp å tast dæm inn.']},
     {id:'mange',naar:()=>!!bgImg&&floors.length===1&&!fasadar.length,tittel:'Har bygget fleire teikningar?',
-      tekst:'Du kan dra alle inn på lerretet samstundes: planar, delplanar, fasadar og PDF-ar med mange sider. Programmet gjettar etasje og type frå teksten i teikninga, og du rettar før noko vert lagt inn. Same val ligg under «+ Etasje» → «Legg inn mange teikningar».'},
+      tekst:'Du kan dra alle inn på lerretet samstundes: planar, delplanar, fasadar og PDF-ar med mange sider. Programmet gjettar etasje og type frå teksten i teikninga, og du rettar før noko vert lagt inn. Same val ligg under «+ Etasje» → «Legg inn mange teikningar».',
+      tr:['Har bygge fleir teikninga?','Du kan dra alle inn på lerrete på én gong: plana, delplana, fasada og PDF-a med mange sie. Programme gjette etasje og type frå teksten i teikning\'n, og du rette før nåkka blir lagt inn. Same val ligg under «+ Etasje» → «Legg inn mange teikningar».']},
     {id:'kople',naar:()=>viewMode==='plan'&&hovudEtasjar()>1&&alleSoner().length>1&&!alleSoner().some(z=>z.groupId),tittel:'Same bruk over fleire etasjar?',
       tekst:'⇌ Kople soner gjer soner med same kategori til éi SIMIEN-sone. Areal og geometri vert framleis rekna per etasje.',
+      tr:['Same bruk over fleir etasja?','⇌ Kople soner gjør sona med same kategori tel ei SIMIEN-sone. Areal og geometri blir framleis rekna per etasje.'],
       knappar:[{t:'Opne Kople soner',hovud:true,gjer:()=>trykk('kopleBtn')}]},
     {id:'eksport',naar:()=>alleSoner().filter(z=>(z.windows||[]).length).length>=2,tittel:'Før du eksporterer',
-      tekst:'Sjekk kategori, byggeår og etasjehøgd i sonekorta, og at nordpila stemmer. I eksportdialogen kan du òg leggje inn tiltak, som etterisolering og vindaugsbyte, så reknar SIMIEN lønnsemda.'},
+      tekst:'Sjekk kategori, byggeår og etasjehøgd i sonekorta, og at nordpila stemmer. I eksportdialogen kan du òg leggje inn tiltak, som etterisolering og vindaugsbyte, så reknar SIMIEN lønnsemda.',
+      tr:['Før du eksportere','Sjekk kategori, byggeår og etasjehøgd i sonekortan, og at nordpila stemme. I eksportdialogen kan du og legg inn tiltak, som etterisolering og vindusbytte, så rekne SIMIEN lønnsomheta.']},
   ];
   const sett=new Set((()=>{try{return JSON.parse(lsHent('klipsSett')||'[]');}catch(e){return [];}})());
   const merkSett=id=>{sett.add(id);lsSet('klipsSett',JSON.stringify([...sett]));};
   const passar=k=>{try{return !!k.naar();}catch(e){return false;}};
-  const kontekstTips=k=>({naar:k.naar,tittel:k.tittel,tekst:k.tekst,knappar:k.knappar||[{t:'Takk',hovud:true,gjer:()=>{}}]});
+  const kTittel=k=>trond&&k.tr?k.tr[0]:k.tittel,kTekst=k=>trond&&k.tr?k.tr[1]:k.tekst;
+  const kontekstTips=k=>({naar:k.naar,tittel:kTittel(k),tekst:kTekst(k),knappar:k.knappar||[{t:'Takk',hovud:true,gjer:()=>{}}]});
 
-  // pi:true = berre i EntroPi (KI-oppteikninga finst berre der)
+  // pi:true = berre i EntroPi (KI-oppteikninga finst berre der).
+  // tr = trøndersk; berreTr:true = berre i trønder-modus.
   const VISSTE_DU=[
-    {t:'Rekkjefølgja som sparer mest arbeid: kalibrer fyrst, set nordpila etterpå, og teikn så. Areal, fasaderetning og glasandel byggjer alle på desse to.'},
-    {t:'Du kan sleppe mange teikningar på lerretet samstundes, òg fasadeteikningar. Dei vert sorterte i etasjar, delplanar og fasadar, og du rettar før noko vert lagt inn.'},
-    {t:'Ei PDF med mange sider vert éin etasje per side. Vil du berre ha den fyrste, vel «Berre side 1 her».'},
-    {t:'KI-oppteikninga krev skala på planteikningane. Fasadeteikningar utan skala går, men gir grovare høgder.',pi:true},
-    {t:'Med «Heile bygget» les KI-oppteikninga alle etasjane og fasadane i éi køyring.',pi:true},
-    {t:'I KI-forslaget slår du saman to soner med ⊕ på den felles veggen, eller alle like med «⊕ Same kategori».',pi:true},
-    {t:'Gå gjennom KI-forslaget plan for plan med ← og →. Ctrl+Z angrar berre i forslaget, og ingenting vert lagt inn før du trykkjer «Godta».',pi:true},
-    {t:'KI-en hentar namn, bruk og byggeår frå teksten i teikninga. Sjekk kategorien i forslaget, han går rett inn i energimerket.',pi:true},
-    {t:'Hald Shift medan du teiknar, så låser linja seg til 90° og 45°.'},
-    {t:'Teikn sonekanten langs innsida av ytterveggen.'},
-    {t:'Teiknar du ei sone inntil ei anna, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.'},
-    {t:'Klikk på ei sone i teikninga, så finn du sonekortet hennar i sidepanelet.'},
-    {t:'Alt+klikk på ein seksjon i sonekortet opnar eller lukkar han i alle sonene samstundes.'},
-    {t:'⌖ Snap festar punktet til veggkryss i planteikninga. Slå han av om han tek feil hjørne.'},
-    {t:'«Rett ut» rettar ei skeiv eller fotografert teikning med to kjende mål eller eit rektangel.'},
-    {t:'Har ein etasje fleire teikningar, til dømes éi per fløy, legg dei inn som delplanar og plasser dei med ⌖.'},
-    {t:'Tak og golv kan delast i flater med eigen type, til dømes halve taket mot det fri og resten mot kaldt loft (✂ i sonekortet).'},
-    {t:'⊞ Fasadar slår saman ytterveggar med same himmelretning til éin fasade i SIMIEN.'},
-    {t:'«Del sone» i høgreklikkmenyen deler ei sone langs ei linje du teiknar, og vindauga følgjer med.'},
-    {t:'☰ Listebasert redigering lèt deg endre mange vindauge eller soner på ein gong.'},
-    {t:'Høgreklikk på etasjefana for å kopiere ein heil etasje over i eit anna prosjekt.'},
-    {t:'Ei SXI-fil med vindauge som er større enn fasaden vert stoppa. Eg seier frå før du kjem så langt.'},
-    {t:'Ctrl+O opnar filveljaren, Ctrl+S lagrar, og «?» viser alle snarvegane.'},
+    {t:'Rekkjefølgja som sparer mest arbeid: kalibrer fyrst, set nordpila etterpå, og teikn så. Areal, fasaderetning og glasandel byggjer alle på desse to.',
+     tr:'Rekkefølgja som spare mest arbeid: kalibrer først, sett nordpila etterpå, og teikn så. Areal, fasaderetning og glasandel bygge alle på dæm to.'},
+    {t:'Du kan sleppe mange teikningar på lerretet samstundes, òg fasadeteikningar. Dei vert sorterte i etasjar, delplanar og fasadar, og du rettar før noko vert lagt inn.',
+     tr:'Du kan slepp mange teikninga på lerrete på én gong, og fasadeteikninga. Dæm blir sortert i etasja, delplana og fasada, og du rette før nåkka blir lagt inn.'},
+    {t:'Ei PDF med mange sider vert éin etasje per side. Vil du berre ha den fyrste, vel «Berre side 1 her».',
+     tr:'Ei PDF med mange sie blir én etasje per side. Vil du berre ha den første, vel «Berre side 1 her».'},
+    {t:'KI-oppteikninga krev skala på planteikningane. Fasadeteikningar utan skala går, men gir grovare høgder.',pi:true,
+     tr:'KI-oppteikninga krev skala på planteikningan. Fasadeteikninga uten skala går, men gir grovar høgd.'},
+    {t:'Med «Heile bygget» les KI-oppteikninga alle etasjane og fasadane i éi køyring.',pi:true,
+     tr:'Med «Heile bygget» les KI-oppteikninga alle etasjan og fasadan i éi køyring. Fortar enn å sitt bakerst i bussen tel Steinkjer.'},
+    {t:'I KI-forslaget slår du saman to soner med ⊕ på den felles veggen, eller alle like med «⊕ Same kategori».',pi:true,
+     tr:'I KI-forslage slår du saman to sona med ⊕ på den felles veggen, eller alle like med «⊕ Same kategori».'},
+    {t:'Gå gjennom KI-forslaget plan for plan med ← og →. Ctrl+Z angrar berre i forslaget, og ingenting vert lagt inn før du trykkjer «Godta».',pi:true,
+     tr:'Gå gjennom KI-forslage plan for plan med ← og →. Ctrl+Z angre berre i forslage, og ingenting blir lagt inn før du trykke «Godta».'},
+    {t:'KI-en hentar namn, bruk og byggeår frå teksten i teikninga. Sjekk kategorien i forslaget, han går rett inn i energimerket.',pi:true,
+     tr:'KI-en hent namn, bruk og byggeår frå teksten i teikning\'n. Sjekk kategorien i forslage, han går rett inn i energimerke.'},
+    {t:'Hald Shift medan du teiknar, så låser linja seg til 90° og 45°.',
+     tr:'Hold Shift mens du teikne, så låse linja sæ tel 90° og 45°. Rett som muran på Nidarosdomen.'},
+    {t:'Teikn sonekanten langs innsida av ytterveggen.',
+     tr:'Teikn sonekanten langs innsida tå ytterveggen. Itj utsida, gutt.'},
+    {t:'Teiknar du ei sone inntil ei anna, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.',
+     tr:'Teikne du ei sone inntil ei anna, blir den felles veggen skiljekonstruksjon i begge sonan tå sæ sjøl.'},
+    {t:'Klikk på ei sone i teikninga, så finn du sonekortet hennar i sidepanelet.',
+     tr:'Klikk på ei sone i teikning\'n, så finn du sonekorte hennes i sidepanele.'},
+    {t:'Alt+klikk på ein seksjon i sonekortet opnar eller lukkar han i alle sonene samstundes.',
+     tr:'Alt+klikk på en seksjon i sonekorte opne eller lukke han i alle sonan på én gong.'},
+    {t:'⌖ Snap festar punktet til veggkryss i planteikninga. Slå han av om han tek feil hjørne.',
+     tr:'⌖ Snap feste punkte tel veggkryss i planteikning\'n. Skru\'n av om han tar feil hjørne.'},
+    {t:'«Rett ut» rettar ei skeiv eller fotografert teikning med to kjende mål eller eit rektangel.',
+     tr:'«Rett ut» rette ei skeiv eller fotografert teikning med to kjente mål eller et rektangel.'},
+    {t:'Har ein etasje fleire teikningar, til dømes éi per fløy, legg dei inn som delplanar og plasser dei med ⌖.',
+     tr:'Har en etasje fleir teikninga, tel dømes ei per fløy, legg dæm inn som delplana og plasser dæm med ⌖.'},
+    {t:'Tak og golv kan delast i flater med eigen type, til dømes halve taket mot det fri og resten mot kaldt loft (✂ i sonekortet).',
+     tr:'Tak og golv kan delas i flate med eigen type, tel dømes halve take mot det fri og resten mot kaldt loft (✂ i sonekorte).'},
+    {t:'⊞ Fasadar slår saman ytterveggar med same himmelretning til éin fasade i SIMIEN.',
+     tr:'⊞ Fasadar slår saman ytterveggan med same himmelretning tel én fasade i SIMIEN.'},
+    {t:'«Del sone» i høgreklikkmenyen deler ei sone langs ei linje du teiknar, og vindauga følgjer med.',
+     tr:'«Del sone» i høgreklikkmenyen dele ei sone langs ei linje du teikne, og vinduan følge med.'},
+    {t:'☰ Listebasert redigering lèt deg endre mange vindauge eller soner på ein gong.',
+     tr:'☰ Listebasert redigering la dæ endre mange vindu eller sona på én gong.'},
+    {t:'Høgreklikk på etasjefana for å kopiere ein heil etasje over i eit anna prosjekt.',
+     tr:'Høgreklikk på etasjefana for å kopier en heil etasje over i et anna prosjekt.'},
+    {t:'Ei SXI-fil med vindauge som er større enn fasaden vert stoppa. Eg seier frå før du kjem så langt.',
+     tr:'Ei SXI-fil med vindu som e større enn fasaden blir stoppa. Æ sei ifrå før du kjæm så langt.'},
+    {t:'Ctrl+O opnar filveljaren, Ctrl+S lagrar, og «?» viser alle snarvegane.',
+     tr:'Ctrl+O opne filveljaren, Ctrl+S lagre, og «?» vise alle snarveian.'},
+    {berreTr:true,tr:'Åge Aleksandersen sang om lys og varme. Det e akkurat det SIMIEN rekne på, men vinduan må du nok teikn sjøl.'},
+    {berreTr:true,tr:'Rai-rai! Ei godt kalibrert teikning e det finaste æ veit, nest etter DDE på Steinkjer en laurdagskveld.'},
+    {berreTr:true,tr:'Levva livet, men kalibrer først.'},
+    {berreTr:true,tr:'Kor mange trøndera trengs for å teikn ei sone? Én. Resten står og sei «itj sånn, gutt».'},
   ];
 
   function aktivtTips(){
@@ -20598,24 +20674,32 @@ function printFasadeView(){
     knappEl.textContent='';
     const lukk=()=>{if(t.key&&!t.utanSeinare)utsett.add(t.key);skjul();};
     (t.knappar||[]).forEach(k=>{
-      const b=document.createElement('button');b.textContent=k.t;if(k.hovud)b.className='k-hovud';
+      const b=document.createElement('button');b.textContent=bt(k.t);if(k.hovud)b.className='k-hovud';
       b.onclick=()=>{skjul();if(t.key&&t.utanSeinare)utsett.add(t.key);k.gjer();};
       knappEl.appendChild(b);
     });
-    if(t.key&&!t.utanSeinare){const b=document.createElement('button');b.textContent='Seinare';b.onclick=lukk;knappEl.appendChild(b);}
-    const av=document.createElement('button');av.className='k-av';av.textContent='Slå av Klips';av.onclick=()=>settAv(true);knappEl.appendChild(av);
+    if(t.key&&!t.utanSeinare){const b=document.createElement('button');b.textContent=bt('Seinare');b.onclick=lukk;knappEl.appendChild(b);}
+    const av=document.createElement('button');av.className='k-av';av.textContent=bt('Slå av Klips');av.onclick=()=>settAv(true);knappEl.appendChild(av);
     document.getElementById('klipsLukk').onclick=()=>{if(t.key==='helsa')lsSet('klipsHelsa','1');if(t.key)utsett.add(t.key);skjul();};
     rot.classList.add('prat');
     spel(auto?'inn':'vift');
     sjaaPaa(1,-1,1400);   // ser opp mot boblen ei stund
   }
   function skjul(){vist=null;rot.classList.remove('prat');}
-  function spel(k){rot.classList.remove('inn','vift','feir');void rot.offsetWidth;rot.classList.add(k);}
+  function spel(k){
+    if(k3&&rot.classList.contains('k3d')){k3.spel(k);return;}
+    rot.classList.remove('inn','vift','feir');void rot.offsetWidth;rot.classList.add(k);
+  }
 
   // Står det ein dialog eller eit overlegg oppå figuren, held han seg stille.
+  // 3D-lerretet har pointer-events:none utanfor figuren, så det må slåast på
+  // eit augneblink — elles finn elementFromPoint det som ligg under.
   function dekt(){
-    const r=fig.getBoundingClientRect();if(!r.width)return true;
-    const el=document.elementFromPoint(r.left+r.width/2,r.top+r.height*0.6);
+    const f=figEl(),r=f.getBoundingClientRect();if(!r.width)return true;
+    const pe=f.style.pointerEvents;if(f!==fig)f.style.pointerEvents='auto';
+    const el=f===fig?document.elementFromPoint(r.left+r.width/2,r.top+r.height*0.6)
+      :document.elementFromPoint(r.left+r.width*k3.midt[0],r.top+r.height*k3.midt[1]);
+    f.style.pointerEvents=pe;
     return !el||!rot.contains(el);
   }
   function roleg(){
@@ -20639,27 +20723,34 @@ function printFasadeView(){
 
   ['pointerdown','keydown','wheel'].forEach(ev=>window.addEventListener(ev,e=>{if(!rot.contains(e.target))sistAktiv=Date.now();},true));
 
-  fig.addEventListener('click',()=>{
+  const klikkFig=()=>figEl().dispatchEvent(new Event('click'));
+  const vedKlikk=fn=>{fig.addEventListener('click',fn);if(k3)k3.el.addEventListener('click',fn);};
+  vedKlikk(()=>{
     if(vist){skjul();return;}
     const t=aktivtTips();
     if(t){vis(t,false);return;}
-    const fleire={t:'Fleire tips',hovud:true,gjer:()=>setTimeout(()=>fig.dispatchEvent(new Event('click')),0)};
+    const fleire={t:'Fleire tips',hovud:true,gjer:()=>setTimeout(klikkFig,0)};
     // Fyrst det som passar til det brukaren held på med, så dei generelle
     const k=KONTEKST.find(k=>!vistNo.has(k.id)&&passar(k));
     if(k){vistNo.add(k.id);merkSett(k.id);
-      vis({tittel:k.tittel,tekst:k.tekst,knappar:k.knappar?[...k.knappar,{...fleire,hovud:false}]:[fleire]},false);return;}
+      vis({tittel:kTittel(k),tekst:kTekst(k),knappar:k.knappar?[...k.knappar,{...fleire,hovud:false}]:[fleire]},false);return;}
     vistNo.clear();
-    const liste=VISSTE_DU.filter(v=>!v.pi||inPi());
-    vis({key:null,tittel:'Visste du at …',tekst:liste[vdIdx++%liste.length].t,knappar:[fleire]},false);
+    const liste=VISSTE_DU.filter(v=>(!v.pi||inPi())&&(!v.berreTr||trond));
+    const v=liste[vdIdx++%liste.length];
+    vis({key:null,tittel:TR('Visste du at …','Visst du at …'),tekst:trond?v.tr:v.t,knappar:[fleire]},false);
   });
 
   // Auga følgjer musa — litt, slik Clippy gjorde
   const pL=document.getElementById('klipsPupL'),pR=document.getElementById('klipsPupR');
   let laastTil=0,rafP=0,mx=0,my=0;
-  function sjaaPaa(dx,dy,ms){laastTil=Date.now()+ms;const s=`translate(${dx*3.5} ${dy*4.5})`;pL.setAttribute('transform',s);pR.setAttribute('transform',s);}
+  function sjaaPaa(dx,dy,ms){
+    if(k3)k3.sjaa(dx,dy,ms);
+    laastTil=Date.now()+ms;const s=`translate(${dx*3.5} ${dy*4.5})`;pL.setAttribute('transform',s);pR.setAttribute('transform',s);
+  }
+  // 3D-figuren følgjer musa sjølv (auga, og kroppen snur seg litt)
   window.addEventListener('mousemove',e=>{
     mx=e.clientX;my=e.clientY;
-    if(rafP||rot.classList.contains('av'))return;
+    if(rafP||rot.classList.contains('av')||rot.classList.contains('k3d'))return;
     rafP=requestAnimationFrame(()=>{rafP=0;
       if(Date.now()<laastTil)return;
       const r=fig.getBoundingClientRect();if(!r.width)return;
@@ -20677,17 +20768,39 @@ function printFasadeView(){
   }
   document.getElementById('klipsMini').onclick=()=>settAv(false);
   rot.classList.toggle('av',lsHent('klipsAv')==='1');
+
+  // Trønder-modus: bart-knappen i toppen av boblen
+  const trondKnapp=document.getElementById('klipsTrond'),underEl=document.getElementById('klipsUnder');
+  const sporInn=document.getElementById('klipsSporIn');
+  function brukTrond(){
+    trondKnapp.setAttribute('aria-pressed',trond?'true':'false');
+    trondKnapp.title=trond?'Tilbake til nynorsk':'Trønder-modus';
+    underEl.textContent=TR('Entro energimerking','Entro, Trondhjæm');
+    if(sporInn)sporInn.placeholder=TR('Spør om programmet …','Spør mæ om programme …');
+    if(k3)k3.trond(trond);
+  }
+  trondKnapp.onclick=e=>{
+    e.stopPropagation();
+    trond=!trond;lsSet('klipsTrond',trond?'1':null);brukTrond();
+    vis({key:null,tittel:TR('Tilbake til nynorsk','Æ e han Klips!'),
+      tekst:TR('Bart og vest er lagde bort. Eg snakkar nynorsk att.',
+        'No har æ fått på mæ skinnvesten og barten, og no ska du få høre ordentle språk. Sett på «Lys og varme», så teikne vi nåkka fint. Rai-rai!'),
+      knappar:[{t:'Takk',hovud:true,gjer:()=>{}}]},false);
+    spel(trond?'snurr':'vift');
+  };
+  brukTrond();
   if(!rot.classList.contains('av'))spel('inn');
 
   window.Klips={
     // Kalla etter ein vellukka SXI-eksport
     feir(){
       if(rot.classList.contains('av'))return;
-      vis({key:null,tittel:'SXI-fila er klar!',tekst:'Lukke til med energimerket. Hugs å sjekke resultatet i SIMIEN før du sender det inn.',
+      vis({key:null,tittel:TR('SXI-fila er klar!','SXI-fila e klar!'),tekst:TR('Lukke til med energimerket. Hugs å sjekke resultatet i SIMIEN før du sender det inn.',
+        'Lykke tel med energimerke! Sjekk resultate i SIMIEN før du sende det inn. Og så har du fortjent litt DDE. Levva livet!'),
         knappar:[{t:'Takk, Klips',hovud:true,gjer:()=>{}}]},false);
       spel('feir');
     },
-    vis:()=>fig.dispatchEvent(new Event('click')),
+    vis:klikkFig,
   };
 
   // ── Spør Klips (berre i EntroPi) ──
@@ -20713,11 +20826,11 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
     e.preventDefault();
     const q=sporIn.value.trim().replace(/\s+/g,' ');
     if(q.length<3||spurde)return;
-    const nokkel=q.toLowerCase();
-    const visSvar=s=>vis({key:null,svar:true,tittel:'Klips svarar',tekst:s,knappar:[]},false);
+    const nokkel=(trond?'tr:':'')+q.toLowerCase();
+    const visSvar=s=>vis({key:null,svar:true,tittel:TR('Klips svarar','Klips svare'),tekst:s,knappar:[]},false);
     if(svarMinne.has(nokkel)){sporIn.value='';visSvar(svarMinne.get(nokkel));return;}
     spurde=true;sporForm.querySelector('button').disabled=true;rot.classList.add('tenk');
-    vis({key:null,tittel:'Augneblink …',tekst:'«'+q+'»',knappar:[]},false);
+    vis({key:null,tittel:TR('Augneblink …','Vent litt, æ tænke …'),tekst:'«'+q+'»',knappar:[]},false);
     let r;
     try{
       r=await window.EntroHost.askAi({oppgave:'hjelp',maxTokens:700,images:[],meta:{sporsmal:q.length},
@@ -20725,17 +20838,416 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
           properties:{omProgrammet:{type:'boolean'},svar:{type:'string'}}},
         prompt:'Du er Klips, hjelpefiguren i SXI-generatoren frå Entro AS. Svar BERRE på spørsmål om korleis ein brukar dette programmet, eller om energimerking slik programmet gjer det. '
           +'Er spørsmålet om noko anna, set omProgrammet=false og svar med éi kort setning om at du berre kan hjelpe med SXI-generatoren. '
-          +'Svar på nynorsk, kort og konkret (høgst 4 setningar eller ei kort punktliste), med namna på knappane slik dei står under. Finst ikkje svaret i grunnlaget, seier du det i staden for å gjette.\n\n'
+          +(trond?'Svar på overdriven, stereotypisk trøndersk dialekt (Æ, itj, mæ, dæ, sæ, fali, gutt, apokope), gjerne med ei lita tilvising til DDE eller Åge Aleksandersen, men hald innhaldet korrekt. Byrj gjerne med «Æ e han Klips». Kort og konkret (høgst 4 setningar eller ei kort punktliste), med namna på knappane slik dei står under. Finst ikkje svaret i grunnlaget, seier du det i staden for å gjette.\n\n'
+            :'Svar på nynorsk, kort og konkret (høgst 4 setningar eller ei kort punktliste), med namna på knappane slik dei står under. Finst ikkje svaret i grunnlaget, seier du det i staden for å gjette.\n\n')
           +'GRUNNLAG:\n'+KLIPS_KUNNSKAP+'\n\n'+tilstand()+'\n\nSPØRSMÅL: '+q});
     }catch(err){r={ok:false,message:err.message};}
     spurde=false;sporForm.querySelector('button').disabled=false;rot.classList.remove('tenk');
-    if(!r.ok){vis({key:null,tittel:'Det gjekk ikkje',tekst:r.message||'Fekk ikkje svar frå EntroPi.',knappar:[]},false);return;}
-    const svar=String(r.result.svar||'').trim()||'Det veit eg dessverre ikkje.';
+    if(!r.ok){vis({key:null,tittel:TR('Det gjekk ikkje','Det gjekk itj'),tekst:r.message||TR('Fekk ikkje svar frå EntroPi.','Fekk itj svar frå EntroPi.'),knappar:[]},false);return;}
+    const svar=String(r.result.svar||'').trim()||TR('Det veit eg dessverre ikkje.','Det veit æ itj, gutt.');
     svarMinne.set(nokkel,svar);sporIn.value='';
     visSvar(svar);
   });
   // I EntroPi opnar eit klikk på figuren med spørjefeltet klart
-  fig.addEventListener('click',()=>{if(vist&&inPi())setTimeout(()=>sporIn.focus(),0);});
+  vedKlikk(()=>{if(vist&&inPi())setTimeout(()=>sporIn.focus(),0);});
+
+  // ── Klips i 3D ──
+  // Same figur som SVG-en — binders, Entro-hjelm, energimerket i handa — men
+  // bygd i Three.js med ekte metall, blank hjelm og fjører på alt som rører
+  // seg: kroppen snur seg mot musa, hjelmen ligg laus og heng etter i hoppa,
+  // og han vinkar med merket, tek av seg hjelmen og tek salto når SXI-fila er
+  // klar. SVG-en står att som reserve: utan WebGL, eller om konteksten vert
+  // mista. Animasjonane er lag oppå kvarandre: ro (pust, svai), tilstand
+  // (prat, tenk, mus over), og éin handling om gongen (`akt`). Alt går
+  // gjennom fjører, så overgangane vert mjuke utan at kvar handling må
+  // tenkje på kvar den førre slutta.
+  function lagKlips3D(){
+    if(typeof THREE==='undefined')return null;
+    const cv=document.createElement('canvas');cv.id='klipsGL';
+    cv.setAttribute('role','img');cv.setAttribute('aria-label','Klips — klikk for eit tips');cv.title='Klips — klikk for eit tips';
+    let R;
+    try{R=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true,powerPreference:'low-power'});}catch(e){return null;}
+    const W=240,H=270;
+    R.setPixelRatio(Math.min(2,window.devicePixelRatio||1));R.setSize(W,H,false);
+    R.outputEncoding=THREE.sRGBEncoding;R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1;
+    R.setClearColor(0,0);
+    const RO=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const scene=new THREE.Scene();
+    // r128 les hex-fargar som lineære; utan omrekninga vert alt bleikt i sRGB-utdata
+    const lin=h=>new THREE.Color(h).convertSRGBToLinear();
+    const MAAL=new THREE.Vector3(-.47,2.2,0);
+    const cam=new THREE.PerspectiveCamera(26,W/H,1,80);
+    cam.position.set(MAAL.x+2.4,MAAL.y+4,23.8);cam.lookAt(MAAL);
+
+    // Miljøkart til metallet: grå-kvit kuppel med tre «softboksar»
+    {const pm=new THREE.PMREMGenerator(R),es=new THREE.Scene();
+     const sg=new THREE.SphereGeometry(10,24,12),p=sg.attributes.position,c=[];
+     const a=new THREE.Color(0x5d666b),b=new THREE.Color(0xf4f6f7),t=new THREE.Color();
+     for(let i=0;i<p.count;i++){t.copy(a).lerp(b,(p.getY(i)/10+1)/2);c.push(t.r,t.g,t.b);}
+     sg.setAttribute('color',new THREE.Float32BufferAttribute(c,3));
+     es.add(new THREE.Mesh(sg,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide})));
+     const lys=(x,y,z,w,h,k,c)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(c).multiplyScalar(k),side:THREE.DoubleSide}));m.position.set(x,y,z);m.lookAt(0,0,0);es.add(m);};
+     lys(-5,6,5,5,3,3,0xffffff);lys(7,1,3,1.5,7,2.2,0xffffff);lys(0,-1,-8,9,2,1.6,0x9fd0d4);
+     scene.environment=pm.fromScene(es,0.03).texture;pm.dispose();}
+    scene.add(new THREE.HemisphereLight(0xffffff,lin(0x9aa6b0),.5));
+    const key=new THREE.DirectionalLight(0xffffff,.8);key.position.set(-4,7,8);scene.add(key);
+    const rim=new THREE.DirectionalLight(lin(0xa8dde0),.8);rim.position.set(6,3,-7);scene.add(rim);
+
+    // Koordinatane er dei same som i SVG-en, så figuren held forma si
+    const P=(x,y,z=0)=>new THREE.Vector3((x-189)/50,(240-y)/50,z);
+    const LOGO=new Path2D(document.getElementById('kLogo').getAttribute('d'));
+    const ani=R.capabilities.getMaxAnisotropy();
+    const tekstur=c=>{const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=ani;return t;};
+    const mTraad=new THREE.MeshStandardMaterial({color:lin(0xd4d4ce),metalness:1,roughness:.17});
+    const mHjelm=new THREE.MeshPhysicalMaterial({color:lin(0x32595e),roughness:.32,clearcoat:1,clearcoatRoughness:.06,envMapIntensity:.45});
+    const mHjelmMork=new THREE.MeshStandardMaterial({color:lin(0x162b2d),roughness:.7});
+    const mKvit=new THREE.MeshPhysicalMaterial({color:lin(0xf2f2f0),roughness:.25,clearcoat:1,clearcoatRoughness:.05,envMapIntensity:.4});
+    const mPupil=new THREE.MeshPhysicalMaterial({color:lin(0x0c0c0b),roughness:.25,clearcoat:1,envMapIntensity:.5});
+    const mGlans=new THREE.MeshBasicMaterial({color:lin(0xffffff)});
+    const mBryn=new THREE.MeshStandardMaterial({color:lin(0x2a2927),roughness:.55});
+
+    const FOT=P(190,362),HJ=P(192,112);
+    const rotG=new THREE.Group();rotG.position.copy(FOT);scene.add(rotG);   // hopp, snu, salto
+    const hallG=new THREE.Group();rotG.add(hallG);                          // helling
+    const sqG=new THREE.Group();hallG.add(sqG);                             // klem og strekk
+    const modell=new THREE.Group();modell.position.set(-FOT.x,-FOT.y,0);sqG.add(modell);
+    const treff=[];
+
+    // Binderset: same bane som #kTraad, som eitt rundt røyr
+    const bane=new THREE.CurvePath();
+    const L=(a,b)=>bane.add(new THREE.LineCurve3(P(...a),P(...b)));
+    const Q=(a,c,b)=>bane.add(new THREE.QuadraticBezierCurve3(P(...a),P(...c),P(...b)));
+    L([178,176],[178,300]);Q([178,300],[178,318],[191,318]);Q([191,318],[204,318],[204,300]);L([204,300],[204,140]);
+    Q([204,140],[204,116],[182,116]);Q([182,116],[160,116],[160,140]);L([160,140],[160,326]);
+    Q([160,326],[160,356],[189,356]);Q([189,356],[218,356],[218,326]);L([218,326],[218,160]);
+    const RT=.085;
+    const traad=new THREE.Mesh(new THREE.TubeGeometry(bane,460,RT,14,false),mTraad);modell.add(traad);treff.push(traad);
+    const ende=new THREE.SphereGeometry(RT,14,10);
+    [P(178,176),P(218,160)].forEach(p=>{const m=new THREE.Mesh(ende,mTraad);m.position.copy(p);modell.add(m);});
+
+    // Auga: kvite ellipsoidar, pupillen glid langs overflata
+    const Z=new THREE.Vector3(0,0,1),DIR=new THREE.Vector3();
+    function lagAuge(sx,sy){
+      const g=new THREE.Group();g.position.copy(P(sx,sy,.2));
+      const kv=new THREE.Mesh(new THREE.SphereGeometry(1,32,24),mKvit);g.add(kv);treff.push(kv);
+      const pup=new THREE.Group();
+      const pm=new THREE.Mesh(new THREE.SphereGeometry(.46,24,16),mPupil);pm.scale.z=.35;pup.add(pm);
+      const gl=new THREE.Mesh(new THREE.SphereGeometry(.13,12,8),mGlans);gl.position.set(.15,.17,.16);pup.add(gl);
+      const gl2=new THREE.Mesh(new THREE.SphereGeometry(.055,8,6),mGlans);gl2.position.set(-.14,-.16,.15);pup.add(gl2);
+      g.add(pup);modell.add(g);
+      return {g,pup};
+    }
+    const augeL=lagAuge(170,154),augeR=lagAuge(212,154);
+    function settPupil(a,u,v){
+      const w=Math.sqrt(Math.max(.05,1-u*u-v*v));
+      a.pup.position.set(u*.9,v*.9,w*.9);DIR.set(u,v,w).normalize();a.pup.quaternion.setFromUnitVectors(Z,DIR);
+    }
+    function lagBryn(a,c,b){
+      const kurve=new THREE.QuadraticBezierCurve3(P(...a,.36),P(...c,.36),P(...b,.36));
+      const midt=kurve.getPoint(.5);
+      const geo=new THREE.TubeGeometry(kurve,20,.055,8,false);geo.translate(-midt.x,-midt.y,-midt.z);
+      const g=new THREE.Group();g.position.copy(midt);g.add(new THREE.Mesh(geo,mBryn));
+      [kurve.getPoint(0),kurve.getPoint(1)].forEach(p=>{const s=new THREE.Mesh(new THREE.SphereGeometry(.055,8,6),mBryn);s.position.copy(p).sub(midt);g.add(s);});
+      modell.add(g);return {g,y:midt.y};
+    }
+    const brynL=lagBryn([152,128],[164,118],[181,125]),brynR=lagBryn([200,121],[215,112],[230,120]);
+
+    // Armen og energimerket. Kortet heng i handa, så det kan vifte rundt grepet.
+    const skulder=new THREE.Group();skulder.position.copy(P(160,268,.02));modell.add(skulder);
+    const s0=P(160,268),hand=P(128,258).sub(s0);
+    const armKurve=new THREE.QuadraticBezierCurve3(new THREE.Vector3(),P(142,270).sub(s0),hand);
+    skulder.add(new THREE.Mesh(new THREE.TubeGeometry(armKurve,24,RT*.9,10,false),mTraad));
+    const handG=new THREE.Group();handG.position.copy(hand);handG.rotation.y=.32;skulder.add(handG);
+    const knoke=new THREE.Mesh(new THREE.SphereGeometry(RT*1.25,14,10),mTraad);handG.add(knoke);
+    const rr=(g,x,y,w,h,r)=>{g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();};
+    const kortC=document.createElement('canvas');kortC.width=392;kortC.height=544;
+    const bakC=document.createElement('canvas');bakC.width=196;bakC.height=272;
+    function teiknKort(){
+      const g=kortC.getContext('2d');g.setTransform(4,0,0,4,0,0);g.clearRect(0,0,98,136);
+      const gr=g.createLinearGradient(0,0,0,136);gr.addColorStop(0,'#fff');gr.addColorStop(1,'#eaeef2');
+      g.fillStyle=gr;g.fillRect(0,0,98,136);
+      g.save();g.translate(9,7);g.scale(.07,.07);g.fillStyle='#32595e';g.fill(LOGO);g.restore();
+      g.fillStyle='#32595e';g.font='600 9px Inter, system-ui, sans-serif';g.textBaseline='alphabetic';g.fillText('Energimerke',22,18);
+      const F=['#3B6D11','#639922','#97C459','#FAC775','#EF9F27','#D85A30','#A32D2D'],T=['#fff','#fff','#173404','#412402','#412402','#fff','#fff'];
+      F.forEach((f,i)=>{const y=28+i*15,w=34+i*8;
+        g.fillStyle=f;rr(g,8,y,w,12,2);g.fill();
+        g.fillStyle='rgba(255,255,255,.25)';rr(g,8,y,w,4,2);g.fill();
+        g.beginPath();g.moveTo(8+w,y);g.lineTo(8+w+5,y+6);g.lineTo(8+w,y+12);g.fillStyle=f;g.fill();
+        g.fillStyle=T[i];g.font='700 9px Inter, system-ui, sans-serif';g.fillText('ABCDEFG'[i],12,y+9.5);});
+      g.fillStyle='#32595e';g.beginPath();g.moveTo(72,43);g.lineTo(86,43);g.lineTo(92,49);g.lineTo(86,55);g.lineTo(72,55);g.fill();
+      const b=bakC.getContext('2d');b.setTransform(2,0,0,2,0,0);
+      const gb=b.createLinearGradient(0,0,98,136);gb.addColorStop(0,'#3d6a70');gb.addColorStop(1,'#1d3739');
+      b.fillStyle=gb;b.fillRect(0,0,98,136);
+      b.save();b.translate(49-124*.3/2,40);b.scale(.3,.3);b.fillStyle='#fff';b.fill(LOGO);b.restore();
+      b.fillStyle='rgba(255,255,255,.85)';b.font='600 9px Inter, system-ui, sans-serif';b.textAlign='center';b.fillText('Entro',49,118);
+    }
+    teiknKort();
+    const kortT=tekstur(kortC),bakT=tekstur(bakC);
+    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{teiknKort();kortT.needsUpdate=bakT.needsUpdate=true;});
+    const mKant=new THREE.MeshStandardMaterial({color:lin(0xd5dce2),roughness:.6,envMapIntensity:.3});
+    const kort=new THREE.Mesh(new THREE.BoxGeometry(1.96,2.72,.045),[mKant,mKant,mKant,mKant,
+      new THREE.MeshStandardMaterial({map:kortT,color:lin(0xe4e4e4),roughness:.5,envMapIntensity:.3}),new THREE.MeshStandardMaterial({map:bakT,roughness:.5,envMapIntensity:.3})]);
+    kort.position.set(-.98,-.46,0);kort.rotation.z=.14;handG.add(kort);treff.push(kort);
+
+    // Hjelmen ligg laus på hovudet (eiga fysikk, sjå ramme())
+    const hjelmPiv=new THREE.Group();hallG.add(hjelmPiv);
+    const hjelm=new THREE.Group();hjelm.rotation.z=.17;hjelmPiv.add(hjelm);
+    const hForm=new THREE.Group();hForm.scale.z=.82;hjelm.add(hForm);
+    const kuppel=new THREE.Mesh(new THREE.SphereGeometry(1,48,24,0,Math.PI*2,0,Math.PI/2),mHjelm);kuppel.scale.set(.86,.95,.86);hForm.add(kuppel);treff.push(kuppel);
+    const bremPkt=[[.8,.05],[.98,-.01],[1.15,-.07],[1.18,-.11],[1.13,-.135],[.95,-.095],[.8,-.04],[.8,.05]].map(([x,y])=>new THREE.Vector2(x,y));
+    const brem=new THREE.Mesh(new THREE.LatheGeometry(bremPkt,64),mHjelm);hForm.add(brem);treff.push(brem);
+    // To ryggar, ein på kvar side, så logoen midt framme står fri
+    {const ryggG=new THREE.Group();ryggG.scale.copy(kuppel.scale);hForm.add(ryggG);
+     const ryggGeo=new THREE.TorusGeometry(Math.sqrt(1-.52*.52)+.02,.055,10,48,Math.PI);
+     [-.52,.52].forEach(x=>{const m=new THREE.Mesh(ryggGeo,mHjelm);m.rotation.y=Math.PI/2;m.position.x=x;ryggG.add(m);});}
+    const under=new THREE.Mesh(new THREE.CircleGeometry(.84,40),mHjelmMork);under.rotation.x=Math.PI/2;under.position.y=-.02;hForm.add(under);
+    {const c=document.createElement('canvas');c.width=160;c.height=256;const g=c.getContext('2d');
+     const s=Math.min(160/124,256/199)*.78;
+     g.translate((160-124*s)/2,(256-199*s)/2);g.scale(s,s);
+     g.save();g.translate(4,6);g.fillStyle='rgba(16,30,32,.45)';g.fill(LOGO);g.restore();
+     g.fillStyle='#fff';g.fill(LOGO);
+     const merke=new THREE.Mesh(new THREE.SphereGeometry(1.008,20,14,Math.PI/2-.42,.84,.28,.88),
+       new THREE.MeshPhysicalMaterial({map:tekstur(c),transparent:true,roughness:.32,clearcoat:1,depthWrite:false,envMapIntensity:.45}));
+     merke.scale.copy(kuppel.scale);hForm.add(merke);}
+
+    // Trønder-utstyr: bart og skinnvest med frynser. Ligg i modellen, så det
+    // klemmer og strekkjer seg med kroppen; synleg berre i trønder-modus.
+    const trondG=new THREE.Group();trondG.visible=false;modell.add(trondG);
+    const frynser=[],treffTrond=[];   // stråletesten ser ikkje på .visible, så vesten har eiga liste
+    {const mHaar=new THREE.MeshStandardMaterial({color:lin(0x5e3d22),roughness:.9,envMapIntensity:.2});
+     const mLaer=new THREE.MeshStandardMaterial({color:lin(0x1c1b1a),roughness:.42,envMapIntensity:.6});
+     const kule=new THREE.SphereGeometry(1,14,10),mx=.04;
+     // Barten: to tjukke halvdelar som heng ned i endane (kvalross), bygd av kuler
+     [-1,1].forEach(s=>{
+       const k=new THREE.CubicBezierCurve3(new THREE.Vector3(mx,1.2,.4),new THREE.Vector3(mx+s*.32,1.24,.4),
+         new THREE.Vector3(mx+s*.6,1.08,.33),new THREE.Vector3(mx+s*.66,.68,.24));
+       for(let i=0;i<=18;i++){const t=i/18,p=k.getPoint(t),r=.21*(1-t)+.06*t+.03*Math.sin(t*Math.PI);
+         [[0,0],[.07,-.03*s],[-.07,.03*s]].forEach(([dy,dz],j)=>{if(j&&i>14)return;
+           const m=new THREE.Mesh(kule,mHaar);m.position.set(p.x,p.y+dy,p.z+dz);m.scale.set(r,r*(j?.75:.9),r*.8);trondG.add(m);});}
+     });
+     // Vesten: to framstykke med V-hals, ekstrudert så han har tjukkleik rundt binderset
+     [-1,1].forEach(s=>{
+       const sh=new THREE.Shape(),X=x=>x*s;
+       sh.moveTo(X(.07),.2);sh.lineTo(X(.38),.86);sh.lineTo(X(.7),.82);
+       sh.quadraticCurveTo(X(.62),.2,X(.84),.02);sh.lineTo(X(.84),-1.5);sh.lineTo(X(.07),-1.5);sh.lineTo(X(.07),.2);
+       const g=new THREE.ExtrudeGeometry(sh,{depth:.34,bevelEnabled:true,bevelThickness:.025,bevelSize:.025,bevelSegments:2,curveSegments:10});
+       const m=new THREE.Mesh(g,mLaer);m.position.z=-.19;trondG.add(m);treffTrond.push(m);
+       // Lyse stingar langs kanten framme
+       const sting=new THREE.Mesh(new THREE.BoxGeometry(.012,1.62,.01),new THREE.MeshBasicMaterial({color:lin(0x8a8780)}));
+       sting.position.set(X(.13),-.66,.18);trondG.add(sting);
+       for(let i=0;i<9;i++){
+         const geo=new THREE.BoxGeometry(.035,.34,.03);geo.translate(0,-.17,0);
+         const f=new THREE.Mesh(geo,mLaer);f.position.set(X(.13+i*.087),-1.52,.13);trondG.add(f);frynser.push(f);
+       }
+     });
+     // Knapp på brystet med «Æ»
+     const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');
+     g.fillStyle='#f4efe4';g.beginPath();g.arc(64,64,60,0,7);g.fill();g.lineWidth=8;g.strokeStyle='#b0332c';g.stroke();
+     g.fillStyle='#b0332c';g.font='800 72px Inter, system-ui, sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('Æ',64,70);
+     const pin=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.03,28),[new THREE.MeshStandardMaterial({color:lin(0xc9a84a),metalness:1,roughness:.3}),
+       new THREE.MeshStandardMaterial({map:tekstur(c),roughness:.4}),new THREE.MeshStandardMaterial({color:lin(0xc9a84a),metalness:1,roughness:.3})]);
+     pin.rotation.set(Math.PI/2,0,0);pin.position.set(-.45,.2,.19);trondG.add(pin);}
+
+    // Tenkjeprikkar som går i ring over hjelmen
+    const tenkG=new THREE.Group();hallG.add(tenkG);tenkG.visible=false;
+    const prikkar=[0,1,2].map(i=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.12,14,10),mHjelm);tenkG.add(m);return m;});
+
+    // Skugge på golvet, skalert etter kor høgt han er
+    const skC=document.createElement('canvas');skC.width=128;skC.height=64;
+    {const g=skC.getContext('2d'),gr=g.createRadialGradient(64,32,0,64,32,64);
+     gr.addColorStop(0,'rgba(16,24,40,.42)');gr.addColorStop(.5,'rgba(16,24,40,.16)');gr.addColorStop(1,'rgba(16,24,40,0)');
+     g.fillStyle=gr;g.fillRect(0,0,128,64);}
+    const skugge=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:tekstur(skC),transparent:true,depthWrite:false}));
+    skugge.rotation.x=-Math.PI/2;skugge.position.set(FOT.x-.95,FOT.y-.05,0);scene.add(skugge);
+
+    // Konfetti i fargane frå energimerket
+    const KF=[0x32595e,0x3B6D11,0x639922,0x97C459,0xFAC775,0xEF9F27,0xD85A30,0x6a979c];
+    const konfGeo=new THREE.PlaneGeometry(.2,.11);
+    const konf=Array.from({length:56},(_,i)=>{const m=new THREE.Mesh(konfGeo,new THREE.MeshBasicMaterial({color:lin(KF[i%KF.length]),side:THREE.DoubleSide,transparent:true}));
+      m.visible=false;scene.add(m);return {m,v:new THREE.Vector3(),rv:new THREE.Vector3(),liv:0};});
+    function konfetti(){
+      const o=new THREE.Vector3(FOT.x-.6,FOT.y+5.4,.3);
+      konf.forEach(k=>{const a=Math.random()*Math.PI*2,f=3+Math.random()*6;
+        k.m.position.copy(o);k.v.set(Math.cos(a)*f*.7,6+Math.random()*7,Math.sin(a)*f*.5);
+        k.rv.set(Math.random()*14-7,Math.random()*14-7,Math.random()*14-7);k.liv=1.8+Math.random()*.9;k.m.visible=true;});
+    }
+
+    // ── Rørsle ──
+    const fj=(x,k,d)=>({x,v:0,m:x,k,d});
+    const steg=(f,dt)=>{f.v+=(f.k*(f.m-f.x)-f.d*f.v)*dt;f.x+=f.v*dt;};
+    const F={yaw:fj(0,60,11),lean:fj(0,80,9),sq:fj(1,260,9),arm:fj(0,90,11),kort:fj(0,160,10),
+      bryn:fj(0,140,12),skeiv:fj(0,120,12),auge:fj(1,220,18),eu:fj(0,160,16),ev:fj(0,160,16),tilt:fj(0,90,7),vipp:fj(0,110,9)};
+    const glatt=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
+    const hald=(e,a,b,r)=>glatt(a,a+r,e)*(1-glatt(b-r,b,e));
+    const hopp=(e,a,b,h)=>{if(e<a||e>b)return 0;const p=(e-a)/(b-a);return 4*h*p*(1-p);};
+    let T=0,akt=null,sistAkt='',nesteRo=6+Math.random()*6,nesteBlunk=2,blunkT=-1;
+    let hover=false,laastTil=0,laasU=0,laasV=0,mus={x:-1e4,y:-1e4},rekt=null;   // rekt: lerretet på skjermen, lese ved musrørsle
+    window.addEventListener('resize',()=>{rekt=null;});
+    let hY=0,hV=0,kroppY=0,kroppV=0,konfLaus=false,landa=[];
+    // Handlingane: e = sekund sidan start, o = måla for denne ramma.
+    // Returnerer false når dei er ferdige. `landa` gir eitt støyt per landing.
+    const lande=(e,t,id,k)=>{if(e>=t&&!landa.includes(id)){landa.push(id);F.sq.v-=k;}};
+    const AKT={
+      inn(e,o){
+        const p=Math.min(1,e/.55);
+        o.y=e<.55?5.5*(1-p*p):0;o.spin=-Math.PI*2*(1-p)*(1-p);o.hjelmLyft=e<.7?.7:0;
+        lande(e,.55,'a',6);
+        if(e>.75&&e<.95)o.auge=.1;
+        o.bryn+=.12*hald(e,.9,1.6,.15);o.arm-=.5*hald(e,.9,1.6,.2);o.kort+=.35*Math.sin(e*16)*hald(e,1,1.55,.1);
+        return e<1.7;},
+      vift(e,o){
+        lande(e,0,'a',-2.5);
+        o.arm-=1*hald(e,0,1.4,.2);o.kort+=.5*Math.sin((e-.15)*15)*hald(e,.15,1.25,.1);
+        o.bryn+=.1*hald(e,0,1.4,.2);o.lean+=.07*hald(e,0,1.4,.25);
+        return e<1.45;},
+      feir(e,o){
+        if(e<.2){o.sq=.8;o.y=-.05;}
+        o.y+=hopp(e,.2,.95,2.1)+hopp(e,1.15,1.65,1.1);
+        if(e>.2&&e<.95)o.flip=Math.PI*2*glatt(.25,.9,e);   // hjulslag mot venstre
+        if(e>1.15&&e<1.65)o.spin=Math.PI*2*glatt(1.15,1.65,e);
+        if(e>.5&&!konfLaus){konfLaus=true;konfetti();}
+        lande(e,.95,'a',6);lande(e,1.65,'b',4.5);
+        if(e>.95&&e<1.15)o.sq=.88;
+        o.arm-=1.15*hald(e,.15,2.7,.25);o.kort+=.4*Math.sin(e*13)*hald(e,1.7,2.7,.15);
+        o.auge=.5;o.bryn+=.14;o.hjelmLyft=.5*hald(e,.45,.9,.15);
+        return e<2.8;},
+      hatt(e,o){   // tek hjelmen av og på att, som ei helsing
+        o.hjelmLyft=.95*hald(e,.1,1.3,.3);o.hjelmSnu=.3*hald(e,.1,1.3,.3);o.hjelmVipp=.75*hald(e,.25,1.2,.3);
+        o.bryn+=.1*hald(e,.1,1.3,.3);o.ev=.35*hald(e,.1,1.3,.3);o.lean-=.05*hald(e,.1,1.3,.3);
+        return e<1.6;},
+      sjaa(e,o){   // ser seg rundt
+        const u=-.62*hald(e,.1,1,.2)+.62*hald(e,1,1.9,.2);o.eu=u;o.ev=.05;o.yaw+=u*.6;
+        return e<2.1;},
+      kort(e,o){   // beundrar energimerket
+        const h=hald(e,.1,2,.35);o.eu=-.7*h;o.ev=-.35*h;o.yaw-=.35*h;o.arm-=.45*h;o.kort+=.18*h+.06*Math.sin(e*6)*h;o.bryn+=.08*h;
+        return e<2.2;},
+      snurr(e,o){
+        o.y+=hopp(e,.12,.8,.75);o.spin=Math.PI*2*glatt(.12,.8,e);lande(e,.8,'a',3.5);
+        if(e<.12)o.sq=.9;
+        return e<1.2;},
+      strekk(e,o){ // strekk og gjesp
+        const h=hald(e,.1,1.4,.4);o.sq=1+.13*h;o.arm-=.6*h;o.auge=1-.85*h;o.bryn+=.1*h;
+        return e<1.7;},
+    };
+    const RO_AKT=['hatt','sjaa','kort','snurr','strekk'];
+    function start(n){if(RO||!AKT[n])return;akt={n,t:0};landa=[];konfLaus=false;sistAkt=n;}
+
+    function ramme(dt){
+      T+=dt;
+      const prat=rot.classList.contains('prat'),tenk=rot.classList.contains('tenk');
+      const o={yaw:0,lean:0,sq:1,y:0,arm:0,kort:0,bryn:0,skeiv:0,auge:1,eu:0,ev:0,hjelmLyft:0,hjelmSnu:0,hjelmVipp:0,spin:0,flip:0};
+      // Mus: auga følgjer peikaren, kroppen snur seg litt etter
+      const hode=augeL.g.getWorldPosition(new THREE.Vector3()).project(cam),r=rekt||(rekt=cv.getBoundingClientRect());
+      const hx=r.left+(hode.x+1)/2*r.width,hy=r.top+(1-hode.y)/2*r.height;
+      const dx=mus.x-hx,dy=mus.y-hy,d=Math.hypot(dx,dy)||1,kk=Math.min(1,d/160);
+      if(performance.now()<laastTil){o.eu=laasU;o.ev=laasV;}
+      else{o.eu=dx/d*.52*kk;o.ev=-dy/d*.45*kk;}
+      o.yaw=Math.max(-1,Math.min(1,dx/520))*.42;
+      if(!RO){
+        o.sq+=Math.sin(T*2.1)*.014;o.lean+=Math.sin(T*.9)*.035;o.y+=Math.sin(T*1.8)*.035;
+        if(prat){o.yaw+=.32;o.bryn+=.07;o.lean+=Math.sin(T*2.6)*.03;o.sq+=Math.sin(T*8.5)*.012;}
+        if(tenk){o.eu=-.42;o.ev=.5;o.bryn+=.03;o.skeiv=.14;o.lean+=Math.sin(T*1.5)*.06;o.yaw-=.2;}
+        if(hover){o.auge=1.1;o.bryn+=.08;o.lean-=.04;}
+        if(akt){akt.t+=dt;if(!AKT[akt.n](akt.t,o))akt=null;}
+        else if(!prat&&!tenk&&!hover&&T>nesteRo){
+          const val=RO_AKT.filter(n=>n!==sistAkt);start(val[Math.floor(Math.random()*val.length)]);nesteRo=T+9+Math.random()*9;}
+        // Blunk, av og til to gonger
+        if(T>nesteBlunk){blunkT=0;nesteBlunk=T+2.2+Math.random()*4+(Math.random()<.2?-1.95:0);}
+      }
+      let blunk=1;if(blunkT>=0){blunkT+=dt;blunk=blunkT<.14?1-Math.sin(Math.PI*blunkT/.14)*.95:1;if(blunkT>=.14)blunkT=-1;}
+      F.yaw.m=o.yaw;F.lean.m=o.lean;F.sq.m=o.sq;F.arm.m=o.arm;F.kort.m=o.kort;F.bryn.m=o.bryn;F.skeiv.m=o.skeiv;
+      F.auge.m=o.auge;F.eu.m=o.eu;F.ev.m=o.ev;F.vipp.m=o.hjelmVipp;
+      for(const k in F)steg(F[k],dt);
+      // Kroppen: y direkte (hopp er ballistiske), alt anna gjennom fjørene
+      const nyY=o.y,nyV=(nyY-kroppY)/Math.max(dt,1e-3),akk=Math.max(-250,Math.min(250,(nyV-kroppV)/Math.max(dt,1e-3)));
+      kroppY=nyY;kroppV=nyV;
+      const c=2.6;   // hjulslaget går rundt midten av kroppen, ikkje rundt føtene
+      const px=-.9,cf=Math.cos(o.flip),sf=Math.sin(o.flip);   // midt mellom kortet og binderset
+      rotG.position.set(FOT.x+px-(px*cf-c*sf),FOT.y+kroppY+c-(px*sf+c*cf),0);
+      rotG.rotation.set(0,F.yaw.x+o.spin,o.flip,'ZYX');
+      hallG.rotation.z=F.lean.x;
+      const sq=Math.max(.6,F.sq.x);sqG.scale.set(1/Math.sqrt(sq),sq,1/Math.sqrt(sq));
+      skulder.rotation.z=F.arm.x;handG.rotation.z=F.kort.x;
+      const ay=Math.max(.04,F.auge.x*blunk);
+      augeL.g.scale.set(.34,.42*ay,.22);augeR.g.scale.set(.34,.42*ay,.22);
+      const eu=Math.max(-.6,Math.min(.6,F.eu.x)),ev=Math.max(-.55,Math.min(.55,F.ev.x));
+      settPupil(augeL,eu+.04,ev);settPupil(augeR,eu-.04,ev);
+      brynL.g.position.y=brynL.y+F.bryn.x+F.skeiv.x;brynR.g.position.y=brynR.y+F.bryn.x-F.skeiv.x*.4;
+      brynL.g.rotation.z=-F.skeiv.x*1.2;brynR.g.rotation.z=F.bryn.x*.6;
+      // Hjelmen: laus på hovudet. Kroppen si akselerasjon gir ei skinkraft,
+      // ei fjør dreg han mot hovudet (eller dit handlinga løftar han), og han
+      // kan aldri gå gjennom hovudet — då sprett han litt.
+      const hodeY=(HJ.y-FOT.y)*sq;
+      hV+=(-akk*.9+190*(o.hjelmLyft-hY)-13*hV)*dt;hY+=hV*dt;
+      if(hY<0){hY=0;if(hV<0)hV=-hV*.28;}
+      hjelmPiv.position.set((HJ.x-FOT.x)/Math.sqrt(sq),hodeY+hY,0);
+      F.tilt.m=o.hjelmSnu-F.lean.v*.12+hY*.25;
+      hjelm.rotation.set(F.vipp.x,0,.17+F.tilt.x);
+      // Tenkjeprikkar
+      if(trondG.visible)frynser.forEach((f,i)=>{
+        f.rotation.z=Math.sin(T*2.6+i*.7)*.06-F.lean.v*.5-F.yaw.v*.15;
+        f.rotation.x=Math.max(-.7,Math.min(.7,kroppV*.06));});
+      tenkG.visible=tenk&&!RO;
+      if(tenkG.visible){tenkG.position.set(HJ.x-FOT.x,hodeY+hY+1.35,0);
+        prikkar.forEach((m,i)=>{const a=T*2.4+i*2.094;m.position.set(Math.cos(a)*.62,Math.sin(T*3+i)*.08,Math.sin(a)*.62);m.scale.setScalar(.75+.35*Math.sin(T*4+i*1.3));});}
+      // Skugga krympar og blekner når han er i lufta
+      const lyft=Math.max(0,rotG.position.y-FOT.y),sk=1/(1+lyft*.35);
+      skugge.scale.set(4.6*sk,1.3*sk,1);skugge.material.opacity=sk;
+      // Konfetti
+      let konfAktiv=false;
+      konf.forEach(k=>{if(!k.m.visible)return;konfAktiv=true;k.liv-=dt;
+        if(k.liv<=0){k.m.visible=false;return;}
+        k.v.y-=14*dt;k.v.multiplyScalar(1-1.6*dt);k.m.position.addScaledVector(k.v,dt);
+        k.m.rotation.x+=k.rv.x*dt;k.m.rotation.y+=k.rv.y*dt;k.m.rotation.z+=k.rv.z*dt;
+        k.m.material.opacity=Math.min(1,k.liv/.5);});
+      return !!(akt||hover||prat||tenk||konfAktiv||blunkT>=0||Math.abs(F.sq.v)+Math.abs(F.yaw.v)+Math.abs(F.eu.v)+Math.abs(F.ev.v)+Math.abs(hV)>.01);
+    }
+
+    // Stråletest: lerretet tek berre imot musa når peikaren står på figuren
+    const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+    let rafM=0,inni=false;
+    function treffTest(){
+      const r=rekt=cv.getBoundingClientRect();let paa=false;
+      inni=!!r.width&&mus.x>=r.left&&mus.x<=r.right&&mus.y>=r.top&&mus.y<=r.bottom;
+      if(inni){
+        ndc.set((mus.x-r.left)/r.width*2-1,-((mus.y-r.top)/r.height)*2+1);
+        ray.setFromCamera(ndc,cam);paa=ray.intersectObjects(trondG.visible?treff.concat(treffTrond):treff,false).length>0;
+      }
+      if(paa!==hover){hover=paa;cv.style.pointerEvents=paa?'auto':'none';if(paa&&!akt&&!RO)F.sq.v+=2.2;}
+    }
+    window.addEventListener('mousemove',e=>{
+      mus.x=e.clientX;mus.y=e.clientY;
+      if(rafM||rot.classList.contains('av'))return;
+      rafM=requestAnimationFrame(()=>{rafM=0;treffTest();});
+    },{passive:true});
+
+    let sist=performance.now(),rolegRamme=0,daud=false,n=0;
+    cv.addEventListener('webglcontextlost',e=>{e.preventDefault();daud=true;rot.classList.remove('k3d');});
+    function loop(no){
+      if(daud)return;
+      requestAnimationFrame(loop);
+      if(rot.classList.contains('av'))return;
+      const dt=Math.min(.05,(no-sist)/1000);
+      // I ro: 30 bilete i sekundet er nok til pust og svai
+      if(!akt&&!hover&&!rot.classList.contains('prat')&&!rot.classList.contains('tenk')&&(no-sist)<30)return;
+      sist=no;
+      const rorer=ramme(dt);
+      // Figuren kan flytte seg under ein musepeikar som står i ro
+      if(inni&&++n%8===0)treffTest();
+      if(RO&&!rorer&&rolegRamme++>2)return;
+      if(rorer)rolegRamme=0;
+      R.render(scene,cam);
+    }
+    requestAnimationFrame(loop);
+
+    return {
+      el:cv,
+      midt:[.55,.62],   // kroppen sin plass i lerretet, til dekt()
+      spel(k){if(k==='vift'&&akt&&akt.n==='inn')return;start(k);},
+      trond(paa){trondG.visible=!!paa;},
+      sjaa(dx,dy,ms){laastTil=performance.now()+ms;laasU=dx*.5;laasV=-dy*.45;},
+    };
+  }
 })();
 
 </script>
