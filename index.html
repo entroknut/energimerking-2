@@ -502,6 +502,45 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 #hintbar #hintText{min-width:0;line-height:1.45}
 #hintbar #modeLabel{flex-shrink:0}
 
+/* ── Klips — energimerkingsassistenten nede til venstre på lerretet ──
+   Berre figuren, boblen og mini-knappen tek imot musa; resten av boksen
+   slepp klikka gjennom til teikninga. */
+#klips{position:absolute;left:12px;bottom:10px;z-index:5;pointer-events:none;font-family:inherit}
+#klipsFig{display:block;width:92px;height:128px;pointer-events:all;cursor:pointer;transform-origin:50% 100%;transition:transform .18s;filter:drop-shadow(0 2px 3px rgba(16,24,40,.12))}
+#klipsFig:hover{transform:translateY(-3px)}
+#klips.inn #klipsFig{animation:klipsInn .55s cubic-bezier(.3,1.5,.5,1)}
+#klips.vift #klipsFig{animation:klipsVift .7s ease-in-out}
+#klips.feir #klipsFig{animation:klipsHopp .5s ease-in-out 3}
+@keyframes klipsInn{0%{transform:translateY(40px) scale(.8);opacity:0}100%{transform:none;opacity:1}}
+@keyframes klipsVift{0%,100%{transform:none}25%{transform:rotate(-6deg)}60%{transform:rotate(5deg)}}
+@keyframes klipsHopp{0%,100%{transform:none}50%{transform:translateY(-14px)}}
+#klipsFig .k-auge{transform-box:fill-box;transform-origin:50% 50%;animation:klipsBlunk 5.5s infinite}
+@keyframes klipsBlunk{0%,95%,100%{transform:none}97%{transform:scaleY(.1)}}
+#klipsFig .k-bryn{transition:transform .25s}
+#klips.prat #klipsFig .k-bryn{transform:translateY(-4px)}
+#klipsBoble{position:absolute;left:96px;bottom:74px;width:300px;max-width:calc(100vw - 140px);background:#fff;border:1px solid var(--border2);border-radius:14px;box-shadow:var(--shadow-md);padding:12px 14px 12px;pointer-events:all;display:none;color:var(--text)}
+#klips.prat #klipsBoble{display:block;animation:klipsBoble .22s ease-out}
+@keyframes klipsBoble{0%{opacity:0;transform:translateY(6px) scale(.97)}100%{opacity:1;transform:none}}
+#klipsBoble::before,#klipsBoble::after{content:"";position:absolute;left:-11px;bottom:18px;border:10px solid transparent;border-right-color:var(--border2);border-left:0}
+#klipsBoble::after{left:-9px;border-right-color:#fff}
+.k-topp{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-bottom:6px}
+.k-topp b{color:#32595e;font-weight:600;font-size:12px}
+.k-topp .entro-ikon{width:9px;height:14px}
+.k-lukk{margin-left:auto;border:none;background:none;color:var(--text3);font-size:16px;line-height:1;cursor:pointer;padding:0 2px;font-family:inherit}
+.k-lukk:hover{color:var(--text)}
+.k-tittel{font-size:13px;font-weight:600;margin-bottom:4px}
+.k-tekst{font-size:12px;line-height:1.5;color:var(--text2)}
+.k-knappar{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.k-knappar button{font:inherit;font-size:12px;border-radius:7px;padding:5px 12px;cursor:pointer;border:1px solid var(--border2);background:#fff;color:var(--text)}
+.k-knappar button:hover{background:#f4f6f8}
+.k-knappar button.k-hovud{background:#32595e;border-color:#32595e;color:#fff;font-weight:600}
+.k-knappar button.k-hovud:hover{background:#26464a}
+.k-av{margin-left:auto;border:none!important;background:none!important;color:var(--text3)!important;font-size:11px!important;padding:5px 2px!important;text-decoration:underline}
+#klipsMini{display:none;pointer-events:all;width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:rgba(255,255,255,.92);box-shadow:var(--shadow-sm);cursor:pointer;padding:0;align-items:center;justify-content:center;opacity:.75}
+#klipsMini:hover{opacity:1}
+#klips.av #klipsFig,#klips.av #klipsBoble{display:none!important}
+#klips.av #klipsMini{display:flex}
+@media (prefers-reduced-motion:reduce){#klipsFig,#klipsFig *,#klipsBoble{animation:none!important;transition:none!important}}
 /* ── Scale badge ── */
 #scaleBadge{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.92);border:1px solid var(--border);border-radius:999px;padding:4px 12px;font-size:11px;color:var(--text2);pointer-events:none;box-shadow:var(--shadow-sm);backdrop-filter:blur(8px);font-weight:500;font-family:inherit;font-variant-numeric:tabular-nums;transition:all .2s}
 #scaleBadge.uncal{color:#92400e;border-color:#fcd34d;background:#fffbeb;pointer-events:all;cursor:pointer;font-size:12px;font-weight:600;padding:6px 14px;box-shadow:0 1px 4px rgba(245,158,11,.25);animation:pulseWarn 2.5s ease-in-out infinite}
@@ -1037,7 +1076,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.16.3</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.17.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -1049,6 +1088,48 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div id="slippFlate"><b id="slippTittel">Slepp filene her</b><span id="slippTekst"></span></div>
     <div id="lasteKort" role="status" aria-live="polite"><div class="lk-topp"><div class="lk-spin"></div><div style="min-width:0;flex:1"><div class="lk-tittel"></div><div class="lk-tekst"></div></div></div><div class="lk-bar"><div class="lk-fyll"></div></div></div>
     <div id="scaleBadge" class="uncal">Ikkje kalibrert</div>
+    <div id="klips" class="av">
+      <div id="klipsBoble" role="status" aria-live="polite">
+        <div class="k-topp"><span class="entro-ikon" aria-hidden="true"></span><b>Klips</b>· Entro energimerking<button class="k-lukk" id="klipsLukk" title="Lukk">×</button></div>
+        <div class="k-tittel" id="klipsTittel"></div>
+        <div class="k-tekst" id="klipsTekst"></div>
+        <div class="k-knappar" id="klipsKnappar"></div>
+      </div>
+      <svg id="klipsFig" viewBox="24 54 232 322" role="img" aria-label="Klips — klikk for eit tips"><title>Klips — klikk for eit tips</title>
+        <defs><path id="kLogo" d="M95.5 0 99.9 0 101.9 4 100.7 25 102.7 48 106.6 63 121.2 102 124.2 117 124.3 130 122.2 143 116.3 159 110.2 169 101.8 179 92 187.1 81 193.3 70 197.2 58 199.4 44 199.2 28 195 20.4 191 11.4 183 5.7 175 .7 162-.4 151 .8 138 3.6 128 10 115.3 19 104 25 98.8 31 94.8 60 79.6 69 72.7 71 72 74 73.1 75.3 75 75.4 78 74 83 71.9 87 64.2 97 48.4 112 42.5 121 39.5 128 37.6 136 36.6 149 37.8 157 40.9 164 46 169.1 51 171.4 58 171.6 63 170.4 70 166.2 76.3 159 80.3 152 84.4 142 86.4 133 87.4 122 86.2 104 80.6 71 79.7 56 80.6 43 82.6 32 87 17 91 7.1Z"/>
+        <path id="kTraad" d="M178 176 L178 300 Q178 318 191 318 Q204 318 204 300 L204 140 Q204 116 182 116 Q160 116 160 140 L160 326 Q160 356 189 356 Q218 356 218 326 L218 160"/></defs>
+        <ellipse cx="192" cy="368" rx="60" ry="6" fill="rgba(16,24,40,.10)"/>
+        <g id="klipsMerke" transform="translate(30 214) rotate(-8)">
+          <rect width="98" height="136" rx="6" fill="#fff" stroke="#cfd6dd"/>
+          <use href="#kLogo" transform="translate(9 7) scale(.07)" fill="#32595e"/>
+          <text x="22" y="18" font-size="9" font-weight="600" fill="#32595e">Energimerke</text>
+          <rect x="8" y="28" width="34" height="12" rx="2" fill="#3B6D11"/><rect x="8" y="43" width="42" height="12" rx="2" fill="#639922"/><rect x="8" y="58" width="50" height="12" rx="2" fill="#97C459"/><rect x="8" y="73" width="58" height="12" rx="2" fill="#FAC775"/><rect x="8" y="88" width="66" height="12" rx="2" fill="#EF9F27"/><rect x="8" y="103" width="74" height="12" rx="2" fill="#D85A30"/><rect x="8" y="118" width="82" height="12" rx="2" fill="#A32D2D"/>
+          <g font-size="9" font-weight="600"><text x="12" y="37.5" fill="#fff">A</text><text x="12" y="52.5" fill="#fff">B</text><text x="12" y="67.5" fill="#173404">C</text><text x="12" y="82.5" fill="#412402">D</text><text x="12" y="97.5" fill="#412402">E</text><text x="12" y="112.5" fill="#fff">F</text><text x="12" y="127.5" fill="#fff">G</text></g>
+          <path d="M72 43h14l6 6-6 6H72z" fill="#32595e"/>
+        </g>
+        <path d="M160 268 Q142 270 128 258" fill="none" stroke="#444441" stroke-width="9" stroke-linecap="round"/>
+        <path d="M160 268 Q142 270 128 258" fill="none" stroke="#D3D1C7" stroke-width="3.5" stroke-linecap="round"/>
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <use href="#kTraad" stroke="rgba(16,24,40,.22)" stroke-width="11" transform="translate(2 3)"/>
+          <use href="#kTraad" stroke="#5F5E5A" stroke-width="10"/>
+          <use href="#kTraad" stroke="#B4B2A9" stroke-width="6"/>
+          <use href="#kTraad" stroke="#F1EFE8" stroke-width="2" transform="translate(-1.5 -1)"/>
+        </g>
+        <g class="k-auge"><ellipse cx="170" cy="154" rx="17" ry="21" fill="#fff" stroke="#2C2C2A" stroke-width="2"/>
+          <g id="klipsPupL"><circle cx="170" cy="154" r="7.5" fill="#2C2C2A"/><circle cx="173" cy="150.5" r="2.6" fill="#fff"/><circle cx="167.5" cy="158" r="1.1" fill="#fff"/></g></g>
+        <g class="k-auge"><ellipse cx="212" cy="154" rx="17" ry="21" fill="#fff" stroke="#2C2C2A" stroke-width="2"/>
+          <g id="klipsPupR"><circle cx="212" cy="154" r="7.5" fill="#2C2C2A"/><circle cx="215" cy="150.5" r="2.6" fill="#fff"/><circle cx="209.5" cy="158" r="1.1" fill="#fff"/></g></g>
+        <g class="k-bryn" fill="none" stroke="#2C2C2A" stroke-width="3.5" stroke-linecap="round"><path d="M150 128 Q163 118 182 126"/><path d="M199 122 Q215 113 231 121"/></g>
+        <g transform="rotate(-10 192 104)">
+          <path d="M150 108 Q150 62 192 62 Q234 62 234 108Z" fill="#32595e" stroke="#1f3a3d" stroke-width="1.5"/>
+          <path d="M180 64 Q192 60 204 64 L204 108 L180 108Z" fill="#3d6b71"/>
+          <path d="M160 92 Q164 74 180 67" fill="none" stroke="#7fa3a6" stroke-width="3" stroke-linecap="round" opacity=".8"/>
+          <path d="M136 106 Q192 122 248 106 L249 112 Q192 128 135 112Z" fill="#26464a" stroke="#1f3a3d" stroke-width="1.2"/>
+          <use href="#kLogo" transform="translate(185 72) scale(.12)" fill="#fff"/>
+        </g>
+      </svg>
+      <button id="klipsMini" title="Slå på Klips, energimerkingsassistenten"><svg width="14" height="22" viewBox="0 0 14 22" aria-hidden="true"><path d="M5 6v10a2 2 0 0 0 4 0V3.5a2.5 2.5 0 0 0-5 0V17a4 4 0 0 0 8 0V6" fill="none" stroke="#5F5E5A" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    </div>
     <canvas id="compassCanvas" class="plan-only" width="96" height="96" title="Nordpila — dra for å justere kva veg nord peikar"></canvas>
     <button id="compassNordBtn" class="plan-only" title="Hald inne for å sjå planteikninga med nord opp (som kart)" style="position:absolute;bottom:14px;right:122px;height:28px;padding:0 10px;font-size:11px;font-weight:600;font-family:inherit;background:rgba(255,255,255,.92);border:1px solid var(--border2);border-radius:7px;color:var(--text2);cursor:pointer;box-shadow:var(--shadow-sm);backdrop-filter:blur(6px);white-space:nowrap;transition:all .12s;display:flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M10.5 5.5 9 9l-3.5 1.5L7 7z" stroke-linejoin="round"/></svg> Nord-sjekk</button>
 
@@ -18417,6 +18498,7 @@ const ANSVARLEG_KEY='sxiAnsvarleg';
     dlg.style.display='none';
     // 🎉 Konfetti!
     launchConfetti();
+    if(window.Klips)window.Klips.feir();
   };
 })();
 
@@ -20330,6 +20412,183 @@ function printFasadeView(){
     if(map&&mapLoaded){map.easeTo({bearing:-deg,duration:400});refreshZones();}
   };
 
+})();
+
+// ── 2f. Klips — energimerkingsassistenten ────────────────────────
+// Ein binders med Entro-hjelm nede til venstre på lerretet. Han seier frå om
+// ting som gjer energimerket feil (manglande skala, for store opningar,
+// kategori, nord) og har elles nokre «visste du»-tips når ein klikkar på han.
+// Berre visning: han les tilstanden og trykkjer på dei same knappane som
+// brukaren, og endrar aldri prosjektet sjølv.
+//
+// Reglane er med vilje varsame — den opphavlege Clippy vart hata fordi han
+// avbraut. Difor: ingen tips medan brukaren teiknar, drar eller nettopp har
+// gjort noko (KLIPS_ROLEG), minst KLIPS_PAUSE mellom to automatiske tips,
+// «Seinare» gjeld til økta er slutt, og «Slå av» vert hugsa i nettlesaren.
+(function(){
+  const rot=document.getElementById('klips');if(!rot)return;
+  const fig=document.getElementById('klipsFig'),boble=document.getElementById('klipsBoble');
+  const tittelEl=document.getElementById('klipsTittel'),tekstEl=document.getElementById('klipsTekst'),knappEl=document.getElementById('klipsKnappar');
+  const KLIPS_ROLEG=2500,KLIPS_PAUSE=20000,KLIPS_TAKT=1500;
+  const lsHent=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
+  const lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(e){}};
+  let sistAktiv=Date.now(),sistTips=0,vist=null,vdIdx=0;
+  const utsett=new Set();   // regel-nøklar brukaren har sagt «Seinare» til i denne økta
+
+  // Alle soner på alle etasjar. Den aktive etasjen les `zones`-aliaset (same
+  // fella som _fyllFraPi), og fasadevisinga har ingen soner på lerretet.
+  const alleSoner=()=>floors.flatMap((f,i)=>(i===activeFloor&&viewMode==='plan'?zones:f.zones)||[]);
+  const tilSone=z=>{if(viewMode==='plan')saveFloorState();visSonekort(z);};
+  const trykk=id=>{const b=document.getElementById(id);if(b)b.click();};
+
+  // Prioritert: den fyrste regelen som slår til vert vist. `key` skil mellom
+  // ulike tilfelle av same regel (eitt ark, éi sone), så eit nytt problem
+  // kjem fram sjølv om brukaren har utsett eit liknande.
+  const REGLAR=[
+    {id:'helsa',sjekk:()=>!lsHent('klipsHelsa')&&{key:'helsa',
+      tittel:'Hei, eg er Klips!',
+      tekst:'Eg er energimerkingsassistenten til Entro. Eg seier frå når noko kan gjere energimerket feil, og elles held eg meg i ro. Klikk på meg om du vil ha eit tips.',
+      knappar:[{t:'Kjekt å vite',hovud:true,gjer:()=>lsSet('klipsHelsa','1')}],utanSeinare:true}},
+    {id:'skala',sjekk:()=>bgImg&&!mmPerImgPx&&mode!=='calibrate'&&{key:'skala:'+viewMode+':'+(viewMode==='plan'?curFloor().id:activeFasade),
+      tittel:'Det ser ut som du har lasta opp ei teikning!',
+      tekst:(viewMode==='fasade'?'Fasadearket':'Teikninga')+' manglar skala, så alle areal og veggengder vert feil i energimerket. Kalibrer fyrst. Det tek ti sekund.',
+      knappar:[{t:'Kalibrer no',hovud:true,gjer:()=>trykk('calBtn')}]}},
+    {id:'arkSkala',sjekk:()=>{
+      if(viewMode!=='plan')return null;
+      const i=floors.findIndex((f,j)=>j!==activeFloor&&(f.bgImg||f.bgImgData)&&!mppForFloor(f));
+      if(i<0)return null;const f=floors[i];
+      return {key:'arkSkala:'+f.id,tittel:arkNamn(f)+' manglar skala',
+        tekst:'Areala på det arket vert ikkje rekna rett før det er kalibrert, og dei går rett inn i energimerket.',
+        knappar:[{t:'Gå til arket',hovud:true,gjer:()=>switchFloor(i)}]};}},
+    {id:'opningar',sjekk:()=>{
+      for(const z of alleSoner()){
+        const g=fasadarMedForStoreOpningar(z);
+        if(g.length)return {key:'opn:'+_zuk(z),tittel:'Vindauga får ikkje plass',
+          tekst:'I «'+z.name+'» er opningane større enn fasaden '+g[0].namn+' ('+g[0].opn.toFixed(1).replace('.',',')+' m² mot '+g[0].area.toFixed(1).replace('.',',')+' m²). SXI-eksporten stoppar til det er retta.',
+          knappar:[{t:'Vis sona',hovud:true,gjer:()=>tilSone(z)}]};
+      }
+      return null;}},
+    {id:'kategori',sjekk:()=>{
+      const s=alleSoner();if(!s.length||s.some(z=>z.bygkat))return null;
+      return {key:'kat',tittel:'Kva slags bygg er dette?',
+        tekst:'Ingen av sonene har fått bygningskategori, så alle går til SIMIEN som kontorbygg. Er det ikkje eit kontorbygg, vert energimerket feil.',
+        knappar:[{t:'Vis sonekortet',hovud:true,gjer:()=>tilSone(s[0])},{t:'Det er kontor',gjer:()=>utsett.add('kat')}],utanSeinare:true};}},
+    {id:'vindauge',sjekk:()=>{
+      const s=alleSoner();if(s.length<1||s.some(z=>(z.windows||[]).length)||mode==='window')return null;
+      return {key:'vindauge',tittel:'Neste steg: vindauge og dører',
+        tekst:'Sonene er på plass. Legg inn vindauge og dører på fasadane, så får SIMIEN rett glasandel og varmetap.',
+        knappar:[{t:'Legg til vindauge',hovud:true,gjer:()=>trykk('winBtn')}]};}},
+    {id:'nord',sjekk:()=>{
+      if(globalNorth!==0||!alleSoner().some(z=>(z.windows||[]).length))return null;
+      return {key:'nord',tittel:'Peikar nord rett opp?',
+        tekst:'Nordpila står på 0°. Fasaderetningane, og dermed soltilskotet i SIMIEN, følgjer pila. Dra kompasset nede til høgre om teikninga ikkje har nord opp.',
+        knappar:[{t:'Det stemmer',hovud:true,gjer:()=>utsett.add('nord')}],utanSeinare:true};}},
+  ];
+  const VISSTE_DU=[
+    'Hald Shift medan du teiknar, så låser linja seg til 90° og 45°.',
+    'Teiknar du ei sone inntil ei anna, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.',
+    'Klikk på ei sone i teikninga, så finn du sonekortet hennar i sidepanelet.',
+    'Alt+klikk på ein seksjon i sonekortet opnar eller lukkar han i alle sonene samstundes.',
+    '⌖ Snap festar punktet til veggkryss i planteikninga. Slå han av om han tek feil hjørne.',
+    '☰ Listebasert redigering lèt deg endre mange vindauge eller soner på ein gong.',
+    'Høgreklikk på etasjefana for å kopiere ein heil etasje over i eit anna prosjekt.',
+    'Ei SXI-fil med vindauge som er større enn fasaden vert stoppa. Eg seier frå før du kjem så langt.',
+  ];
+
+  function aktivtTips(){
+    for(const r of REGLAR){
+      let t=null;try{t=r.sjekk();}catch(e){t=null;}
+      if(t&&!utsett.has(t.key))return t;
+    }
+    return null;
+  }
+  function vis(t,auto){
+    vist=t;sistTips=Date.now();
+    tittelEl.textContent=t.tittel;tekstEl.textContent=t.tekst;
+    knappEl.textContent='';
+    const lukk=()=>{if(t.key&&!t.utanSeinare)utsett.add(t.key);skjul();};
+    (t.knappar||[]).forEach(k=>{
+      const b=document.createElement('button');b.textContent=k.t;if(k.hovud)b.className='k-hovud';
+      b.onclick=()=>{skjul();if(t.key&&t.utanSeinare)utsett.add(t.key);k.gjer();};
+      knappEl.appendChild(b);
+    });
+    if(t.key&&!t.utanSeinare){const b=document.createElement('button');b.textContent='Seinare';b.onclick=lukk;knappEl.appendChild(b);}
+    const av=document.createElement('button');av.className='k-av';av.textContent='Slå av Klips';av.onclick=()=>settAv(true);knappEl.appendChild(av);
+    document.getElementById('klipsLukk').onclick=()=>{if(t.key==='helsa')lsSet('klipsHelsa','1');if(t.key)utsett.add(t.key);skjul();};
+    rot.classList.add('prat');
+    spel(auto?'inn':'vift');
+    sjaaPaa(1,-1,1400);   // ser opp mot boblen ei stund
+  }
+  function skjul(){vist=null;rot.classList.remove('prat');}
+  function spel(k){rot.classList.remove('inn','vift','feir');void rot.offsetWidth;rot.classList.add(k);}
+
+  // Står det ein dialog eller eit overlegg oppå figuren, held han seg stille.
+  function dekt(){
+    const r=fig.getBoundingClientRect();if(!r.width)return true;
+    const el=document.elementFromPoint(r.left+r.width/2,r.top+r.height*0.6);
+    return !el||!rot.contains(el);
+  }
+  function roleg(){
+    return Date.now()-sistAktiv>KLIPS_ROLEG&&!dragging&&!curPts.length&&!calPts.length&&!measurePts.length
+      &&document.visibilityState==='visible'&&!dekt();
+  }
+  setInterval(()=>{
+    if(rot.classList.contains('av'))return;
+    if(vist&&vist.key){
+      // Problemet er løyst (t.d. kalibrert) — boblen går bort av seg sjølv
+      const no=aktivtTips();if(!no||no.key!==vist.key){if(vist.key!=='helsa')skjul();}
+      return;
+    }
+    if(vist||Date.now()-sistTips<KLIPS_PAUSE||!roleg())return;
+    const t=aktivtTips();if(t)vis(t,true);
+  },KLIPS_TAKT);
+
+  ['pointerdown','keydown','wheel'].forEach(ev=>window.addEventListener(ev,e=>{if(!rot.contains(e.target))sistAktiv=Date.now();},true));
+
+  fig.addEventListener('click',()=>{
+    if(vist){skjul();return;}
+    const t=aktivtTips();
+    if(t)vis(t,false);
+    else vis({key:null,tittel:'Visste du at …',tekst:VISSTE_DU[vdIdx++%VISSTE_DU.length],
+      knappar:[{t:'Fleire tips',hovud:true,gjer:()=>setTimeout(()=>fig.dispatchEvent(new Event('click')),0)}]},false);
+  });
+
+  // Auga følgjer musa — litt, slik Clippy gjorde
+  const pL=document.getElementById('klipsPupL'),pR=document.getElementById('klipsPupR');
+  let laastTil=0,rafP=0,mx=0,my=0;
+  function sjaaPaa(dx,dy,ms){laastTil=Date.now()+ms;const s=`translate(${dx*4.5} ${dy*3.5})`;pL.setAttribute('transform',s);pR.setAttribute('transform',s);}
+  window.addEventListener('mousemove',e=>{
+    mx=e.clientX;my=e.clientY;
+    if(rafP||rot.classList.contains('av'))return;
+    rafP=requestAnimationFrame(()=>{rafP=0;
+      if(Date.now()<laastTil)return;
+      const r=fig.getBoundingClientRect();if(!r.width)return;
+      const cx=r.left+r.width*0.62,cy=r.top+r.height*0.31;
+      const dx=mx-cx,dy=my-cy,d=Math.hypot(dx,dy)||1,k=Math.min(1,d/160);
+      const s=`translate(${(dx/d*4.5*k).toFixed(2)} ${(dy/d*3.5*k).toFixed(2)})`;
+      pL.setAttribute('transform',s);pR.setAttribute('transform',s);
+    });
+  });
+
+  function settAv(av){
+    rot.classList.toggle('av',av);lsSet('klipsAv',av?'1':null);
+    if(av){skjul();if(typeof hintText!=='undefined')hintText.textContent='Klips er slått av. Klikk på binderset nede til venstre for å slå han på att.';}
+    else{sistTips=0;spel('inn');}
+  }
+  document.getElementById('klipsMini').onclick=()=>settAv(false);
+  rot.classList.toggle('av',lsHent('klipsAv')==='1');
+  if(!rot.classList.contains('av'))spel('inn');
+
+  window.Klips={
+    // Kalla etter ein vellukka SXI-eksport
+    feir(){
+      if(rot.classList.contains('av'))return;
+      vis({key:null,tittel:'SXI-fila er klar!',tekst:'Lukke til med energimerket. Hugs å sjekke resultatet i SIMIEN før du sender det inn.',
+        knappar:[{t:'Takk, Klips',hovud:true,gjer:()=>{}}]},false);
+      spel('feir');
+    },
+    vis:()=>fig.dispatchEvent(new Event('click')),
+  };
 })();
 
 </script>

@@ -1543,6 +1543,29 @@ triangulert.
 - Prøvefila: 25 felt, ~23 ekte. Kjende manglar: persiennevindauge vert for
   låge, og lyse flekkar inne (lamper) kan gi små falske felt.
 
+## Klips (energimerkingsassistenten)
+
+Ein binders med Entro-hjelm nede til venstre på lerretet (`#klips`, koden
+under `// ── 2f.`), inspirert av Clippy. Logoen er `--entro-ikon` spora til
+ein vektorbane (`#kLogo`), så han er skarp i alle storleikar. Med begge
+modusane.
+
+- **Berre visning.** Han les tilstanden og trykkjer på dei same knappane som
+  brukaren (`calBtn`, `winBtn`, `visSonekort`, `switchFloor`) — han endrar
+  aldri prosjektet sjølv.
+- `REGLAR` er prioritert: fyrste regel som slår til vert vist. `key` skil
+  tilfella (ark-id, `_zuk(z)`), så eit nytt problem kjem fram sjølv om eit
+  liknande er utsett. Ny regel: legg han inn der.
+- `fasadarMedForStoreOpningar` er same sjekk som stoppar eksporten.
+- Aldri irriterande: ingen automatiske tips medan brukaren teiknar/drar
+  (`curPts`, `calPts`, `measurePts`, `dragging`), før 2,5 s utan aktivitet,
+  eller oftare enn kvart 20. s. Ligg ein dialog oppå figuren
+  (`elementFromPoint`), teier han. «Seinare» gjeld økta; boblen går bort av
+  seg sjølv når problemet er løyst.
+- `localStorage`: `klipsAv` (slått av → mini-knapp) og `klipsHelsa`.
+  Ingenting i prosjektfila.
+- `Klips.feir()` vert kalla etter vellukka SXI-eksport.
+
 ## Kjende manglar / ikkje implementert
 
 - Import av eksisterande SXI
