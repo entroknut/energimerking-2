@@ -1565,6 +1565,15 @@ modusane.
 - `localStorage`: `klipsAv` (slått av → mini-knapp) og `klipsHelsa`.
   Ingenting i prosjektfila.
 - `Klips.feir()` vert kalla etter vellukka SXI-eksport.
+- **Spør Klips (berre EntroPi, `#klipsSpor.embed-only`)**: fritekst-spørsmål via
+  `EntroHost.askAi({oppgave:'hjelp'})`. Billeg med vilje: ingen bilete,
+  `maxTokens` 700, prompten er `KLIPS_KUNNSKAP` (kort grunnlag om programmet)
+  + éi linje tilstand + spørsmålet. Verten sender `hjelp` til
+  `claude-haiku-5-5` med `effort:'low'` (docs/entropi-integrasjon.md). Modellen
+  svarar `{omProgrammet,svar}` og avviser alt som ikkje gjeld programmet.
+  Eitt spørsmål om gongen, likt spørsmål i økta vert svara frå `svarMinne`.
+  Ny funksjon i programmet ⇒ éi setning i `KLIPS_KUNNSKAP`, elles veit ikkje
+  Klips om han.
 
 ## Kjende manglar / ikkje implementert
 

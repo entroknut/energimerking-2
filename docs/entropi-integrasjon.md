@@ -51,7 +51,7 @@ plukkar lyttaren opp meldingar frå andre bibliotek (Mapbox, React DevTools).
 | `sxi:save` | `requestId`, `auto`, `filename`, `bytes`, `blob`, `meta` | brukaren trykte «Lagre» (eller EntroPi bad om det). **Må** svarast med `sxi:save-result`. |
 | `sxi:request-systems` | `requestId` | brukaren opna «Hent tekniske systemer». Svar med `sxi:systems`. Verktøyet ventar 12 s, så gir det opp og seier det til brukaren. |
 | `sxi:export-sxi` | `filename`, `bytes`, `blob`, `meta` | SXI-fila til SIMIEN vart eksportert. Kjem berre om init hadde `wantsSxi:true`. Krev ikkje svar. |
-| `sxi:ai-request` | `requestId`, `oppgave`, `prompt`, `images`, `schema`, `maxTokens`, `meta` | KI-oppteikninga (beta) treng eit svar frå Claude. **Må** stadfestast med `sxi:ai-ack` innan 15 s og svarast med `sxi:ai-result`. Sjå «KI-oppteikning». |
+| `sxi:ai-request` | `requestId`, `oppgave`, `prompt`, `images`, `schema`, `maxTokens`, `meta` | KI-oppteikninga eller «Spør Klips» (`oppgave:'hjelp'`) treng eit svar frå Claude. **Må** stadfestast med `sxi:ai-ack` innan 15 s og svarast med `sxi:ai-result`. Sjå «KI-oppteikning». |
 
 `meta` på `sxi:save`: `{floors, zones, braM2, adresse, savedAt, appVersion}` —
 nok til å vise «3 etasjar · 12 soner · 2 480 m²» på byggkortet utan å opne fila.
@@ -378,7 +378,7 @@ Knappen er `.embed-only`, så funksjonen finst berre inne i EntroPi.
 
 ```js
 { type:'sxi:ai-request', requestId:'ki3',
-  oppgave:'soner',          // 'soner' | 'opningar' | 'fasade' — til logging og grenser
+  oppgave:'soner',          // 'soner' | 'opningar' | 'fasade' | 'hjelp' — vel modell og grenser
   prompt:'…',               // ferdig tekst, nynorsk
   images:[{mediaType:'image/jpeg', data:'<base64>'}],   // 1–2 bilete, ≤ 2400 px
   schema:{…},               // JSON-skjema for svaret (structured outputs)
@@ -401,6 +401,22 @@ const client = new Anthropic();   // ANTHROPIC_API_KEY frå miljøet
 export async function POST(req: Request) {
   // Krev innlogga brukar, og avgrens: maks 2 bilete, maks ~6 MB, maxTokens ≤ 32000.
   const d = await req.json();
+  // «Spør Klips»: korte tekstsvar om programmet. Billegaste modell, låg
+  // innsats, ingen bilete — eitt spørsmål kostar ein brøkdel av ei øre.
+  if (d.oppgave === 'hjelp') {
+    if ((d.images ?? []).length || d.prompt.length > 12000)
+      return Response.json({ ok: false, message: 'Ugyldig hjelpespørsmål.' });
+    const msg = await client.messages.create({
+      model: 'claude-haiku-5-5',
+      max_tokens: Math.min(d.maxTokens ?? 700, 1000),
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: d.schema } },
+      messages: [{ role: 'user', content: d.prompt }],
+    });
+    if (msg.stop_reason !== 'end_turn')
+      return Response.json({ ok: false, message: 'Klips fekk ikkje svart på det.' });
+    const text = msg.content.filter(c => c.type === 'text').map(c => c.text).join('');
+    return Response.json({ ok: true, result: JSON.parse(text) });
+  }
   const msg = await client.beta.messages.create({
     model: 'claude-opus-5-5',
     max_tokens: Math.min(d.maxTokens ?? 16000, 32000),
@@ -424,6 +440,15 @@ export async function POST(req: Request) {
 React-sida sender `sxi:ai-ack` når meldinga kjem, poster til ruta, og sender
 `{type:'sxi:ai-result', requestId, ...svaret}` tilbake til iframen.
 
+- **«Spør Klips» (`oppgave:'hjelp'`)** er eit spørjefelt i boblen til
+  hjelpefiguren. Berre tekst (ingen bilete), `maxTokens` 700, og prompten er
+  eit kort kunnskapsgrunnlag om programmet (~1000 token) + spørsmålet. Ruta
+  skal sende det til den billegaste modellen (`claude-haiku-5-5`, `effort:'low'`)
+  — med Haiku 5.5 sine prisar (0,10 / 0,50 USD per million token) kostar eitt
+  spørsmål om lag 0,0005 USD. Modellen avviser spørsmål som ikkje gjeld
+  programmet (`omProgrammet:false`). Verktøyet sender eitt spørsmål om gongen
+  og hugsar svaret på eit likt spørsmål i økta, så det vert ikkje sendt to gonger.
+  Ruta bør likevel ha ei grense per brukar (t.d. 50 spørsmål per dag).
 - **Modellen vel verten**, ikkje verktøyet. Ein analyse med to bilete på
   `effort:'high'` tek gjerne 30–120 s; kortare tidsavbrot enn 6 min på
   vertssida vil gi feil på store teikningar.
@@ -625,7 +650,7 @@ export function Energimerking({ bygg, brukar, onClose }: { bygg: Bygg; brukar: B
           try {
             const res = await fetch('/api/sxi/ki', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ prompt: d.prompt, images: d.images,
+              body: JSON.stringify({ oppgave: d.oppgave, prompt: d.prompt, images: d.images,
                                      schema: d.schema, maxTokens: d.maxTokens }),
             });
             const svar = await res.json();     // {ok, result} eller {ok:false, message}
