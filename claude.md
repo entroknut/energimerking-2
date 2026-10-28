@@ -1562,7 +1562,14 @@ modusane.
   eller oftare enn kvart 20. s. Ligg ein dialog oppå figuren
   (`elementFromPoint`), teier han. «Seinare» gjeld økta; boblen går bort av
   seg sjølv når problemet er løyst.
-- `localStorage`: `klipsAv` (slått av → mini-knapp) og `klipsHelsa`.
+- **Tre nivå:** `REGLAR` (problem — alltid fyrst), `KONTEKST` (tips knytte
+  til modus/tilstand: teikning, vindauge, fasadevising, «nord før du teiknar»,
+  KI-oppteikning og fasadar i EntroPi, mange teikningar på ein gong …) og
+  `VISSTE_DU` (generelle, `pi:true` = berre i EntroPi). Eit kontekst-tips vert
+  vist av seg sjølv éin gong per nettlesar (`klipsSett`) og går bort når
+  `naar()` vert usann (t.d. ut av teiknemodus). Klikk på figuren går gjennom
+  dei som passar no, så «visste du».
+- `localStorage`: `klipsAv` (slått av → mini-knapp), `klipsHelsa` og `klipsSett`.
   Ingenting i prosjektfila.
 - `Klips.feir()` vert kalla etter vellukka SXI-eksport.
 - **Spør Klips (berre EntroPi, `#klipsSpor.embed-only`)**: fritekst-spørsmål via

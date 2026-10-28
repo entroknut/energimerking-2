@@ -1088,7 +1088,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.18.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.19.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -20466,6 +20466,7 @@ function printFasadeView(){
   const lsHent=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
   const lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(e){}};
   let sistAktiv=Date.now(),sistTips=0,vist=null,vdIdx=0;
+  const vistNo=new Set();   // kontekst-tips vist ved klikk i denne runden, før vi går over til «visste du»
   const utsett=new Set();   // regel-nøklar brukaren har sagt «Seinare» til i denne økta
 
   // Alle soner på alle etasjar. Den aktive etasjen les `zones`-aliaset (same
@@ -20517,15 +20518,71 @@ function printFasadeView(){
         tekst:'Nordpila står på 0°. Fasaderetningane, og dermed soltilskotet i SIMIEN, følgjer pila. Dra kompasset nede til høgre om teikninga ikkje har nord opp.',
         knappar:[{t:'Det stemmer',hovud:true,gjer:()=>utsett.add('nord')}],utanSeinare:true};}},
   ];
+  // Tips knytte til det brukaren held på med. Vert viste av seg sjølv ÉIN
+  // gong per nettlesar (klipsSett), etter problema i REGLAR og med same
+  // pause- og rolegreglar. Boblen går bort når situasjonen er over
+  // (naar() vert usann). Klikk på figuren viser dei att, sett eller ikkje.
+  const kal=()=>!!(bgImg&&mmPerImgPx);
+  const hovudEtasjar=()=>floors.filter(f=>!erDelplan(f)).length;
+  const KONTEKST=[
+    {id:'teikn',naar:()=>mode==='draw'&&viewMode==='plan',tittel:'Teiknetips',
+      tekst:'Klikk hjørna langs innsida av ytterveggen. Enter eller dobbeltklikk avsluttar, Esc avbryt. Hald Shift for rette vinklar, og ⌖ Snap festar punktet til veggkryss i teikninga.'},
+    {id:'nabo',naar:()=>mode==='draw'&&viewMode==='plan'&&alleSoner().length>0,tittel:'Teikn inntil nabosona',
+      tekst:'Legg du den nye sona kant i kant med ei som finst, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.'},
+    {id:'vindauge',naar:()=>mode==='window',tittel:'Vindaugstips',
+      tekst:'Klikk to punkt langs ein fasadevegg for breidda. Har veggen fleire like vindauge, set antal i staden for å teikne kvart: det blir éitt element i SIMIEN. Ctrl+C og Ctrl+V kopierer eit vindauge til ein annan vegg.'},
+    {id:'rediger',naar:()=>mode==='edit',tittel:'Redigere ei sone',
+      tekst:'Dra hjørna for å flytte dei, og høgreklikk på eit hjørne for å slette det. Vindauge og skiljeveggar følgjer med.'},
+    {id:'maal',naar:()=>mode==='measure',tittel:'Kontrollmål',
+      tekst:'Mål ein avstand du kjenner frå teikninga. Stemmer han, stemmer kalibreringa. Måla påverkar ikkje SXI-fila.'},
+    {id:'fasadevising',naar:()=>viewMode==='fasade',tittel:'Fasadeteikningar',
+      tekst:'Fasadearket har sin eigen skala, så kalibrer det for seg. «Side om side» viser plan og fasade samstundes, så du kan måle høgder medan du ser planen.'},
+    {id:'nord-fyrst',naar:()=>viewMode==='plan'&&kal()&&!alleSoner().length&&globalNorth===0,tittel:'Set himmelretninga før du teiknar',
+      tekst:'Skalaen er på plass. Neste steg: dra nordpila nede til høgre så ho peikar mot nord i teikninga. Fasaderetningane og soltilskotet i SIMIEN følgjer ho, og det er lettare å få rett no enn når alt er teikna.',
+      knappar:[{t:'Nord stemmer alt',hovud:true,gjer:()=>utsett.add('nord')}]},
+    {id:'ki-start',naar:()=>inPi()&&viewMode==='plan'&&kal()&&!alleSoner().length,tittel:'La KI-en teikne for deg',
+      tekst:'✦ KI-oppteikning teiknar soner, vindauge og dører frå planteikninga på nokre minutt. Du ser forslaget på lerretet og rettar eller godtek det før noko vert lagt inn.',
+      knappar:[{t:'Opne KI-oppteikning',hovud:true,gjer:()=>trykk('aiBtn')}]},
+    {id:'ki-fasade',naar:()=>inPi()&&viewMode==='plan'&&kal()&&!alleSoner().length&&!fasadar.length,tittel:'Har du fasadeteikningar?',
+      tekst:'Last dei opp òg. KI-oppteikninga les høgd og brystning på vindauga og etasjehøgdene frå fasadane, så du slepp å taste dei inn.'},
+    {id:'mange',naar:()=>!!bgImg&&floors.length===1&&!fasadar.length,tittel:'Har bygget fleire teikningar?',
+      tekst:'Du kan dra alle inn på lerretet samstundes: planar, delplanar, fasadar og PDF-ar med mange sider. Programmet gjettar etasje og type frå teksten i teikninga, og du rettar før noko vert lagt inn. Same val ligg under «+ Etasje» → «Legg inn mange teikningar».'},
+    {id:'kople',naar:()=>viewMode==='plan'&&hovudEtasjar()>1&&alleSoner().length>1&&!alleSoner().some(z=>z.groupId),tittel:'Same bruk over fleire etasjar?',
+      tekst:'⇌ Kople soner gjer soner med same kategori til éi SIMIEN-sone. Areal og geometri vert framleis rekna per etasje.',
+      knappar:[{t:'Opne Kople soner',hovud:true,gjer:()=>trykk('kopleBtn')}]},
+    {id:'eksport',naar:()=>alleSoner().filter(z=>(z.windows||[]).length).length>=2,tittel:'Før du eksporterer',
+      tekst:'Sjekk kategori, byggeår og etasjehøgd i sonekorta, og at nordpila stemmer. I eksportdialogen kan du òg leggje inn tiltak, som etterisolering og vindaugsbyte, så reknar SIMIEN lønnsemda.'},
+  ];
+  const sett=new Set((()=>{try{return JSON.parse(lsHent('klipsSett')||'[]');}catch(e){return [];}})());
+  const merkSett=id=>{sett.add(id);lsSet('klipsSett',JSON.stringify([...sett]));};
+  const passar=k=>{try{return !!k.naar();}catch(e){return false;}};
+  const kontekstTips=k=>({naar:k.naar,tittel:k.tittel,tekst:k.tekst,knappar:k.knappar||[{t:'Takk',hovud:true,gjer:()=>{}}]});
+
+  // pi:true = berre i EntroPi (KI-oppteikninga finst berre der)
   const VISSTE_DU=[
-    'Hald Shift medan du teiknar, så låser linja seg til 90° og 45°.',
-    'Teiknar du ei sone inntil ei anna, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.',
-    'Klikk på ei sone i teikninga, så finn du sonekortet hennar i sidepanelet.',
-    'Alt+klikk på ein seksjon i sonekortet opnar eller lukkar han i alle sonene samstundes.',
-    '⌖ Snap festar punktet til veggkryss i planteikninga. Slå han av om han tek feil hjørne.',
-    '☰ Listebasert redigering lèt deg endre mange vindauge eller soner på ein gong.',
-    'Høgreklikk på etasjefana for å kopiere ein heil etasje over i eit anna prosjekt.',
-    'Ei SXI-fil med vindauge som er større enn fasaden vert stoppa. Eg seier frå før du kjem så langt.',
+    {t:'Rekkjefølgja som sparer mest arbeid: kalibrer fyrst, set nordpila etterpå, og teikn så. Areal, fasaderetning og glasandel byggjer alle på desse to.'},
+    {t:'Du kan sleppe mange teikningar på lerretet samstundes, òg fasadeteikningar. Dei vert sorterte i etasjar, delplanar og fasadar, og du rettar før noko vert lagt inn.'},
+    {t:'Ei PDF med mange sider vert éin etasje per side. Vil du berre ha den fyrste, vel «Berre side 1 her».'},
+    {t:'KI-oppteikninga krev skala på planteikningane. Fasadeteikningar utan skala går, men gir grovare høgder.',pi:true},
+    {t:'Med «Heile bygget» les KI-oppteikninga alle etasjane og fasadane i éi køyring.',pi:true},
+    {t:'I KI-forslaget slår du saman to soner med ⊕ på den felles veggen, eller alle like med «⊕ Same kategori».',pi:true},
+    {t:'Gå gjennom KI-forslaget plan for plan med ← og →. Ctrl+Z angrar berre i forslaget, og ingenting vert lagt inn før du trykkjer «Godta».',pi:true},
+    {t:'KI-en hentar namn, bruk og byggeår frå teksten i teikninga. Sjekk kategorien i forslaget, han går rett inn i energimerket.',pi:true},
+    {t:'Hald Shift medan du teiknar, så låser linja seg til 90° og 45°.'},
+    {t:'Teikn sonekanten langs innsida av ytterveggen.'},
+    {t:'Teiknar du ei sone inntil ei anna, blir den felles veggen skiljekonstruksjon i begge sonene av seg sjølv.'},
+    {t:'Klikk på ei sone i teikninga, så finn du sonekortet hennar i sidepanelet.'},
+    {t:'Alt+klikk på ein seksjon i sonekortet opnar eller lukkar han i alle sonene samstundes.'},
+    {t:'⌖ Snap festar punktet til veggkryss i planteikninga. Slå han av om han tek feil hjørne.'},
+    {t:'«Rett ut» rettar ei skeiv eller fotografert teikning med to kjende mål eller eit rektangel.'},
+    {t:'Har ein etasje fleire teikningar, til dømes éi per fløy, legg dei inn som delplanar og plasser dei med ⌖.'},
+    {t:'Tak og golv kan delast i flater med eigen type, til dømes halve taket mot det fri og resten mot kaldt loft (✂ i sonekortet).'},
+    {t:'⊞ Fasadar slår saman ytterveggar med same himmelretning til éin fasade i SIMIEN.'},
+    {t:'«Del sone» i høgreklikkmenyen deler ei sone langs ei linje du teiknar, og vindauga følgjer med.'},
+    {t:'☰ Listebasert redigering lèt deg endre mange vindauge eller soner på ein gong.'},
+    {t:'Høgreklikk på etasjefana for å kopiere ein heil etasje over i eit anna prosjekt.'},
+    {t:'Ei SXI-fil med vindauge som er større enn fasaden vert stoppa. Eg seier frå før du kjem så langt.'},
+    {t:'Ctrl+O opnar filveljaren, Ctrl+S lagrar, og «?» viser alle snarvegane.'},
   ];
 
   function aktivtTips(){
@@ -20572,8 +20629,12 @@ function printFasadeView(){
       const no=aktivtTips();if(!no||no.key!==vist.key){if(vist.key!=='helsa')skjul();}
       return;
     }
+    // Eit kontekst-tips går bort når brukaren har gått vidare (t.d. ut av teiknemodus)
+    if(vist&&vist.naar){if(!passar(vist))skjul();return;}
     if(vist||Date.now()-sistTips<KLIPS_PAUSE||!roleg())return;
-    const t=aktivtTips();if(t)vis(t,true);
+    const t=aktivtTips();if(t){vis(t,true);return;}
+    const k=KONTEKST.find(k=>!sett.has(k.id)&&passar(k));
+    if(k){merkSett(k.id);vis(kontekstTips(k),true);}
   },KLIPS_TAKT);
 
   ['pointerdown','keydown','wheel'].forEach(ev=>window.addEventListener(ev,e=>{if(!rot.contains(e.target))sistAktiv=Date.now();},true));
@@ -20581,9 +20642,15 @@ function printFasadeView(){
   fig.addEventListener('click',()=>{
     if(vist){skjul();return;}
     const t=aktivtTips();
-    if(t)vis(t,false);
-    else vis({key:null,tittel:'Visste du at …',tekst:VISSTE_DU[vdIdx++%VISSTE_DU.length],
-      knappar:[{t:'Fleire tips',hovud:true,gjer:()=>setTimeout(()=>fig.dispatchEvent(new Event('click')),0)}]},false);
+    if(t){vis(t,false);return;}
+    const fleire={t:'Fleire tips',hovud:true,gjer:()=>setTimeout(()=>fig.dispatchEvent(new Event('click')),0)};
+    // Fyrst det som passar til det brukaren held på med, så dei generelle
+    const k=KONTEKST.find(k=>!vistNo.has(k.id)&&passar(k));
+    if(k){vistNo.add(k.id);merkSett(k.id);
+      vis({tittel:k.tittel,tekst:k.tekst,knappar:k.knappar?[...k.knappar,{...fleire,hovud:false}]:[fleire]},false);return;}
+    vistNo.clear();
+    const liste=VISSTE_DU.filter(v=>!v.pi||inPi());
+    vis({key:null,tittel:'Visste du at …',tekst:liste[vdIdx++%liste.length].t,knappar:[fleire]},false);
   });
 
   // Auga følgjer musa — litt, slik Clippy gjorde
@@ -20632,7 +20699,7 @@ function printFasadeView(){
   // sende på nytt (svarMinne), og berre eitt spørsmål går om gongen.
   const KLIPS_KUNNSKAP=`SXI-generatoren (Entro AS) er eit nettbasert oppmålingsverktøy for energimerking av norske bygg. Brukaren lastar opp planteikningar, teiknar soner som polygon og eksporterer ei SXI-fil til SIMIEN.
 Arbeidsgang: 1) «↑ Last opp» (PDF, bilete eller .entro; fleire filer/sider vert fleire etasjar, med dialog for type og namn). 2) «⊕ Kalibrer»: lengd (klikk to punkt, tast mm), areal (klikk ei sone) eller målestokk (1:100 osv., papirformat frå PDF). Utan skala vert alle areal feil. Global skala som standard, «Eiga» skala per etasje i skalabadgen. 3) «Sone»: klikk hjørne, Enter/dobbeltklikk avsluttar, Esc avbryt, Shift låser til 90°/45°. «⌖ Snap» snappar til veggkryss i teikninga. 4) «Vindauge»: klikk to punkt på ein fasadevegg, vel breidd/høgd/antal/U-verdi. Antal>1 er éitt SIMIEN-element. Ctrl+C/V kopierer. 5) Sonekortet i sidepanelet: bygningskategori (standard kontor), byggeår, etasjehøgd, takvinkel, golv- og taktype, U-verdiar, n50. 6) «⬇ SXI»: eksportdialog med klimastad, kommunenr og tiltak; eksporten stoppar om vindauga er større enn fasaden.
-Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på sone: del sone, kopier, skjul, vis sonekort. Nabosoner får felles vegg som skiljekonstruksjon (SK) automatisk; vegg kan gjerast om til fasade i sonekortet. «⊞ Fasadar» slår saman ytterveggar til éin fasade. «⇌ Kople» koplar soner med same kategori til éi SIMIEN-sone. Tak og golv kan delast i flater med eigen type (✂). Nordpila (nede til høgre) styrer fasaderetningane; «Nord-sjekk» roterer visinga. «Rett ut» rettar skeive skann (to kjende mål eller rektangel). «Roter» roterer 90°. Delplanar: fleire teikningar for same etasje, plassert med ⌖. Fasadeteikningar: eige lag berre for måling (Plan/Fasade, Side om side). «Mål» tek kontrollmål. «☰ Liste» redigerer mange vindauge/soner samstundes. 3D-visning og kart. «✦ KI-oppteikning» teiknar soner og vindauge frå teikninga (krev kalibrering). Lagring: «Lagre» lagrar på bygget i EntroPi (autolagring kvart 2. minutt), ⬇ lastar ned .entro. Ctrl+Z/Ctrl+Y angrar/gjer om. «?» viser tastatursnarvegar. Høgreklikk på etasjefana: kopier etasje, slett fleire, gjer til delplan.`;
+Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på sone: del sone, kopier, skjul, vis sonekort. Nabosoner får felles vegg som skiljekonstruksjon (SK) automatisk; vegg kan gjerast om til fasade i sonekortet. «⊞ Fasadar» slår saman ytterveggar til éin fasade. «⇌ Kople» koplar soner med same kategori til éi SIMIEN-sone. Tak og golv kan delast i flater med eigen type (✂). Nordpila (nede til høgre) styrer fasaderetningane; «Nord-sjekk» roterer visinga. «Rett ut» rettar skeive skann (to kjende mål eller rektangel). «Roter» roterer 90°. Delplanar: fleire teikningar for same etasje, plassert med ⌖. Fasadeteikningar: eige lag berre for måling (Plan/Fasade, Side om side). «Mål» tek kontrollmål. «☰ Liste» redigerer mange vindauge/soner samstundes. 3D-visning og kart. «✦ KI-oppteikning» teiknar soner, vindauge og dører frå teikninga (krev kalibrering). Ho les òg fasadeteikningar (vindaugshøgd, brystning, etasjehøgd) og kan køyre heile bygget i éi køyring. Forslaget vert gått gjennom plan for plan (← →), og soner kan slåast saman med ⊕ før «Godta». Mange teikningar, òg fasadar, kan sleppast inn samstundes og vert sorterte automatisk. Lagring: «Lagre» lagrar på bygget i EntroPi (autolagring kvart 2. minutt), ⬇ lastar ned .entro. Ctrl+Z/Ctrl+Y angrar/gjer om. «?» viser tastatursnarvegar. Høgreklikk på etasjefana: kopier etasje, slett fleire, gjer til delplan.`;
   const svarMinne=new Map();
   let spurde=false;
   const sporForm=document.getElementById('klipsSpor'),sporIn=document.getElementById('klipsSporIn');
