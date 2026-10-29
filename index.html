@@ -378,6 +378,8 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .zdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .zname-input{font-size:13px;font-weight:600;border:none;background:transparent;color:var(--text);outline:none;width:100%;cursor:text;font-family:inherit}
 .zname-input:focus{color:var(--accent)}
+.zname-input[readonly]{cursor:pointer;text-overflow:ellipsis}
+.zname-input:not([readonly]){box-shadow:inset 0 -1.5px 0 var(--accent)}
 .metric{display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)}
 .metric:last-of-type{border-bottom:none}
 .metric-l{color:var(--text3);font-weight:500}
@@ -695,6 +697,9 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
 .li-red-felt input:focus,.li-red-felt select:focus{border-color:var(--accent);box-shadow:var(--ring)}
 .li-red-felt .endra{border-color:var(--accent);background:#f0faf6}
 .li-red-felt input::placeholder{color:#a0a8b4;font-style:italic}
+.li-red-felt input:disabled{background:var(--surface2,#f3f4f6);color:var(--text3)}
+.li-laast-merk{font-size:11px;color:var(--text3);white-space:nowrap;cursor:help}
+.li-tab td.laast{font-style:italic;cursor:help}
 .li-std{width:30px;height:30px;flex-shrink:0;border:1px solid var(--border2);border-radius:7px;background:var(--surface2);color:var(--text3);cursor:pointer;font-size:14px}
 .li-std:hover{color:var(--accent);border-color:var(--accent)}
 .li-red-feil{font-size:12px;color:var(--red);min-height:16px;margin:10px 0 2px}
@@ -1098,7 +1103,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.20.3</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.21.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -4137,10 +4142,13 @@ function _liU(z,k){const d={uVegg:0.26,uTak:0.18,uGulv:0.35,uVindu:1.60,uDor:2.0
 function _liOpnA(w){const d=w.type==='dor';return Math.max(0.1,(w.hoyMm||(d?2100:1200))/1000)*Math.max(0.1,(w.breddeMm||(d?900:1200))/1000)*(w.antal||1);}
 
 // Kolonne: {k, t (tittel), ein (eining), num, des (desimalar), get(r), set(r,v) — utan set er ho til lesing,
-// opt (liste for nedtrekk), valfri (tom = standard), ph(r) (standardverdien som plasshaldar), heil}
+// opt (liste for nedtrekk), valfri (tom = standard), ph(r) (standardverdien som plasshaldar), heil,
+// laast(r) (grunn til at feltet ikkje kan endrast for denne rada, elles null)}
 const LISTE_TYPAR={
   vindauge:{namn:'Vindauge',rader:()=>_liOpningar('vindauge'),kol:()=>_liOpnKol(false)},
   dor:{namn:'Dører',rader:()=>_liOpningar('dor'),kol:()=>_liOpnKol(true)},
+  golv:{namn:'Golv',rader:()=>_liFlater('gulv'),kol:()=>_liFlateKol('gulv')},
+  tak:{namn:'Tak',rader:()=>_liFlater('tak'),kol:()=>_liFlateKol('tak')},
   vegg:{namn:'Ytterveggar (U-verdi fasadar)',rader:_liVeggar,kol:()=>[
     {k:'namn',t:'Namn',get:r=>r.namn},
     {k:'sone',t:'Sone',get:r=>r.z.name},
@@ -4161,8 +4169,6 @@ const LISTE_TYPAR={
     {k:'areal',t:'Areal',ein:'m²',num:1,des:1,get:r=>getAreaM2(r.z)},
     {k:'hoyde',t:'Høgd',ein:'m',num:1,des:2,valfri:1,ph:r=>{const f=r.f;return f?.defaultHoyde??(parseFloat(fhI.value)||3);},get:r=>r.z.hoyde,set:(r,v)=>{r.z.hoyde=v;}},
     {k:'him',t:'Himling',ein:'m',num:1,des:2,valfri:1,ph:r=>getHoyde(r.z),get:r=>r.z.himling,set:(r,v)=>{r.z.himling=v;}},
-    {k:'golv',t:'Golv',opt:GULV_TYPER,get:r=>r.z.gulvtype||GULV_TYPER[0],set:(r,v)=>{r.z.gulvtype=v;}},
-    {k:'tak',t:'Tak',opt:TAK_TYPER,get:r=>r.z.taktype||TAK_TYPER[0],set:(r,v)=>{r.z.taktype=v;}},
     {k:'vinkel',t:'Takvinkel',ein:'°',num:1,des:0,valfri:1,ph:()=>0,get:r=>r.z.takvinkel||null,set:(r,v)=>{r.z.takvinkel=v;}},
     ...[['uVegg','U-vegg'],['uTak','U-tak'],['uGulv','U-golv'],['uVindu','U-vindauge'],['uDor','U-dør'],['n50','n50']].map(([k,t])=>(
       {k,t,ein:k==='n50'?'1/h':'W/m²K',num:1,des:2,valfri:1,ph:r=>_liU({...r.z,[k]:null},k),get:r=>r.z[k],set:(r,v)=>{r.z[k]=v;}})),
@@ -4177,6 +4183,47 @@ const LISTE_TYPAR={
         if(etasjeArk(r.f).includes(curFloor()))fhI.value=v;}},
   ]},
 };
+// Golv og tak: éi rad per flate i ei oppdelt sone, elles éi rad for heile sona
+// (fl=null — då er det sona sin gulvtype/taktype og uGulv/uTak som gjeld).
+function _liFlater(kind){
+  const ut=[];
+  floors.forEach(f=>f.zones.forEach(z=>{
+    const fl=flateListe(z,kind);
+    if(!fl.length)ut.push({key:_zuk(z)+':'+kind,z,f,fl:null,etg:arkNamn(f)});
+    else fl.forEach((x,i)=>ut.push({key:_zuk(z)+':'+kind+':'+(x.id??i),z,f,fl:x,etg:arkNamn(f)}));
+  }));
+  return ut;
+}
+// Kjellar kan verken veljast eller veljast bort her: han styrer rollene til
+// veggane (KJ/YV/SK) og oppfyllinga, og det skal gjerast i sonekortet.
+function _liFlateKol(kind){
+  const F=FLATE[kind];
+  const type=r=>flateType(r.z,kind,r.fl);
+  const kjellar=r=>kind==='gulv'&&type(r)===KJELLER_GULV;
+  return [
+    {k:'namn',t:'Namn',get:r=>r.fl?(r.fl.name||F.lbl):'Heile '+F.eining},
+    {k:'sone',t:'Sone',get:r=>r.z.name},
+    {k:'etg',t:'Etasje',get:r=>r.etg},
+    {k:'type',t:'Type',opt:F.typar.filter(t=>t!==KJELLER_GULV),get:type,
+      laast:r=>kjellar(r)?'Kjellargolv kan berre endrast i sonekortet':null,
+      set:(r,v)=>{
+        if(!r.fl){r.z[F.zoneFelt]=v;if(kind==='tak')r.z.gavlflater=[];return;}
+        r.fl.type=v;
+        if(kind==='tak'){
+          if(v==='Tak'){
+            if(r.fl.vinkel==null)r.fl.vinkel=getTakvinkel(r.z);
+            if(r.fl.retning==null)r.fl.retning=_autoRetningForTakflate(r.fl.pts,r.z,calcSegments(r.z.pts,getHoyde(r.z),mppForZone(r.z))||[]);
+          }
+          r.z.gavlflater=[];
+        }
+      }},
+    {k:'areal',t:'Areal',ein:'m²',num:1,des:1,get:r=>r.fl?flateAreaM2(r.z,r.fl):(getAreaM2(r.z)||0)},
+    {k:'u',t:'U-verdi',ein:'W/m²K',num:1,des:2,valfri:1,ph:r=>_liU(r.z,F.uFelt),
+      laast:r=>r.fl&&kjellar(r)?'Kjellargolv har ingen eigen U-verdi per flate':null,
+      get:r=>r.fl?r.fl.uverdi:r.z[F.uFelt],
+      set:(r,v)=>{if(r.fl)r.fl.uverdi=v;else r.z[F.uFelt]=v;}},
+  ];
+}
 function _liOpningar(type){
   const ut=[];
   floors.forEach(f=>f.zones.forEach(z=>(z.windows||[]).forEach(w=>{
@@ -4302,12 +4349,14 @@ function renderListe(){
     kol.forEach(c=>{
       const td=document.createElement('td');if(c.num)td.className='num';
       const v=c.get(r);
-      if(!c.set)td.classList.add('les');
+      const laast=c.set&&c.laast?c.laast(r):null;
+      if(!c.set||laast)td.classList.add('les');
+      if(laast){td.classList.add('laast');td.title=laast;}
       if(c.set&&c.valfri&&(v==null||v==='')&&c.ph){
         // Standardverdien står grå, så det er tydeleg at han ikkje er sett for hand
         const p=c.ph(r);td.classList.add('std');
         td.textContent=typeof p==='number'?_liNum(p,c.des):p;
-        td.title='Standardverdi';
+        if(!laast)td.title='Standardverdi';
       }else td.textContent=c.num?_liNum(v,c.des):(v??'');
       td.dataset.k=c.k;
       tr.appendChild(td);
@@ -4345,7 +4394,7 @@ function _liRedigerValde(){
   const box=document.createElement('div');box.className='li-red-box';
   const tittel=document.createElement('h3');
   tittel.innerHTML='<span class="li-red-ik">'+ikonSvg('rediger')+'</span><span></span>';
-  tittel.lastChild.textContent='Rediger '+(maal.length===1?'«'+String(kol[0]?.get(maal[0])??'')+'»':maal.length+' '+T.namn.toLowerCase().replace(/ \(.*\)$/,''));
+  tittel.lastChild.textContent='Rediger '+(maal.length===1?'«'+String(T.kol()[0]?.get(maal[0])??'')+'»':maal.length+' '+T.namn.toLowerCase().replace(/ \(.*\)$/,''));
   const sub=document.createElement('div');sub.className='li-red-sub';
   sub.textContent=maal.length>1
     ?'Felt du endrar, vert sette på alle '+maal.length+'. Felt du ikkje rører, står som dei er.'
@@ -4355,9 +4404,20 @@ function _liRedigerValde(){
   const endra=new Map();   // k → {c, inp, std:true|undefined}
   const fmt=(c,v)=>v==null||v===''?'':(c.num?_liNum(v,c.des):String(v));
   kol.forEach(c=>{
-    const verdiar=maal.map(r=>c.get(r));
+    // Låste rader vert verken viste i feltet eller endra
+    const opne=c.laast?maal.filter(r=>!c.laast(r)):maal;
+    const nLaast=maal.length-opne.length;
+    const verdiar=(opne.length?opne:maal).map(r=>c.get(r));
     const lik=verdiar.every(v=>fmt(c,v)===fmt(c,verdiar[0]));
     const lab=document.createElement('label');lab.textContent=c.t+(c.ein?' ['+c.ein+']':'');
+    if(!opne.length){
+      const celle=document.createElement('div');celle.className='li-red-felt';
+      const inp=document.createElement('input');inp.type='text';inp.disabled=true;
+      inp.value=lik?fmt(c,verdiar[0]):'ulike verdiar';inp.title=c.laast(maal[0]);
+      const m=document.createElement('span');m.className='li-laast-merk';m.textContent='låst';m.title=inp.title;
+      celle.append(inp,m);grid.append(lab,celle);
+      return;
+    }
     let inp;
     if(c.opt){
       inp=document.createElement('select');
@@ -4368,13 +4428,18 @@ function _liRedigerValde(){
       inp=document.createElement('input');inp.type='text';
       if(c.num){inp.inputMode='decimal';inp.classList.add('num');}
       inp.value=lik?fmt(c,verdiar[0]):'';
-      const ph=c.valfri&&c.ph?c.ph(maal[0]):null;
+      const ph=c.valfri&&c.ph?c.ph(opne[0]):null;
       inp.placeholder=!lik?'ulike verdiar':(c.valfri?(typeof ph==='number'?'standard ('+_liNum(ph,c.des)+')':'standard'):'');
     }
-    const merk=()=>{endra.set(c.k,{c,inp});lab.classList.add('endra');inp.classList.add('endra');};
+    const merk=()=>{endra.set(c.k,{c,inp,opne});lab.classList.add('endra');inp.classList.add('endra');};
     inp.addEventListener('input',merk);inp.addEventListener('change',merk);
     const celle=document.createElement('div');celle.className='li-red-felt';
     celle.appendChild(inp);
+    if(nLaast){
+      const m=document.createElement('span');m.className='li-laast-merk';
+      m.textContent=nLaast+' låst';m.title=c.laast(maal.find(r=>c.laast(r)))+' — '+(nLaast===1?'denne står':'desse står')+' urørt.';
+      celle.appendChild(m);
+    }
     if(c.valfri&&!c.opt){
       const std=document.createElement('button');std.type='button';std.className='li-std';std.textContent='↺';
       std.title='Set standardverdien';
@@ -4397,7 +4462,7 @@ function _liRedigerValde(){
   lagre.onclick=()=>{
     // Les og sjekk alle endra felt fyrst — anten vert alt lagra, eller ingenting
     const nye=[];
-    for(const {c,inp} of endra.values()){
+    for(const {c,inp,opne} of endra.values()){
       let v;
       if(c.opt){if(inp.value==='')continue;v=inp.value;}
       else if(c.num){
@@ -4412,20 +4477,21 @@ function _liRedigerValde(){
         if(!inp.value.trim())continue;   // tomt namn = ingen endring
         v=inp.value;
       }
-      nye.push({c,v});
+      nye.push({c,v,opne});
     }
     lukk();
     if(!nye.length){hintText.textContent='Ingen endringar.';return;}
     snapshot();
-    maal.forEach(r=>nye.forEach(({c,v})=>c.set(r,v)));
+    nye.forEach(({c,v,opne})=>opne.forEach(r=>c.set(r,v)));
     markDirty();
     updateResults();renderTable();draw();
     renderListe();
     // Vis kva som vart endra
-    const synlege=_liRader().rader,ks=new Set(maal.map(x=>x.key));
+    const synlege=_liRader().rader;
     document.querySelectorAll('#listeTab tbody tr').forEach((tr,i)=>{
-      if(!synlege[i]||!ks.has(synlege[i].key))return;
-      nye.forEach(({c})=>{const td=tr.querySelector('td[data-k="'+c.k+'"]');if(td)td.classList.add('endra');});
+      if(!synlege[i])return;
+      nye.forEach(({c,opne})=>{if(!opne.some(x=>x.key===synlege[i].key))return;
+        const td=tr.querySelector('td[data-k="'+c.k+'"]');if(td)td.classList.add('endra');});
     });
     hintText.textContent=(maal.length>1?maal.length+' '+T.namn.toLowerCase().replace(/ \(.*\)$/,'')+' endra':'Endra')+': '
       +nye.map(({c})=>c.t.toLowerCase()).join(', ')+'. Ctrl+Z angrar.';
@@ -8881,13 +8947,24 @@ function updateResults(){
       // ── Klikkbar header ──
       const cardHeader=document.createElement('div');cardHeader.className='zcard-header';
       const dot=document.createElement('div');dot.className='zdot';dot.style.cssText=`background:${COLORS[ci]};flex-shrink:0;cursor:pointer`;
-      dot.title='Dobbelklikk for å zoome til sona';
-      dot.ondblclick=e=>{e.stopPropagation();zoomToZone(z);};
+      dot.title='Klikk for å gå til sona i teikninga';
+      // Namnet tek det meste av headeren. Som skrivefelt heile tida stal det
+      // klikket, og berre ein smal stripe var att til å navigere med. Difor:
+      // klikk = gå til sona (som resten av headeren), dobbeltklikk = endre namn.
       const inp=document.createElement('input');inp.className='zname-input';inp.value=z.name;
+      inp.readOnly=true;
+      const _redigerNamn=()=>{inp.readOnly=false;inp.focus();inp.select();};
       inp.onchange=()=>{z.name=inp.value.trim()||z.name;draw();renderTable();markDirty();};
-      inp.onkeydown=e=>{if(e.key==='Enter')inp.blur();};
-      inp.onclick=e=>e.stopPropagation();
-      inp.title='Dobbelklikk på sirkelen for å zoome til sona';
+      inp.onkeydown=e=>{
+        if(inp.readOnly){if(e.key==='Enter'||e.key==='F2'){e.preventDefault();_redigerNamn();}return;}
+        if(e.key==='Enter')inp.blur();
+        if(e.key==='Escape'){inp.value=z.name;inp.blur();}
+      };
+      inp.onblur=()=>{inp.readOnly=true;};
+      inp.onmousedown=e=>{if(inp.readOnly)e.preventDefault();};   // ingen markør/markering ved klikk
+      inp.onclick=e=>{if(!inp.readOnly)e.stopPropagation();};
+      inp.ondblclick=e=>{e.stopPropagation();_redigerNamn();};
+      inp.title='Klikk for å gå til sona i teikninga · dobbeltklikk for å endre namnet';
       cardHeader.appendChild(dot);cardHeader.appendChild(inp);
       if(floors.length>1){
         const ftag=document.createElement('span');
@@ -8932,7 +9009,7 @@ function updateResults(){
         _updateCollapseAllBtn();
       };
       cardHeader.onclick=e=>{
-        if(e.target===chevron||chevron.contains(e.target)||e.target===inp)return;
+        if(e.target===chevron||chevron.contains(e.target)||(e.target===inp&&!inp.readOnly))return;
         cardHeader._zoomTarget();
       };
       card.appendChild(cardHeader);

@@ -687,8 +687,20 @@ knappar; legg heller eit ikon til i `IKON_SVG` og eit oppslag i `_CTX_IKON`.
 ## Listebasert redigering
 
 «☰ Listebasert redigering» (`opneListe`, inspirert av SIMIEN) viser éin
-tabell per elementtype — vindauge, dører, ytterveggar (U-verdi), soner og
-etasjar. Cellene er **berre visning**: ein vel rader (klikk på rada) og
+tabell per elementtype — vindauge, dører, golv, tak, ytterveggar (U-verdi),
+soner og etasjar.
+
+- **Golv og tak** (`_liFlater`/`_liFlateKol`): éi rad per flate i ei oppdelt
+  sone, elles éi rad «Heile golvet/taket» som skriv til sona sin
+  `gulvtype`/`taktype`. Typeskifte på tak følgjer sidepanelet (vinkel/fall på
+  ny `Tak`-flate, `gavlflater=[]`).
+- **Kjellar kan ikkje veljast eller veljast bort her** — han styrer
+  veggrollene (KJ/YV/SK) og oppfyllinga, og det skal gjerast i sonekortet.
+  `KJELLER_GULV` er teken ut av nedtrekket, og eit golv som alt er kjellar er
+  låst. Generelt: kolonna kan ha `laast(r)` (grunn eller null). Låste rader
+  vert hoppa over ved lagring, og dialogen seier «n låst».
+
+Cellene er **berre visning**: ein vel rader (klikk på rada) og
 trykkjer «Rediger» (`_liRedigerValde`), eller dobbeltklikkar ei rad. Det var
 for lett å endre verdiar ved eit uhell då cellene var felt. `LISTE_TYPAR` held
 kolonnane: `get`, og `set` for dei som kan endrast (utan `set` = utrekna,
@@ -1248,6 +1260,11 @@ SXI-eksporten er urørte — å skjule er eit visingsval, ikkje ei sletting.
 
 ## Finne sonekortet att
 
+- **Heile headeren på sonekortet navigerer** til sona (unnateke auget og
+  chevronen). Namnefeltet er `readOnly` til det vert dobbeltklikka (eller
+  Enter/F2) — som vanleg skrivefelt stal det klikket, og berre ein smal
+  stripe var att å trykkje på.
+
 - **Klikk på ei sone i teikninga** (Naviger, utan å panorere — under 4 px
   rørsle mellom mousedown og mouseup, `_klikkSone`) eller «Vis sonekort» i
   høgreklikkmenyen kallar `visSonekort(z)`: byter til Soner-fana, opnar kortet,
@@ -1563,7 +1580,7 @@ modusane.
     pointer-events på eit augneblink, elles ser `elementFromPoint` forbi.
   - Rørsla er lag: ro (pust, svai, blunk), tilstand (`prat`, `tenk`, mus
     over), og éi handling i `AKT` om gongen (`inn`, `vift`, `feir`, og dei
-    som kjem av seg sjølv i ro: `hatt`, `sjaa`, `kort`, `snurr`, `strekk`).
+    som kjem av seg sjølv i ro: `hatt`, `sjaa`, `kort`, `snurr`, `strekk`, `dans`, `kortsnu`, `hikk`, `kikk`; dessutan `nikk` og `sov`).
     Alt går gjennom fjører (`F`), berre hopp-høgda er direkte. Hjelmen ligg
     laus: kroppen sin akselerasjon dyttar han, han kan ikkje gå gjennom
     hovudet. Hjulslaget roterer rundt midten av figuren, ikkje føtene.
@@ -1584,13 +1601,19 @@ modusane.
   eller oftare enn kvart 20. s. Ligg ein dialog oppå figuren
   (`elementFromPoint`), teier han. «Seinare» gjeld økta; boblen går bort av
   seg sjølv når problemet er løyst.
-- **Tre nivå:** `REGLAR` (problem — alltid fyrst), `KONTEKST` (tips knytte
-  til modus/tilstand: teikning, vindauge, fasadevising, «nord før du teiknar»,
-  KI-oppteikning og fasadar i EntroPi, mange teikningar på ein gong …) og
-  `VISSTE_DU` (generelle, `pi:true` = berre i EntroPi). Eit kontekst-tips vert
-  vist av seg sjølv éin gong per nettlesar (`klipsSett`) og går bort når
-  `naar()` vert usann (t.d. ut av teiknemodus). Klikk på figuren går gjennom
-  dei som passar no, så «visste du».
+- **Tre nivå:** `REGLAR` (problem — alltid fyrst), `KONTEKST` (fem tips knytte
+  til modus/tilstand: KI-oppteikning, nord før du teiknar, teikning, vindauge,
+  før eksport) og `VISSTE_DU` (ti konkrete råd, `pi:true` = berre i EntroPi).
+  **Av seg sjølv kjem berre helsinga og problema i `REGLAR`.** Tips kjem
+  berre når ein klikkar — eitt klikk er nok, og det hoppar over helsinga.
+  Klikk går gjennom kontekst-tipsa som passar no, så «visste du». Brukaren
+  bad om dette (v5.20.3): automatiske kontekst-tips og ei lang liste vart mas.
+  Hald listene korte, og kvart tips skal vere eit råd ein kan gjere noko med.
+- **Rørsler utan boble:** nikkar (`nikk`) når ei ny sone kjem til og tek ein
+  snurr når teikninga vert kalibrert (`reager()` i taktaren). Etter eitt
+  minutt utan aktivitet døser han av (`sov`, via `stille()`). `Klips.spel(namn)`
+  spelar ei rørsle frå konsollen. `inn` og `feir` vert ikkje avbrotne av
+  andre rørsler. SVG-reserven har berre `inn`/`vift`/`feir`.
 - **Trønder-modus** (av som standard; ein liten bart-knapp ved × i toppen
   av boblen, `klipsTrond` i `localStorage`): bart og svart skinnvest med frynser på 3D-figuren (`trondG`,
   ikkje på SVG-reserven), og stereotypisk trøndersk med DDE/Åge-glimt.
@@ -1599,7 +1622,7 @@ modusane.
   (`berreTr:true` = berre i trønder-modus), og knappane via `BT`/`bt()`.
   Ny tekst ⇒ skriv trønder-varianten med, elles dukkar nynorsken opp midt i.
   Spør Klips får eiga språkinstruks, og svarMinne-nøkkelen tek med modusen.
-- `localStorage`: `klipsAv` (slått av → mini-knapp), `klipsHelsa`, `klipsSett` og `klipsTrond`.
+- `localStorage`: `klipsAv` (slått av → mini-knapp), `klipsHelsa` og `klipsTrond` (`klipsSett` frå eldre versjonar vert ikkje lese lenger).
   Ingenting i prosjektfila.
 - `Klips.feir()` vert kalla etter vellukka SXI-eksport.
 - **Spør Klips (berre EntroPi, `#klipsSpor.embed-only`)**: fritekst-spørsmål via
