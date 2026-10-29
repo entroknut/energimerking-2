@@ -1,0 +1,2 @@
+# Biblioteka i den lokale varianten er sha256-sjekka — linjeskifta må stå urørte
+tools/vendor/** -text
