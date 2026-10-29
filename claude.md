@@ -92,6 +92,43 @@ Byggestatus (`gh` er innlogga som `entroknut`):
 gh run list --workflow pages.yml --limit 3
 ```
 
+### Lokal variant (ingen nettilgang)
+
+For oppdrag der teikningane ikkje skal i nærleiken av nettet:
+`python tools/bygg-lokal.py` lagar mappa `lokal/` frå `index.html`:
+`SXI-generatoren-lokal.html` (~4 MB), `sxi-lokal.ico`, `Lag snarveg.cmd`,
+`lag-snarveg.ps1` og `Les meg.txt`. Heile mappa vert kopiert til maskina.
+Mappa er generert og ligg ikkje i git; ho får same versjonsnummer som
+`index.html`. Skripta og «Les meg» er kjeldefiler i `tools/lokal-filer/`.
+
+- **Snarvegen gjer ho til eit «program»**: `Lag snarveg.cmd` lagar ein `.lnk`
+  på skrivebordet og i Start-menyen som opnar fila med
+  `msedge --app=file:///…` (eige vindauge, ingen adresselinje) og ein eigen
+  profil i `%LOCALAPPDATA%\SXI-generatoren-lokal` med `--disable-sync` og
+  `--disable-background-networking`. Stien er absolutt — flyttar brukaren
+  mappa, må skriptet køyrast på nytt. `.ps1` vert skriven med BOM (Windows
+  PowerShell 5.1 les elles æøå som ANSI), `.cmd` som rein ASCII med CRLF.
+- Verifisert frå `file://` i Edge (headless): localStorage, PDF via
+  blob-workeren og merket. Ingen eigen `.exe` (Electron/Tauri) — vurdert og
+  valt bort: SmartScreen/IT-sperrer på usignerte filer, og sperra er den same.
+
+- Biblioteka ligg i `tools/vendor/` (sha256-sjekka) og vert lagde inn i fila.
+  pdf.js-workeren går via ein blob-URL frå `<script type="text/plain">`.
+- Kartet (Mapbox) og Google Fonts er tekne ut; EntroPi-brua får aldri
+  handtrykk (`embedRequested=false`), så KI og Spør Klips er borte.
+- **Garantien er CSP-en** (`connect-src 'none'`, `default-src 'none'`), ikkje
+  at kalla er fjerna: nettlesaren stoppar alt som måtte sleppe gjennom.
+  Merket «Lokal · ingen nett» ved versjonsnummeret tel stoppa forsøk
+  (`securitypolicyviolation`) og vert raudt om CSP-en manglar.
+- Kvar erstatning i skriptet må treffe **nøyaktig éin** gong, og til slutt
+  sjekkar det at ingen kjende CDN-/kartadresser står att. Endrar du dei
+  stadene i `index.html` (CDN-taggane, `workerSrc`, `JSPDF_URL`,
+  `setupMapbox`, `embedRequested`, `appVer`), stoppar bygget med ei melding —
+  rett skriptet, ikkje sjekken.
+- Nytt eksternt kall i `index.html` (fetch, CDN, font) ⇒ ta det ut i skriptet
+  òg. CSP-en stoppar det uansett, men då vert funksjonen daud i den lokale
+  varianten og merket viser «n stoppa».
+
 ---
 
 ## Datamodell

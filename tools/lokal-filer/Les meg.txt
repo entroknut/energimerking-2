@@ -1,0 +1,27 @@
+SXI-generatoren - lokal versjon
+================================
+
+Denne versjonen køyrer berre på denne maskina. Teikningar, soner og
+prosjekt vert aldri sende nokon stad, og nettlesaren sperrar all
+nettverkstrafikk frå programmet.
+
+Installering
+------------
+1. Legg heile mappa der ho skal stå, t.d. C:\SXI-generatoren.
+2. Dobbeltklikk «Lag snarveg.cmd».
+3. Opne «SXI-generatoren (lokal)» frå skrivebordet eller Start-menyen.
+
+Flyttar du mappa seinare, køyr «Lag snarveg.cmd» på nytt.
+
+Det grøne merket «Lokal · ingen nett» øvst i programmet viser at sperra
+står på. Klikk på det for detaljar.
+
+Verd å vite
+-----------
+- Programmet opnar i eit eige Edge-vindauge med ein eigen profil
+  (%LOCALAPPDATA%\SXI-generatoren-lokal). Han deler ingenting med vanleg
+  Edge, og synkronisering er slått av.
+- Kartet og KI-funksjonane finst ikkje i denne versjonen.
+- Prosjektfilene (.entro) havnar der du vel å lagre dei. Lagrar du i ei
+  OneDrive- eller SharePoint-mappe, vert dei synkroniserte dit - vel ei
+  lokal mappe om filene ikkje skal ut av maskina.
