@@ -1274,6 +1274,10 @@ SXI-eksporten er urørte — å skjule er eit visingsval, ikkje ei sletting.
 - **Musa over sona** i teikninga → `.planhover` på kortet (`_markerKort`,
   `_planHoverZ`). **Musa over kortet** → sona vert utheva i `draw()`
   (`_kortHover`, delegert `mouseover` på `#zlist` sidan korta vert bygde på nytt).
+  **Musa over ei rad i Konstruksjonar** → berre dei veggane vert utheva
+  (`_kortHoverSegs`). Rada ber segmentindeksane i `data-hsegs` — éin for ein
+  vanleg vegg, alle for samanslegne SK/YV og sonekoplingar. Ny radtype i
+  Konstruksjonar: set `data-hsegs`, elles viser hoveren heile sona.
 - **Filter** (`#zlistFilter`, fast øvst i panelet): søk på namn (`zlistSok`)
   og «Berre denne etasjen» (`zlistBerreEtg`, heile `etasjeArk`, knappen berre
   synleg med fleire hovudetasjar). Berre visning, vert ikkje lagra. Filteret

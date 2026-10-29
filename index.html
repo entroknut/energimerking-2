@@ -1103,7 +1103,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.21.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.21.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -5871,7 +5871,20 @@ function draw(){
     ctx.closePath();ctx.fillStyle=FILLS[ci];ctx.fill();
     // Musa over kortet i sonelista: dobbel fylling og ein brei, mjuk kant under
     // veggstrekane, så sona er lett å finne i teikninga
-    if(z===_kortHover){
+    if(z===_kortHover&&_kortHoverSegs){
+      // Musa over ei rad i Konstruksjonar: berre veggane i rada, breitt og
+      // tydeleg, med prikkar i endane så ein kort vegg òg er lett å sjå
+      ctx.save();ctx.strokeStyle=COLORS[ci];ctx.fillStyle=COLORS[ci];ctx.lineCap='round';ctx.setLineDash([]);
+      _kortHoverSegs.segs.forEach(si=>{
+        if(si<0||si>=z.pts.length)return;
+        const a=i2s(z.pts[si].x,z.pts[si].y),b=i2s(z.pts[(si+1)%z.pts.length].x,z.pts[(si+1)%z.pts.length].y);
+        ctx.globalAlpha=.5;ctx.lineWidth=12;
+        ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+        ctx.globalAlpha=.9;
+        [a,b].forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();});
+      });
+      ctx.restore();
+    }else if(z===_kortHover){
       ctx.fill();
       ctx.save();ctx.strokeStyle=COLORS[ci];ctx.globalAlpha=.4;ctx.lineWidth=7;ctx.lineJoin='round';ctx.setLineDash([]);ctx.stroke();ctx.restore();
     }
@@ -8746,6 +8759,7 @@ function _zlistTilAnker(sp,a){
 let zlistBerreEtg=false;
 let zlistSok='';
 let _kortHover=null;   // sona musa er over i sonelista → utheva i teikninga
+let _kortHoverSegs=null;   // {k, segs:Set} — konstruksjonsrada musa er over (veggane i _kortHover)
 let _planHoverZ=null;  // sona musa er over i teikninga → ramme på kortet
 function _fleireEtasjar(){return floors.filter(f=>!erDelplan(f)).length>1;}
 function _iSonelista(f,z){
@@ -8830,9 +8844,16 @@ function visSonekort(z){
   zlist.addEventListener('mouseover',e=>{
     const c=e.target.closest&&e.target.closest('.zcard');
     const z=c?c._z||null:null;
-    if(z!==_kortHover){_kortHover=z;draw();}
+    // Rad i Konstruksjonar → berre dei veggane, ikkje heile sona
+    const r=c&&e.target.closest('[data-hsegs]');
+    const hs=r?r.dataset.hsegs:null;
+    if(z!==_kortHover||hs!==(_kortHoverSegs?.k??null)){
+      _kortHover=z;
+      _kortHoverSegs=hs?{k:hs,segs:new Set(hs.split(',').map(Number))}:null;
+      draw();
+    }
   });
-  zlist.addEventListener('mouseleave',()=>{if(_kortHover){_kortHover=null;draw();}});
+  zlist.addEventListener('mouseleave',()=>{if(_kortHover||_kortHoverSegs){_kortHover=null;_kortHoverSegs=null;draw();}});
 })();
 // Namn + tal for ei samla rad i Konstruksjonar (SK samla, YV samla,
 // sonekopling): to linjer som kuttar med «…» i staden for å bryte ord for ord.
@@ -9546,6 +9567,7 @@ function updateResults(){
             unmergeBtn.textContent='Del opp';
             unmergeBtn.onclick=()=>unmergeSegs(grpSegs[0]?grpSegs[0].idx:seg.idx);
             row.appendChild(_kgrpTekst(nameTag,statsSpan));row.appendChild(unmergeBtn);
+            row.dataset.hsegs=grpSegs.map(s2=>s2.idx).join(',');
             facSection.appendChild(row);
             return;
           }
@@ -9603,6 +9625,7 @@ function updateResults(){
                   };
                   row.appendChild(_kgrpTekst(nameTag,statsSpan));
                   row.appendChild(remBtn);
+                  row.dataset.hsegs=zcSegs.map(s2=>s2.idx).join(',');
 
                   // Høgreklikk-meny for å fjerne eller endra sonekobling
                   // row.oncontextmenu=e=>{ // DISABLA medan eg arbeiter med feilretting
@@ -9690,6 +9713,7 @@ function updateResults(){
               unmergeBtn.textContent='Del opp';
               unmergeBtn.onclick=()=>toggleYvMerge(yvMerged.name,grpSegs);
               row.appendChild(_kgrpTekst(nameTag,statsSpan));row.appendChild(unmergeBtn);
+              row.dataset.hsegs=grpSegs.map(s2=>s2.idx).join(',');
               facSection.appendChild(row);
               return;
             }
@@ -9750,6 +9774,7 @@ function updateResults(){
             right.appendChild(pickBtn);
           }
           row.appendChild(left);row.appendChild(right);
+          row.dataset.hsegs=seg.idx;   // musa over rada → veggen vert utheva i teikninga
           if(isSK&&gi>=0)(groupRows[gi]=groupRows[gi]||[]).push({seg,row,left});
 
           // Høgreklikk-meny for sonekoblingar (berre SK)
