@@ -1103,7 +1103,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.21.2</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.21.3</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -21152,6 +21152,107 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
         k.rv.set(Math.random()*14-7,Math.random()*14-7,Math.random()*14-7);k.liv=1.8+Math.random()*.9;k.m.visible=true;});
     }
 
+    // ── Leiketøy: det han finn fram når ingen har gjort noko på ei stund ──
+    // Rubikskube i handa. Lag vert vridne ved å flytte bitane inn i `rubPiv`,
+    // rotere, og bake rotasjonen inn att (posisjonen rundast til rutenettet).
+    const rubikG=new THREE.Group();rubikG.visible=false;handG.add(rubikG);
+    const rubPiv=new THREE.Group();rubikG.add(rubPiv);
+    const RS=.27,rubBitar=[];
+    {const mf=c=>new THREE.MeshStandardMaterial({color:lin(c),roughness:.35,envMapIntensity:.4});
+     const SVART=mf(0x141414),FARGE=[0xc8102e,0xff6a13,0xf4f4f4,0xffd100,0x009a44,0x0051ba].map(mf);
+     const geo=new THREE.BoxGeometry(RS*.94,RS*.94,RS*.94);
+     for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(let k=-1;k<=1;k++){
+       const ms=[i===1,i===-1,j===1,j===-1,k===1,k===-1].map((ut,f)=>ut?FARGE[f]:SVART);
+       const m=new THREE.Mesh(geo,ms);m.position.set(i*RS,j*RS,k*RS);m.userData.heim=m.position.clone();
+       rubikG.add(m);rubBitar.push(m);}}
+    rubikG.position.set(.62,.42,.38);
+    const AKS=['x','y','z'];
+    function rubVri(tr,p){   // p 0–1 for eit lag; p=1 bakar inn
+      if(!rubPiv.children.length){rubPiv.rotation.set(0,0,0);
+        rubBitar.filter(b=>Math.round(b.position[tr.ax]/RS)===tr.lag).forEach(b=>rubPiv.add(b));}
+      rubPiv.rotation[tr.ax]=tr.dir*Math.PI/2*Math.min(1,p);
+      if(p>=1){rubPiv.updateMatrix();
+        [...rubPiv.children].forEach(b=>{b.applyMatrix4(rubPiv.matrix);rubikG.add(b);
+          b.position.set(Math.round(b.position.x/RS)*RS,Math.round(b.position.y/RS)*RS,Math.round(b.position.z/RS)*RS);});
+        rubPiv.rotation.set(0,0,0);}
+    }
+    let rubTrekk=[],rubGjort=0;
+    function rubStokk(){   // stokkar med n tilfeldige vridingar; løysinga er dei same baklengs
+      rubPiv.rotation.set(0,0,0);[...rubPiv.children].forEach(b=>rubikG.add(b));
+      rubBitar.forEach(b=>{b.position.copy(b.userData.heim);b.quaternion.set(0,0,0,1);});
+      const st=[];let sist='';
+      for(let i=0;i<7;i++){let ax;do ax=AKS[Math.floor(Math.random()*3)];while(ax===sist);sist=ax;
+        const tr={ax,lag:Math.floor(Math.random()*3)-1,dir:Math.random()<.5?1:-1};rubVri(tr,1);st.push(tr);}
+      rubTrekk=st.reverse().map(t=>({...t,dir:-t.dir}));rubGjort=0;
+    }
+
+    // Saksofon (alt): koniske røyr — hals med S-boge, rett kropp, boge nede og
+    // ein utsvinga trakt med kant. Klaffar med perlemorknappar framme,
+    // stong langs sida, oktavklaff på halsen og svart munnstykke med ligatur.
+    const saxG=new THREE.Group();saxG.visible=false;modell.add(saxG);
+    const saxMunn=new THREE.Vector3();   // midt i trakta, der notane kjem ut
+    {const mMess=new THREE.MeshPhysicalMaterial({color:lin(0xd6a63a),metalness:1,roughness:.2,clearcoat:.7,clearcoatRoughness:.15,envMapIntensity:1.1});
+     const mInni=new THREE.MeshStandardMaterial({color:lin(0x8a6420),metalness:1,roughness:.35,side:THREE.BackSide});
+     const mPerle=new THREE.MeshPhysicalMaterial({color:lin(0xf4eee2),roughness:.25,clearcoat:1,envMapIntensity:.6});
+     const mSvart=new THREE.MeshStandardMaterial({color:lin(0x121212),roughness:.3});
+     const mSolv=new THREE.MeshStandardMaterial({color:lin(0xdadde0),metalness:1,roughness:.18});
+     const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+     // Røyr der radien følgjer rFn(u): TubeGeometry med radius 1, skalert ring for ring
+     const kon=(kurve,seg,rad,rFn)=>{const g=new THREE.TubeGeometry(kurve,seg,1,rad,false),p=g.attributes.position,c=new THREE.Vector3(),v=new THREE.Vector3();
+       for(let i=0;i<=seg;i++){kurve.getPointAt(i/seg,c);const r=rFn(i/seg);
+         for(let j=0;j<=rad;j++){const k=i*(rad+1)+j;v.fromBufferAttribute(p,k).sub(c).multiplyScalar(r).add(c);p.setXYZ(k,v.x,v.y,v.z);}}
+       return g;};
+     const hals=new THREE.CatmullRomCurve3([V(.1,1.17,.5),V(-.06,1.3,.6),V(-.28,1.27,.68),V(-.42,1.08,.73),V(-.46,.9,.75)]);
+     saxG.add(new THREE.Mesh(kon(hals,40,14,u=>.034+.03*u),mMess));
+     const kropp=new THREE.CatmullRomCurve3([V(-.46,.9,.75),V(-.48,0,.75),V(-.5,-.95,.75),V(-.46,-1.3,.75),V(-.3,-1.47,.75),V(-.1,-1.42,.76),V(.01,-1.2,.77),V(.08,-.9,.79),V(.15,-.6,.84)]);
+     saxG.add(new THREE.Mesh(kon(kropp,120,18,u=>.064+.13*Math.pow(u,1.5)),mMess));
+     // Trakta: utsvinga, retta etter enden av kroppen, med ein rulla kant
+     {const ende=kropp.getPointAt(1),tan=kropp.getTangentAt(1),PR=[[.194,0],[.205,.08],[.228,.16],[.27,.24],[.33,.3],[.4,.335],[.44,.345]];
+      const prof=PR.map(([x,y])=>new THREE.Vector2(x,y)),g=new THREE.LatheGeometry(prof,40);
+      const tg=new THREE.Group();tg.position.copy(ende);tg.quaternion.setFromUnitVectors(V(0,1,0),tan);saxG.add(tg);
+      tg.add(new THREE.Mesh(g,mMess));tg.add(new THREE.Mesh(g,mInni));
+      const kant=new THREE.Mesh(new THREE.TorusGeometry(.44,.022,8,48),mMess);kant.rotation.x=Math.PI/2;kant.position.y=.345;tg.add(kant);
+      saxMunn.copy(ende).addScaledVector(tan,.36);}
+     // Munnstykke og ligatur
+     {const g=new THREE.Group();g.position.set(.1,1.17,.5);g.quaternion.setFromUnitVectors(V(0,1,0),hals.getTangentAt(0).negate());saxG.add(g);
+      const mu=new THREE.Mesh(new THREE.CylinderGeometry(.026,.04,.24,14),mSvart);mu.position.y=.12;g.add(mu);
+      const lig=new THREE.Mesh(new THREE.CylinderGeometry(.044,.044,.05,14,1,true),mSolv);lig.position.y=.07;g.add(lig);}
+     // Klaffar: kopp i messing og perlemorknapp framme, festa til ei stong langs sida
+     const kopp=new THREE.CylinderGeometry(.072,.072,.03,20),perle=new THREE.CylinderGeometry(.042,.046,.03,18);
+     [.06,.13,.2,.3,.37,.44].forEach(u=>{const p=kropp.getPointAt(u),r=.064+.13*Math.pow(u,1.5);
+       const k=new THREE.Mesh(kopp,mMess);k.rotation.x=Math.PI/2;k.position.set(p.x+.02,p.y,p.z+r+.02);saxG.add(k);
+       const pe=new THREE.Mesh(perle,mPerle);pe.rotation.x=Math.PI/2;pe.position.set(p.x+.02,p.y,p.z+r+.045);saxG.add(pe);});
+     {const a=kropp.getPointAt(.03),b=kropp.getPointAt(.5),l=a.distanceTo(b);
+      const st=new THREE.Mesh(new THREE.CylinderGeometry(.014,.014,l,8),mMess);
+      st.position.copy(a).lerp(b,.5);st.position.x+=.1;st.position.z+=.07;st.quaternion.setFromUnitVectors(V(0,1,0),b.clone().sub(a).normalize());saxG.add(st);}
+     // Store klaffar på sida nede ved bogen
+     [.6,.68].forEach(u=>{const p=kropp.getPointAt(u),r=.064+.13*Math.pow(u,1.5);
+       const k=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,.03,22),mMess);k.rotation.z=Math.PI/2;k.position.set(p.x-r-.01,p.y,p.z+.03);saxG.add(k);});
+     // Oktavklaff: ein liten boge over halsen
+     {const ok=new THREE.Mesh(new THREE.TorusGeometry(.09,.012,6,16,Math.PI),mMess);ok.position.copy(hals.getPointAt(.45));ok.position.z+=.03;ok.rotation.z=-.4;saxG.add(ok);}}
+    // Notar som stig opp frå trakta
+    const noteC=document.createElement('canvas');noteC.width=64;noteC.height=96;
+    {const g=noteC.getContext('2d');g.fillStyle='#32595e';
+     g.save();g.translate(20,78);g.rotate(-.35);g.beginPath();g.ellipse(0,0,15,10,0,0,7);g.fill();g.restore();
+     g.fillRect(31,10,5,68);g.beginPath();g.moveTo(36,10);g.quadraticCurveTo(58,26,50,50);g.quadraticCurveTo(52,32,36,28);g.fill();}
+    const noteGeo=new THREE.PlaneGeometry(.5,.75),noteT=tekstur(noteC);
+    const notar=Array.from({length:6},()=>{const m=new THREE.Mesh(noteGeo,new THREE.MeshBasicMaterial({map:noteT,transparent:true,depthWrite:false}));
+      m.visible=false;scene.add(m);return {m,t0:-1};});
+
+    // Fotball: kvit med svarte felt (femkantar som rundingar på eit ekvirektangulært kart)
+    const ballC=document.createElement('canvas');ballC.width=512;ballC.height=256;
+    {const g=ballC.getContext('2d');g.fillStyle='#f6f6f4';g.fillRect(0,0,512,256);g.fillStyle='#1b1b1b';
+     g.fillRect(0,0,512,22);g.fillRect(0,234,512,22);
+     [[26.6,0],[-26.6,36]].forEach(([lat,l0])=>{for(let i=0;i<6;i++){const lon=l0+i*72;
+       const x=lon/360*512,y=(90-lat)/180*256;
+       [x,x-512,x+512].forEach(xx=>{g.beginPath();g.ellipse(xx,y,30/Math.cos(lat*Math.PI/180),28,0,0,7);g.fill();});}});}
+    const ball=new THREE.Mesh(new THREE.SphereGeometry(.36,28,20),new THREE.MeshStandardMaterial({map:tekstur(ballC),roughness:.45,envMapIntensity:.4}));
+    ball.visible=false;scene.add(ball);
+    const BR=.36,BALL_FOT=FOT.y+.62,BALL_HODE=HJ.y+.9+BR;
+    // Triksinga: kva tid ballen er borti foten eller hovudet
+    const TRIKS=[[.75,'f'],[1.35,'f'],[1.95,'f'],[2.85,'h'],[3.55,'h'],[4.45,'f'],[5.05,'f'],[5.6,'f'],[6.2,'f']];
+    const ballPos=(kind)=>kind==='h'?new THREE.Vector3(HJ.x-.05,BALL_HODE,.25):new THREE.Vector3(FOT.x-.35,BALL_FOT,1.05);
+
     // ── Rørsle ──
     const fj=(x,k,d)=>({x,v:0,m:x,k,d});
     const steg=(f,dt)=>{f.v+=(f.k*(f.m-f.x)-f.d*f.v)*dt;f.x+=f.v*dt;};
@@ -21269,15 +21370,65 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
         o.lean+=.13*Math.sin(e*4)*h;o.bukk+=.08*Math.cos(e*4)*h;o.hjelmSnu=.35*h;o.auge=1-.15*h;o.skeiv=.12*h;
         if(e>2.35)o.sq=1-.06*hald(e,2.35,2.9,.1);
         return e<2.9;},
+      // ── Leik når det er stille lenge ──
+      rubik(e,o){   // løyser rubikskuben, lag for lag, og jublar når han er ferdig
+        const D=.55,t0=.5,slutt=t0+rubTrekk.length*D;
+        o.prop='rubik';o.arm-=.55;o.kort-=.15;o.eu=-.55;o.ev=-.42;o.bukk=.08;o.yaw-=.15;o.bryn+=.04;o.skeiv=.06*Math.sin(e*1.3);
+        const i=Math.floor((e-t0)/D);
+        while(rubGjort<Math.min(i,rubTrekk.length)){rubVri(rubTrekk[rubGjort],1);rubGjort++;}
+        if(e>t0&&i<rubTrekk.length){const p=glatt(0,.75,(e-t0-i*D)/D);rubVri(rubTrekk[i],Math.min(.999,p));o.kort+=.06*Math.sin(e*20);}
+        if(e>slutt){   // ferdig: held kuben opp og hoppar
+          const h=hald(e,slutt,slutt+1.5,.2);o.arm-=.75*h;o.eu=-.3*h;o.ev=.2*h;o.auge=1-.6*h;o.bryn+=.14*h;o.bukk=0;
+          o.y+=hopp(e,slutt+.15,slutt+.6,.6);lande(e,slutt+.6,'a',3.5);}
+        return e<slutt+1.7;},
+      sax(e,o){   // saksofonsolo med augo att, svaiar i takt
+        const h=hald(e,.3,6.2,.4),b=e*4.2;o.prop='sax';
+        o.arm-=.6*h;o.lean+=.09*Math.sin(b/2)*h;o.bukk=(.06+.07*Math.sin(b))*h;o.yaw+=.12*Math.sin(b/2)*h;
+        o.auge=1-.85*h;o.bryn+=(.1+.06*Math.sin(b))*h;o.sq+=.035*Math.sin(b)*h;
+        saxG.rotation.z=.06*Math.sin(b/2+.6)*h;   // trakta svingar litt etter kroppen
+        if(e>4.3&&e<5.4){o.lean-=.18*hald(e,4.3,5.4,.2);o.bukk-=.18*hald(e,4.3,5.4,.2);}   // det høge tonen, bakover
+        notar.forEach((n,i)=>{const s=.7+i*.82;if(e>=s&&n.t0<s){n.t0=s;n.alder=0;n.dx=.7+Math.random()*.6;n.m.visible=true;
+          saxG.updateMatrixWorld();n.m.position.copy(saxG.localToWorld(saxMunn.clone()));}});
+        return e<6.6;},
+      fotball(e,o){   // triksar med fotballen: fot, fot, hovud … og eit langt spark til slutt
+        o.prop='ball';
+        const tider=TRIKS,sisteT=tider[tider.length-1][0];
+        let pos;
+        if(e<tider[0][0]){   // ballen dett inn frå venstre
+          const p=e/tider[0][0],a=new THREE.Vector3(FOT.x-3.6,6.4,.9),b=ballPos('f');
+          pos=a.lerp(b,p);pos.y=6.4+(BALL_FOT-6.4)*p*p;
+        }else if(e<sisteT){
+          let i=0;while(e>=tider[i+1][0])i++;
+          const [ta,ka]=tider[i],[tb,kb]=tider[i+1],d=tb-ta,p=(e-ta)/d;
+          const a=ballPos(ka),b=ballPos(kb);pos=a.clone().lerp(b,p);pos.y+=4*(14*d*d/8)*p*(1-p);
+        }else{   // det store sparket, opp og ut til høgre
+          const p=(e-sisteT)/1.4,a=ballPos('f');pos=new THREE.Vector3(a.x+6*p,a.y+9*p-6*p*p,a.z-.4*p);
+        }
+        ball.position.copy(pos);ball.rotation.z-=.16;ball.rotation.x+=.05;
+        tider.forEach(([t,k],j)=>{
+          if(k==='f'){o.y+=hopp(e,t-.1,t+.12,.14);lande(e,t+.12,'f'+j,2);o.lean+=.07*hald(e,t-.15,t+.1,.05);}
+          else{o.bukk-=.14*hald(e,t-.12,t+.12,.05);if(e>=t&&!landa.includes('h'+j)){landa.push('h'+j);hV+=3;}}
+        });
+        if(e>sisteT-.15&&e<sisteT+.3){o.lean+=.15;o.y+=.1;}
+        // Auga følgjer ballen
+        const hx=HJ.x,hy=HJ.y-.85;o.eu=Math.max(-.6,Math.min(.6,(pos.x-hx)/2.5));o.ev=Math.max(-.55,Math.min(.55,(pos.y-hy)/3));
+        if(e>sisteT+.8){o.auge=1-.5*hald(e,sisteT+.8,sisteT+1.6,.15);o.bryn+=.12;}
+        return e<sisteT+1.7;},
+    };
+    // Kalla når ei handling startar: set rekvisitten i startstilling
+    const INIT={
+      rubik:rubStokk,
+      sax(){notar.forEach(n=>{n.t0=-1;n.m.visible=false;});},
     };
     const RO_AKT=['hatt','sjaa','kort','snurr','strekk','dans','kortsnu','hikk','kikk'];
     const HOVER_AKT=['skvett','blunk1','vift','skvett','nikk'];
-    function start(n){if(RO||!AKT[n])return;akt={n,t:0};landa=[];konfLaus=false;sistAkt=n;}
+    const LEIK_AKT=['rubik','sax','fotball'];
+    function start(n){if(RO||!AKT[n])return;akt={n,t:0};landa=[];konfLaus=false;sistAkt=n;if(INIT[n])INIT[n]();}
 
     function ramme(dt){
       T+=dt;
       const prat=rot.classList.contains('prat'),tenk=rot.classList.contains('tenk');
-      const o={yaw:0,lean:0,sq:1,y:0,arm:0,kort:0,bryn:0,skeiv:0,auge:1,eu:0,ev:0,hjelmLyft:0,hjelmSnu:0,hjelmVipp:0,spin:0,flip:0,bukk:0,kortY:0,kortSnu:0,augeL:1,augeR:1,raud:0};
+      const o={yaw:0,lean:0,sq:1,y:0,arm:0,kort:0,bryn:0,skeiv:0,auge:1,eu:0,ev:0,hjelmLyft:0,hjelmSnu:0,hjelmVipp:0,spin:0,flip:0,bukk:0,kortY:0,kortSnu:0,augeL:1,augeR:1,raud:0,prop:null};
       // Mus: auga følgjer peikaren, kroppen snur seg litt etter
       const hode=augeL.g.getWorldPosition(new THREE.Vector3()).project(cam),r=rekt||(rekt=cv.getBoundingClientRect());
       const hx=r.left+(hode.x+1)/2*r.width,hy=r.top+(1-hode.y)/2*r.height;
@@ -21299,8 +21450,10 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
         if(akt){akt.t+=dt;if(!AKT[akt.n](akt.t,o))akt=null;}
         else if(!prat&&!tenk&&!hover&&T>nesteRo){
           // Har ingen gjort noko på eit minutt, døser han av (éin gong om gongen)
-          const doser=stille&&stille()>60000&&sistAkt!=='sov';
-          const val=RO_AKT.filter(n=>n!==sistAkt);start(doser?'sov':val[Math.floor(Math.random()*val.length)]);nesteRo=T+9+Math.random()*9;}
+          // Etter 20 s utan noko finn han oftast fram noko å leike med
+          const st=stille?stille():0,doser=st>60000&&sistAkt!=='sov',leik=!doser&&st>20000&&Math.random()<.7;
+          const val=(leik?LEIK_AKT:RO_AKT).filter(n=>n!==sistAkt);start(doser?'sov':val[Math.floor(Math.random()*val.length)]);
+          nesteRo=T+(leik?12:9)+Math.random()*9;}
         // Blunk, av og til to gonger
         if(T>nesteBlunk){blunkT=0;nesteBlunk=T+2.2+Math.random()*4+(Math.random()<.2?-1.95:0);}
       }
@@ -21319,6 +21472,13 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
       const sq=Math.max(.6,F.sq.x);sqG.scale.set(1/Math.sqrt(sq),sq,1/Math.sqrt(sq));
       skulder.rotation.z=F.arm.x;handG.rotation.z=F.kort.x;
       kort.position.y=-.46+o.kortY;kort.rotation.y=o.kortSnu;
+      // Leiketøyet: berre det handlinga brukar er synleg, og kortet vert lagt bort når handa trengst
+      rubikG.visible=o.prop==='rubik';saxG.visible=o.prop==='sax';ball.visible=o.prop==='ball';
+      kort.visible=o.prop!=='rubik'&&o.prop!=='sax';
+      let notarAktiv=false;
+      notar.forEach(n=>{if(!n.m.visible)return;n.alder+=dt;if(n.alder>2.4){n.m.visible=false;return;}notarAktiv=true;
+        n.m.position.y+=dt*1.15;n.m.position.x+=dt*n.dx+Math.cos(n.alder*5)*dt*.5;n.m.rotation.z=.3*Math.sin(n.alder*4);
+        n.m.material.opacity=Math.min(1,n.alder/.2,(2.4-n.alder)/.7);});
       const ay=Math.max(.04,F.auge.x*blunk);
       augeL.g.scale.set(.34,.42*Math.max(.04,ay*o.augeL),.22);augeR.g.scale.set(.34,.42*Math.max(.04,ay*o.augeR),.22);
       mKinn.opacity=Math.max(0,Math.min(.7,F.raud.x*.7));kinn.forEach(m=>{m.visible=mKinn.opacity>.01;});
@@ -21352,7 +21512,7 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
         k.v.y-=14*dt;k.v.multiplyScalar(1-1.6*dt);k.m.position.addScaledVector(k.v,dt);
         k.m.rotation.x+=k.rv.x*dt;k.m.rotation.y+=k.rv.y*dt;k.m.rotation.z+=k.rv.z*dt;
         k.m.material.opacity=Math.min(1,k.liv/.5);});
-      return !!(akt||hover||prat||tenk||konfAktiv||blunkT>=0||Math.abs(F.sq.v)+Math.abs(F.yaw.v)+Math.abs(F.eu.v)+Math.abs(F.ev.v)+Math.abs(hV)>.01);
+      return !!(akt||hover||prat||tenk||konfAktiv||notarAktiv||blunkT>=0||Math.abs(F.sq.v)+Math.abs(F.yaw.v)+Math.abs(F.eu.v)+Math.abs(F.ev.v)+Math.abs(hV)>.01);
     }
 
     // Stråletest: lerretet tek berre imot musa når peikaren står på figuren

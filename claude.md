@@ -1630,6 +1630,16 @@ modusane.
     `salutt`, `djupbukk`), klikk som lukkar gir `blunk1`, og fire klikk på
     1,8 s gir `svimmel` med ei boble som går bort av seg sjølv.
     `o.augeL`/`o.augeR` styrer kvart auge for seg, `o.raud` dei raude kinna.
+    **Leik når det er stille:** etter 20 s utan aktivitet (`stille()`) vel han
+    oftast frå `LEIK_AKT` — `rubik` (stokkar med 7 vridingar i `INIT`, løyser
+    dei same baklengs og jublar), `sax` (augo att, notar stig frå trakta) og
+    `fotball` (triksar etter `TRIKS`, fot/hovud, og sparkar han ut til slutt).
+    Rekvisittane (`rubikG` i handa, `saxG`, `ball` og `notar` i scena) er
+    usynlege utanom: handlinga set `o.prop`, og `ramme()` slår på berre den
+    eine og legg bort kortet når handa trengst. Avbrot (hover, klikk) er
+    difor trygt — `INIT[n]` set rekvisitten i startstilling ved neste start.
+    NB: tida i handlingane er `dt`, klipt til 0,05 s — i ei struppa fane går
+    dei sakte, så test i ei fane som er framme.
     Alt går gjennom fjører (`F`), berre hopp-høgda er direkte. Hjelmen ligg
     laus: kroppen sin akselerasjon dyttar han, han kan ikkje gå gjennom
     hovudet. Hjulslaget roterer rundt midten av figuren, ikkje føtene.
