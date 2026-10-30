@@ -1622,6 +1622,14 @@ modusane.
   - Rørsla er lag: ro (pust, svai, blunk), tilstand (`prat`, `tenk`, mus
     over), og éi handling i `AKT` om gongen (`inn`, `vift`, `feir`, og dei
     som kjem av seg sjølv i ro: `hatt`, `sjaa`, `kort`, `snurr`, `strekk`, `dans`, `kortsnu`, `hikk`, `kikk`; dessutan `nikk` og `sov`).
+    **Mus og klikk:** når peikaren kjem på figuren, kjem av og til ein liten
+    reaksjon (`HOVER_AKT`: `skvett`, `blunk1`, `vift`, `nikk` — maks kvart 4. s).
+    Står musa på han: `kile` etter 2,2 s, `blyg` etter 7 s (ikkje medan boblen
+    er oppe; under 0,8 s utanfor nullstiller ikkje, sidan han rører seg sjølv
+    under peikaren). Klikk som opnar boble spelar frå `VED_KLIKK` (m.a.
+    `salutt`, `djupbukk`), klikk som lukkar gir `blunk1`, og fire klikk på
+    1,8 s gir `svimmel` med ei boble som går bort av seg sjølv.
+    `o.augeL`/`o.augeR` styrer kvart auge for seg, `o.raud` dei raude kinna.
     Alt går gjennom fjører (`F`), berre hopp-høgda er direkte. Hjelmen ligg
     laus: kroppen sin akselerasjon dyttar han, han kan ikkje gå gjennom
     hovudet. Hjulslaget roterer rundt midten av figuren, ikkje føtene.

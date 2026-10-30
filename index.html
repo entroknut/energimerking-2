@@ -20731,7 +20731,8 @@ function printFasadeView(){
     const av=document.createElement('button');av.className='k-av';av.textContent=bt('Slå av Klips');av.onclick=()=>settAv(true);knappEl.appendChild(av);
     document.getElementById('klipsLukk').onclick=()=>{if(t.key==='helsa')lsSet('klipsHelsa','1');if(t.key)utsett.add(t.key);skjul();};
     rot.classList.add('prat');
-    spel(auto?'inn':['vift','nikk','vift','kortsnu'][Math.floor(Math.random()*4)]);
+    const VED_KLIKK=['vift','nikk','vift','kortsnu','blunk1','salutt','djupbukk'];
+    spel(auto?'inn':VED_KLIKK[Math.floor(Math.random()*VED_KLIKK.length)]);
     sjaaPaa(1,-1,1400);   // ser opp mot boblen ei stund
   }
   function skjul(){vist=null;rot.classList.remove('prat');}
@@ -20785,8 +20786,19 @@ function printFasadeView(){
 
   const klikkFig=()=>figEl().dispatchEvent(new Event('click'));
   const vedKlikk=fn=>{fig.addEventListener('click',fn);if(k3)k3.el.addEventListener('click',fn);};
+  // Klikkar ein fort mange gonger, vert han svimmel (og seier frå at eitt klikk er nok)
+  let klikkT=[];
   vedKlikk(()=>{
-    if(vist){skjul();return;}
+    const no=Date.now();klikkT=klikkT.filter(t=>no-t<1800);klikkT.push(no);
+    if(klikkT.length>=4){
+      klikkT=[];
+      const s={tittel:TR('Oi oi oi …','Æ e heilt ør!'),
+        tekst:TR('Alt går rundt. Eitt klikk er nok — då kjem det eit tips.','Itj klikk så fort, gutt. Ett klikk e nok, så kjæm det et tips.'),knappar:[]};
+      vis(s,false);spel('svimmel');
+      setTimeout(()=>{if(vist===s)skjul();},4500);
+      return;
+    }
+    if(vist){skjul();spel('blunk1');return;}
     // Eitt klikk er nok: helsinga vert hoppa over, og vi går rett til eit tips
     lsSet('klipsHelsa','1');
     const t=aktivtTips();
@@ -21015,6 +21027,10 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
       modell.add(g);return {g,y:midt.y};
     }
     const brynL=lagBryn([152,128],[164,118],[181,125]),brynR=lagBryn([200,121],[215,112],[230,120]);
+    // Raude kinn når han vert kilen eller blyg (usynlege elles)
+    const mKinn=new THREE.MeshBasicMaterial({color:lin(0xe8737a),transparent:true,opacity:0,depthWrite:false});
+    const kinn=[P(168,186,.3),P(214,186,.3)].map(p=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.2,16,10),mKinn);
+      m.position.copy(p);m.scale.set(1,.55,.3);m.visible=false;modell.add(m);return m;});
 
     // Armen og energimerket. Kortet heng i handa, så det kan vifte rundt grepet.
     const skulder=new THREE.Group();skulder.position.copy(P(160,268,.02));modell.add(skulder);
@@ -21141,12 +21157,12 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
     const steg=(f,dt)=>{f.v+=(f.k*(f.m-f.x)-f.d*f.v)*dt;f.x+=f.v*dt;};
     const F={yaw:fj(0,60,11),lean:fj(0,80,9),sq:fj(1,260,9),arm:fj(0,90,11),kort:fj(0,160,10),
       bryn:fj(0,140,12),skeiv:fj(0,120,12),auge:fj(1,220,18),eu:fj(0,160,16),ev:fj(0,160,16),tilt:fj(0,90,7),vipp:fj(0,110,9),
-      bukk:fj(0,90,10)};
+      bukk:fj(0,90,10),raud:fj(0,60,12)};
     const glatt=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
     const hald=(e,a,b,r)=>glatt(a,a+r,e)*(1-glatt(b-r,b,e));
     const hopp=(e,a,b,h)=>{if(e<a||e>b)return 0;const p=(e-a)/(b-a);return 4*h*p*(1-p);};
     let T=0,akt=null,sistAkt='',nesteRo=6+Math.random()*6,nesteBlunk=2,blunkT=-1;
-    let hover=false,laastTil=0,laasU=0,laasV=0,mus={x:-1e4,y:-1e4},rekt=null;   // rekt: lerretet på skjermen, lese ved musrørsle
+    let hover=false,hoverT=0,hoverBort=0,hoverSteg=0,sistHoverAkt=-9,laastTil=0,laasU=0,laasV=0,mus={x:-1e4,y:-1e4},rekt=null;   // rekt: lerretet på skjermen, lese ved musrørsle
     window.addEventListener('resize',()=>{rekt=null;});
     let hY=0,hV=0,kroppY=0,kroppV=0,konfLaus=false,landa=[];
     // Handlingane: e = sekund sidan start, o = måla for denne ramma.
@@ -21220,14 +21236,48 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
         else{o.y+=hopp(e,3.6,3.95,.6);o.auge=1.3;o.bryn+=.16;o.hjelmLyft=.5*hald(e,3.6,3.9,.05);}
         lande(e,3.95,'a',3);
         return e<4.5;},
+      // ── Svar på musa og klikk ──
+      skvett(e,o){   // skvett når peikaren kjem brått på
+        o.y+=hopp(e,0,.35,.55);lande(e,.35,'a',3);
+        o.auge=1+.4*hald(e,0,.7,.06);o.bryn+=.2*hald(e,0,.75,.08);o.hjelmLyft=.6*hald(e,0,.3,.05);
+        o.arm-=.6*hald(e,0,.6,.1);
+        return e<.95;},
+      blunk1(e,o){   // blunkar med eitt auge
+        const h=hald(e,.1,.75,.12);o.augeL=1-.93*h;o.skeiv=-.08*h;o.bryn+=.05*h;o.lean-=.04*h;o.yaw+=.15*h;
+        return e<1;},
+      kile(e,o){   // kilen: fniser og vrir seg når musa vert verande
+        const h=hald(e,.05,1.6,.15);
+        o.lean+=.09*Math.sin(e*31)*h;o.sq+=.05*Math.sin(e*23)*h;o.y+=.08*Math.abs(Math.sin(e*11))*h;
+        o.auge=1-.7*h;o.bryn+=.12*h;o.raud=.8*h;o.arm-=.35*h;o.kort+=.15*Math.sin(e*19)*h;
+        return e<1.8;},
+      blyg(e,o){   // blyg: snur seg bort og gøymer seg bak energimerket
+        const h=hald(e,.1,2.4,.35);
+        o.yaw-=.6*h;o.eu=-.5*h;o.ev=-.35*h;o.arm-=.75*h;o.kort+=.25*h;o.raud=h;o.bukk=.08*h;o.sq-=.04*h;
+        if(e>1.4&&e<1.9){o.eu=.45;o.ev=.1;}   // kikkar fram ein augneblink
+        return e<2.6;},
+      salutt(e,o){   // helsar med energimerket
+        const h=hald(e,.1,1.3,.15);lande(e,.1,'a',-2);
+        o.arm-=.95*h;o.kort+=.55*h+.12*Math.sin(e*9)*hald(e,.4,1.1,.1);o.sq+=.04*h;o.bryn-=.03*h;o.auge=1-.1*h;
+        return e<1.5;},
+      djupbukk(e,o){   // eit djupt bukk, hjelmen vippar med
+        const h=hald(e,.1,1.5,.3);o.bukk=.5*h;o.hjelmVipp=.5*h;o.arm+=.3*h;o.auge=1-.5*h;
+        return e<1.7;},
+      svimmel(e,o){   // for mange klikk: snurrar, og så går alt rundt
+        o.spin=Math.PI*4*glatt(0,.6,e);
+        const h=hald(e,.6,2.7,.3),a=e*8;
+        o.eu=.5*Math.cos(a)*h;o.ev=.45*Math.sin(a)*h;
+        o.lean+=.13*Math.sin(e*4)*h;o.bukk+=.08*Math.cos(e*4)*h;o.hjelmSnu=.35*h;o.auge=1-.15*h;o.skeiv=.12*h;
+        if(e>2.35)o.sq=1-.06*hald(e,2.35,2.9,.1);
+        return e<2.9;},
     };
     const RO_AKT=['hatt','sjaa','kort','snurr','strekk','dans','kortsnu','hikk','kikk'];
+    const HOVER_AKT=['skvett','blunk1','vift','skvett','nikk'];
     function start(n){if(RO||!AKT[n])return;akt={n,t:0};landa=[];konfLaus=false;sistAkt=n;}
 
     function ramme(dt){
       T+=dt;
       const prat=rot.classList.contains('prat'),tenk=rot.classList.contains('tenk');
-      const o={yaw:0,lean:0,sq:1,y:0,arm:0,kort:0,bryn:0,skeiv:0,auge:1,eu:0,ev:0,hjelmLyft:0,hjelmSnu:0,hjelmVipp:0,spin:0,flip:0,bukk:0,kortY:0,kortSnu:0};
+      const o={yaw:0,lean:0,sq:1,y:0,arm:0,kort:0,bryn:0,skeiv:0,auge:1,eu:0,ev:0,hjelmLyft:0,hjelmSnu:0,hjelmVipp:0,spin:0,flip:0,bukk:0,kortY:0,kortSnu:0,augeL:1,augeR:1,raud:0};
       // Mus: auga følgjer peikaren, kroppen snur seg litt etter
       const hode=augeL.g.getWorldPosition(new THREE.Vector3()).project(cam),r=rekt||(rekt=cv.getBoundingClientRect());
       const hx=r.left+(hode.x+1)/2*r.width,hy=r.top+(1-hode.y)/2*r.height;
@@ -21240,6 +21290,12 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
         if(prat){o.yaw+=.32;o.bryn+=.07;o.lean+=Math.sin(T*2.6)*.03;o.sq+=Math.sin(T*8.5)*.012;}
         if(tenk){o.eu=-.42;o.ev=.5;o.bryn+=.03;o.skeiv=.14;o.lean+=Math.sin(T*1.5)*.06;o.yaw-=.2;}
         if(hover){o.auge=1.1;o.bryn+=.08;o.lean-=.04;}
+        // Står musa på han ei stund, vert han kilen — og etter lenge blyg
+        // (han rører seg sjølv, så eit kort augneblink utanfor tel ikkje som at musa gjekk)
+        if(hover&&!prat){hoverT+=dt;hoverBort=0;
+          if(!akt&&hoverSteg===0&&hoverT>2.2){hoverSteg=1;start('kile');}
+          else if(!akt&&hoverSteg===1&&hoverT>7){hoverSteg=2;start('blyg');}}
+        else if((hoverBort+=dt)>.8||prat){hoverT=0;hoverSteg=0;}
         if(akt){akt.t+=dt;if(!AKT[akt.n](akt.t,o))akt=null;}
         else if(!prat&&!tenk&&!hover&&T>nesteRo){
           // Har ingen gjort noko på eit minutt, døser han av (éin gong om gongen)
@@ -21250,7 +21306,7 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
       }
       let blunk=1;if(blunkT>=0){blunkT+=dt;blunk=blunkT<.14?1-Math.sin(Math.PI*blunkT/.14)*.95:1;if(blunkT>=.14)blunkT=-1;}
       F.yaw.m=o.yaw;F.lean.m=o.lean;F.sq.m=o.sq;F.arm.m=o.arm;F.kort.m=o.kort;F.bryn.m=o.bryn;F.skeiv.m=o.skeiv;
-      F.auge.m=o.auge;F.eu.m=o.eu;F.ev.m=o.ev;F.vipp.m=o.hjelmVipp;F.bukk.m=o.bukk;
+      F.auge.m=o.auge;F.eu.m=o.eu;F.ev.m=o.ev;F.vipp.m=o.hjelmVipp;F.bukk.m=o.bukk;F.raud.m=o.raud;
       for(const k in F)steg(F[k],dt);
       // Kroppen: y direkte (hopp er ballistiske), alt anna gjennom fjørene
       const nyY=o.y,nyV=(nyY-kroppY)/Math.max(dt,1e-3),akk=Math.max(-250,Math.min(250,(nyV-kroppV)/Math.max(dt,1e-3)));
@@ -21264,7 +21320,8 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
       skulder.rotation.z=F.arm.x;handG.rotation.z=F.kort.x;
       kort.position.y=-.46+o.kortY;kort.rotation.y=o.kortSnu;
       const ay=Math.max(.04,F.auge.x*blunk);
-      augeL.g.scale.set(.34,.42*ay,.22);augeR.g.scale.set(.34,.42*ay,.22);
+      augeL.g.scale.set(.34,.42*Math.max(.04,ay*o.augeL),.22);augeR.g.scale.set(.34,.42*Math.max(.04,ay*o.augeR),.22);
+      mKinn.opacity=Math.max(0,Math.min(.7,F.raud.x*.7));kinn.forEach(m=>{m.visible=mKinn.opacity>.01;});
       const eu=Math.max(-.6,Math.min(.6,F.eu.x)),ev=Math.max(-.55,Math.min(.55,F.ev.x));
       settPupil(augeL,eu+.04,ev);settPupil(augeR,eu-.04,ev);
       brynL.g.position.y=brynL.y+F.bryn.x+F.skeiv.x;brynR.g.position.y=brynR.y+F.bryn.x-F.skeiv.x*.4;
@@ -21308,7 +21365,10 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
         ndc.set((mus.x-r.left)/r.width*2-1,-((mus.y-r.top)/r.height)*2+1);
         ray.setFromCamera(ndc,cam);paa=ray.intersectObjects(trondG.visible?treff.concat(treffTrond):treff,false).length>0;
       }
-      if(paa!==hover){hover=paa;cv.style.pointerEvents=paa?'auto':'none';if(paa&&!akt&&!RO)F.sq.v+=2.2;}
+      if(paa!==hover){hover=paa;cv.style.pointerEvents=paa?'auto':'none';
+        if(paa&&!akt&&!RO){F.sq.v+=2.2;
+          // Ein liten reaksjon når musa kjem på — ikkje kvar gong, og ikkje tett i tett
+          if(T-sistHoverAkt>4&&Math.random()<.65){sistHoverAkt=T;start(HOVER_AKT[Math.floor(Math.random()*HOVER_AKT.length)]);}}}
     }
     window.addEventListener('mousemove',e=>{
       mus.x=e.clientX;mus.y=e.clientY;
