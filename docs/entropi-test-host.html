@@ -25,6 +25,7 @@
   <button class="btn grey" id="reqSave">Ber verktøyet lagre</button>
   <button class="btn grey" id="pushSys">Send systema uoppmoda</button>
   <button class="btn grey" id="kiKey">KI-nøkkel</button>
+  <button class="btn grey" id="tema" title="Byter mørk/lys modus medan verktøyet er ope (sxi:theme)">☾ Mørk</button>
   <button class="btn grey" id="reload">Last iframe på nytt</button>
   <button class="btn grey" id="wipe">Slett lagra fil</button>
 </header>
@@ -90,6 +91,7 @@ window.addEventListener('message',async ev=>{
       ...(new URLSearchParams(location.search).has('autosave')
           ?{autosaveMs:Number(new URLSearchParams(location.search).get('autosave'))}
           :{}),
+      theme:tema,                    // 'light' | 'dark' | 'system'
       saveLabel:'Lagre på bygget'});
     log('▶ sxi:init'+(lagraTekst?' (med prosjekt)':' (tomt bygg)'));
     return;
@@ -223,6 +225,20 @@ document.getElementById('kiKey').onclick=()=>{
 };
 
 document.getElementById('reqSave').onclick=()=>{send({type:'sxi:request-save'});log('▶ sxi:request-save');};
+// Mørk modus i EntroPi. ?theme=dark|system set startverdien; knappen byter
+// medan verktøyet er ope. Startverdien går òg på iframe-URL-en, så verktøyet
+// er mørkt frå fyrste teikning og ikkje berre etter sxi:init.
+let tema=new URLSearchParams(location.search).get('theme')||'light';
+function visTema(){
+  const m=tema==='dark';
+  document.getElementById('tema').textContent=m?'☀ Lys':'☾ Mørk';
+  document.body.style.background=m?'#0c0d0e':'';
+  fr.style.background=m?'#0c0d0e':'';fr.style.borderColor=m?'#272b30':'';
+}
+document.getElementById('tema').onclick=()=>{
+  tema=tema==='dark'?'light':'dark';visTema();
+  send({type:'sxi:theme',theme:tema});log('▶ sxi:theme '+tema);};
+visTema();
 document.getElementById('reload').onclick=()=>{fr.src=fr.src;setState('lastar…');};
 // Uoppmoda push — verten kan sende lista når han vil, t.d. når nokon har lagt
 // inn eit nytt system i EntroPi medan verktøyet står ope.
@@ -235,7 +251,7 @@ setStored();
 // utan at verten svarar — for å sjekke at nedlastinga av .entro er uendra.
 const SILENT=new URLSearchParams(location.search).has('silent');
 if(SILENT)document.getElementById('state').textContent='silent — svarar ikkje';
-fr.src='../index.html'+(SILENT?'':'?embed=1');
+fr.src='../index.html'+(SILENT?'':'?embed=1&theme='+encodeURIComponent(tema));
 </script>
 </body>
 </html>

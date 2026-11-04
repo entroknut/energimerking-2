@@ -11,7 +11,7 @@ SXI-generatoren er eit nettbasert oppmålingsverktøy frå Entro AS for energime
 
 **Arkitektur:** Éi enkelt HTML-fil (`index.html`, ~9800 linjer) med all kode inline. Ingen bygg-steg. Eksterne avhengigheiter frå CDN: Three.js r128 (3D), pdf.js 3.11 (PDF), Mapbox GL (kart, inlina i fila).
 
-Fila har **to** inline `<script>`-blokker — syntaks-sjekken må sjekke begge.
+Fila har **tre** inline `<script>`-blokker (Mapbox, temaet i `<head>`, programmet) — syntaks-sjekken sjekkar alle.
 
 ---
 
@@ -711,6 +711,32 @@ Invariantar:
   `included_measures_ids`.
 - Valet er per eksport og vert **ikkje** lagra — det slepp den femdelte
   lagringsregelen.
+
+## Mørk modus
+
+Berre i EntroPi: følgjer innstillinga der. `setTema('light'|'dark'|'system')`
+set `data-theme="dark"` på `<html>`; kjeldene er `?theme=` på iframe-URL-en
+(lesen i ein liten `<script>` i `<head>`, så sida ikkje blinkar kvit),
+`theme` i `sxi:init` og meldinga `sxi:theme`. Utanfor EntroPi vert det aldri
+kalla — programmet er lyst som før. Ikkje lagra.
+
+- **Lys modus er uendra, og det er verifisert** (computed style på 1154
+  element, før/etter, 0 skilnader). Mekanismen: dei vanlege tokena
+  (`--surface`, `--text` …) får nye verdiar under `:root[data-theme="dark"]`,
+  og alle hardkoda lyse fargar i stilarket og i JS-strengar står som
+  `var(--dm-x,#original)`. `--dm-*` finst **berre** i mørk modus, så i lys
+  modus gjeld originalfargen eksakt.
+- **Ny farge i ein stil eller ein `style.cssText`**: bruk eit token, eller
+  `var(--dm-x,#farge)`. Ein hardkoda `#fff`-bakgrunn vert ei kvit flekk i
+  mørk modus. JS-fargetabellar (t.d. `ROLLE_FARGE` for YV/SK/KJ) må følgje
+  same mønster.
+- Det som ikkje er eit rett fargebyte (punktrutenett, kvite gjennomsiktige
+  lag, kantar på primærknappar) står i ein eigen blokk nedst i stilarket.
+- Lerret: kompasset les `erMork()`; 3D (`_bg3`/`getBg3D`) les `data-theme`
+  og lyttar på `sxi-tema`-hendinga. **Planteikninga vert ikkje invertert** —
+  arket står kvitt på mørk flate, og lappar/mål på lerretet ligg på arket.
+- Utskriftsvindauget (`printFasadeView`) er eit eige dokument utan token og
+  er med vilje lyst.
 
 ## Ikon og menyar
 

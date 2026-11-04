@@ -20,7 +20,8 @@ hostinga kan halde fram som før.
 EntroPi (entro-digital.vercel.app)          iframe (github.io)
 │                                            │
 │  ◀── sxi:ready ────────────────────────────┤  verktøyet er lasta
-├──── sxi:init {bygg, project} ─────────────▶│  opnar prosjektet frå bygget
+├──── sxi:init {bygg, project, theme} ──────▶│  opnar prosjektet frå bygget
+├──── sxi:theme {theme} ────────────────────▶│  brukaren bytte lys/mørk modus
 │  ◀── sxi:state {dirty} ────────────────────┤  ulagra endringar?
 ├──── sxi:request-save ─────────────────────▶│  (t.d. når modalen vert lukka)
 │  ◀── sxi:save {blob, meta, filename} ──────┤  brukaren trykte «Lagre»
@@ -60,7 +61,8 @@ nok til å vise «3 etasjar · 12 soner · 2 480 m²» på byggkortet utan å op
 
 | type | felt | verknad |
 |---|---|---|
-| `sxi:init` | `bygg`, `brukar`, `project`, `wantsSxi`, `autosaveMs`, `saveLabel` | slår på innbygd modus. Send han som svar på `sxi:ready`. |
+| `sxi:init` | `bygg`, `brukar`, `project`, `wantsSxi`, `autosaveMs`, `saveLabel`, `theme` | slår på innbygd modus. Send han som svar på `sxi:ready`. |
+| `sxi:theme` | `theme` | brukaren har bytt mellom lys og mørk modus i EntroPi medan verktøyet står ope. Verktøyet byter med ein gong, utan å laste på nytt. |
 | `sxi:load` | `project` | byt til eit anna prosjekt medan verktøyet står ope (t.d. ein tidlegare versjon). |
 | `sxi:request-save` | `requestId`, `auto` | ber verktøyet lagre no. Kvar førespurnad endar i ein `sxi:save` med same `requestId` — kjem han medan ei lagring alt går (t.d. ei autolagring), vert han lagd i kø og send så snart den fyrste er ferdig. |
 | `sxi:save-result` | `requestId`, `ok`, `message` | resultatet av lagringa. Utan svar innan 45 s gir verktøyet opp og ber brukaren prøve igjen. |
@@ -91,6 +93,27 @@ Felta i `sxi:init`:
   kjør. Kvar autolagring skriv ei ny fil, så vel eit tal som passar med kor
   mange versjonar de vil ta vare på.
 - `saveLabel` — tekst på lagreknappen (standard «Lagre på bygget»).
+- `theme` — `'light'`, `'dark'` eller `'system'` (følgjer operativsystemet).
+  Utelate ⇒ lys. Sjå «Mørk modus».
+
+### Mørk modus
+
+Verktøyet følgjer innstillinga i EntroPi. Det har ingen eigen brytar — det er
+EntroPi som veit kva brukaren har valt. Tre stader, og EntroPi bør bruke alle:
+
+1. **`&theme=dark` på iframe-URL-en** (ved sida av `?embed=1`). Lesen i
+   `<head>` før noko vert teikna. Utan han står verktøyet kvitt eit augneblink
+   til `sxi:init` kjem — det blinkar i ein elles mørk side.
+2. **`theme` i `sxi:init`** — den gjeldande verdien.
+3. **`sxi:theme {theme}`** når brukaren trykkjer på måne/sol-knappen medan
+   verktøyet er ope.
+
+Gyldige verdiar: `'light'`, `'dark'`, `'system'`. Alt anna vert ignorert.
+Verdien vert ikkje lagra i prosjektet; han kjem på nytt kvar gong. Utanfor
+EntroPi (og utan `?embed=1`) er verktøyet alltid lyst.
+
+Planteikninga sjølv vert ikkje invertert — arket står kvitt på den mørke
+flata, slik det ville gjort i eit teikneprogram.
 
 ### Autolagring til bygget
 
@@ -569,6 +592,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const TOOL_ORIGIN = 'https://entroknut.github.io';
 const TOOL_URL = `${TOOL_ORIGIN}/energimerking-2/index.html?embed=1`;
+// Mørk modus: legg temaet på URL-en òg, så verktøyet er mørkt frå fyrste
+// teikning — `${TOOL_URL}&theme=${tema}` (tema = 'light' | 'dark' | 'system').
 
 type Bygg = { id: string; namn: string; adresse?: string; byggeaar?: number };
 
@@ -584,6 +609,13 @@ export function Energimerking({ bygg, brukar, onClose }: { bygg: Bygg; brukar: B
   const send = useCallback((msg: Record<string, unknown>) => {
     ref.current?.contentWindow?.postMessage({ source: 'entropi', ...msg }, TOOL_ORIGIN);
   }, []);
+
+  // Lys/mørk modus frå EntroPi sitt eige tema (måne/sol-knappen). Bytt ut
+  // kroken med den EntroPi faktisk brukar. Byter brukaren medan verktøyet er
+  // ope, går det over utan å laste iframen på nytt. Ei melding som kjem før
+  // iframen er lasta, går tapt — difor står temaet på URL-en og i sxi:init òg.
+  const tema = useTheme();   // 'light' | 'dark' | 'system'
+  useEffect(() => { send({ type: 'sxi:theme', theme: tema }); }, [tema, send]);
 
   useEffect(() => {
     const onMsg = async (ev: MessageEvent) => {
@@ -601,6 +633,7 @@ export function Energimerking({ bygg, brukar, onClose }: { bygg: Bygg; brukar: B
             project: lagra.current,          // Blob, streng eller null
             wantsSxi: true,
             saveLabel: 'Lagre på bygget',
+            theme: tema,                     // 'light' | 'dark' | 'system'
           });
           break;
 
