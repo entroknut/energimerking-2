@@ -1193,7 +1193,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.22.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.23.0</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -1359,6 +1359,22 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div class="dialog-overlay" id="calOverlay">
       <div class="dialog">
         <h3>📏 Kalibrér skala</h3>
+
+        <!-- Kva skalaen skal gjelde for (berre med fleire etasjar) -->
+        <div id="calScope" style="display:none;margin-bottom:14px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Skalaen skal gjelde for</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <button id="calScopeGlobal" type="button" style="padding:8px 10px;border:1.5px solid var(--border2);border-radius:8px;background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit;text-align:left">
+              <div style="font-weight:700;font-size:12px">Alle etasjar</div>
+              <div style="font-size:10.5px;color:var(--text3);margin-top:1px">Global skala</div>
+            </button>
+            <button id="calScopeOwn" type="button" style="padding:8px 10px;border:1.5px solid var(--border2);border-radius:8px;background:var(--surface);color:var(--text);cursor:pointer;font-family:inherit;text-align:left">
+              <div style="font-weight:700;font-size:12px" id="calScopeOwnNamn">Berre denne etasjen</div>
+              <div style="font-size:10.5px;color:var(--text3);margin-top:1px">Eigen skala</div>
+            </button>
+          </div>
+          <div id="calScopeNote" style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.4"></div>
+        </div>
 
         <!-- Steg 1: vel metode -->
         <div id="calStep1">
@@ -4035,6 +4051,84 @@ function getUtvOmkrets(z){
   return segs.filter(s=>!sk.has(s.idx)).reduce((t,s)=>t+(s.lenM||0),0);
 }
 
+// Målestokken arket faktisk er teikna i, utleidd frå skalaen og papirformatet.
+// Eksakt «1:100» når han ligg innanfor 1,5 % av eit rundt tal, elles «≈1:103»
+// (t.d. etter lengdekalibrering). Utan kjent papir: null — vi gjettar ikkje.
+function maalestokkTekst(ark,mpp){
+  const img=ark&&ark.bgImg;
+  if(!mpp||!img||!ark.paperWMm)return null;
+  const m=mpp*img.width/ark.paperWMm;
+  if(!(m>0))return null;
+  const steg=m<100?5:m<1000?10:50;
+  const r=Math.round(m/steg)*steg;
+  return Math.abs(m-r)/r<0.015?'1:'+r:'≈1:'+Math.round(m);
+}
+function _skalaTekstEl(ark,mpp){
+  const wrap=document.createElement('span');
+  const ms=maalestokkTekst(ark,mpp);
+  if(ms){
+    const b=document.createElement('strong');
+    b.style.cssText='color:var(--text);font-weight:700';
+    b.textContent=ms;
+    wrap.appendChild(b);
+    wrap.appendChild(document.createTextNode(' · '));
+  }
+  wrap.appendChild(document.createTextNode('1 px = '+(mpp?mpp.toFixed(3):'—')+' mm'));
+  return wrap;
+}
+// Byter frå eigen til global skala for etasjen f (måla følgjer med)
+function brukGlobalSkala(f){
+  if(!f.ownCal)return;
+  snapshot();
+  const _oldMpp=_snapshotMpp();
+  f.ownCal=false;
+  f.mmPerImgPx=globalMmPerImgPx;
+  syncFloorState();
+  const _nRe=_reskalerAlleEtasjar(_oldMpp);
+  updateScaleBadge();updateResults();renderTable();renderFloorTabs();draw();
+  hintText.textContent=arkNamn(f)+' brukar no den globale skalaen'
+    +(globalMmPerImgPx?'':' — men han er ikkje sett enno. Kalibrer for å setje han')+'.'
+    +(_nRe>0?' '+_nRe+' vindauge/dør'+(_nRe>1?'er':'')+' vart skalert med bygget.':'');
+}
+// Opnar kalibreringa med eit fast val av kva ho skal gjelde for
+function kalibrerMed(eigen){
+  calBtn.click();
+  calScopeOwn=!!eigen;
+  oppdaterCalScope();
+}
+function visSkalaMeny(anker){
+  const f=curFloor();
+  document.querySelectorAll('.ctx-menu').forEach(m=>m.remove());
+  const menu=document.createElement('div');
+  menu.className='ctx-menu';
+  const r=anker.getBoundingClientRect();
+  menu.style.cssText=`left:${r.left}px;top:${r.bottom+6}px`;
+  const hdr=document.createElement('div');
+  hdr.className='ctx-menu-header';
+  hdr.textContent='Skala for '+arkNamn(f);
+  menu.appendChild(hdr);
+  const close=ev=>{if(!menu.contains(ev.target)){menu.remove();document.removeEventListener('mousedown',close);}};
+  const mk=(merka,tittel,under,fn)=>{
+    const b=document.createElement('button');
+    b.className='ctx-menu-item';
+    b.style.alignItems='flex-start';
+    b.innerHTML=`<span class="ctx-ik">${merka?ctxIkon('✓'):''}</span><span><span style="font-weight:${merka?700:500}">${tittel}</span><br><span style="font-size:11px;color:var(--text3)">${under}</span></span>`;
+    b.onclick=()=>{menu.remove();document.removeEventListener('mousedown',close);fn();};
+    menu.appendChild(b);
+  };
+  const gMs=globalMmPerImgPx?(maalestokkTekst(f,globalMmPerImgPx)||('1 px = '+globalMmPerImgPx.toFixed(3)+' mm')):'ikkje sett';
+  mk(!f.ownCal,'Global skala','Felles for alle etasjar · '+gMs,()=>{if(f.ownCal)brukGlobalSkala(f);});
+  mk(f.ownCal,'Eigen skala for denne etasjen'+(f.ownCal?'':'…'),
+    f.ownCal?'Klikk for å kalibrere han på nytt':'Kalibrer berre '+arkNamn(f)+' — dei andre står urørte',
+    ()=>kalibrerMed(true));
+  const sep=document.createElement('div');sep.className='ctx-menu-sep';menu.appendChild(sep);
+  mk(false,'Kalibrer på nytt…',f.ownCal?'Gjeld berre denne etasjen':'Gjeld alle etasjar med global skala',()=>kalibrerMed(f.ownCal));
+  document.body.appendChild(menu);
+  const mr=menu.getBoundingClientRect();
+  if(mr.right>window.innerWidth)menu.style.left=(window.innerWidth-mr.width-8)+'px';
+  setTimeout(()=>document.addEventListener('mousedown',close),10);
+}
+
 function updateScaleBadge(){
   const f=curFloor();
   const multiFloor=floors.length>1;
@@ -4046,82 +4140,52 @@ function updateScaleBadge(){
     scaleBadge.appendChild(txt);
     scaleBadge.className='uncal';
     scaleBadge.style.pointerEvents='all';
+    scaleBadge.title='';
     scaleBadge.onclick=()=>{if(bgImg)calBtn.click();};
     return;
   }
 
+  scaleBadge.className='';
+  scaleBadge.innerHTML='';
+  scaleBadge.style.pointerEvents='all';
+  scaleBadge.style.cursor='pointer';
+  scaleBadge.title='Klikk for å kalibrere på nytt';
+  scaleBadge.onclick=()=>{if(bgImg)calBtn.click();};
+
   // Fasadeark har alltid si eiga kalibrering — ingen global skala å veksle mot.
   if(iFasade()){
-    scaleBadge.className='';
-    scaleBadge.onclick=null;
-    scaleBadge.style.pointerEvents='none';
-    scaleBadge.textContent='1 px = '+mmPerImgPx.toFixed(3)+' mm · eigen skala for arket';
+    scaleBadge.appendChild(_skalaTekstEl(curFasade(),mmPerImgPx));
+    scaleBadge.appendChild(document.createTextNode(' · eigen skala for arket'));
     return;
   }
 
-  scaleBadge.className='';
-  scaleBadge.onclick=null;
-  scaleBadge.style.pointerEvents=multiFloor?'all':'none';
-  scaleBadge.innerHTML='';
+  const txt=_skalaTekstEl(f,mmPerImgPx);
+  txt.style.marginRight=multiFloor?'8px':'';
+  scaleBadge.appendChild(txt);
+  if(!multiFloor)return;
 
-  if(!multiFloor){
-    // Single floor — plain display
-    scaleBadge.textContent='1 px = '+mmPerImgPx.toFixed(3)+' mm';
-    return;
-  }
-
-  // Multi-floor: show scale + own-cal toggle
-  const scaleSpan=document.createElement('span');
-  scaleSpan.style.cssText='margin-right:8px;';
-  const isOwnCal=f.ownCal&&f.mmPerImgPx;
-  const calLabel=isOwnCal?'Eiga kalibrering':'Global kalibrering';
-  const calVal=(isOwnCal?f.mmPerImgPx:globalMmPerImgPx);
-  scaleSpan.textContent='1 px = '+(calVal?calVal.toFixed(3):'—')+' mm';
-  scaleBadge.appendChild(scaleSpan);
-
-  // Toggle pill
-  const toggle=document.createElement('span');
-  toggle.style.cssText=`
+  // Fleire etasjar: pille som opnar valet global / eigen skala
+  const pill=document.createElement('span');
+  pill.style.cssText=`
     display:inline-flex;align-items:center;gap:4px;
-    padding:2px 8px 2px 6px;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;
+    padding:2px 6px 2px 6px;border-radius:10px;cursor:pointer;font-size:11px;font-weight:600;
     transition:background .15s,color .15s;user-select:none;
     ${f.ownCal
       ? 'background:var(--dm-lil-bg,#eef2ff);color:var(--dm-lil-tx,#4338ca);border:1px solid var(--dm-lil-bd,#c7d2fe);'
       : 'background:var(--dm-gr-bg,#f0fdf4);color:var(--dm-gr-tx,#166534);border:1px solid var(--dm-gr-bd,#bbf7d0);'}
   `;
-
   const dot=document.createElement('span');
   dot.style.cssText=`width:7px;height:7px;border-radius:50%;flex-shrink:0;background:${f.ownCal?'#6366f1':'#22c55e'}`;
   const lbl=document.createElement('span');
-  lbl.textContent=f.ownCal?'Eiga':'Global';
-  toggle.appendChild(dot);
-  toggle.appendChild(lbl);
-  toggle.title=f.ownCal
-    ?'Denne etasjen har eigen kalibrering. Klikk for å bruke global kalibrering.'
-    :'Alle etasjar deler same kalibrering. Klikk for å setje eiga kalibrering for denne etasjen.';
-
-  toggle.onclick=e=>{
-    e.stopPropagation();
-    snapshot();                     // vekslinga kan endre skalaen — gjer den angrande
-    const _oldMpp=mppForFloor(f);   // MÅ tas før ownCal blir bytta
-    f.ownCal=!f.ownCal;
-    if(f.ownCal){
-      // Start med kopi av global som utgangspunkt
-      if(!f.mmPerImgPx)f.mmPerImgPx=globalMmPerImgPx;
-      // Prompt bruker til å kalibrere med ein gong om dei vil
-      hintText.textContent='Eigen kalibrering aktivert for '+f.name+'. Trykk Kalibrer for å setje skala for berre denne etasjen.';
-    } else {
-      f.mmPerImgPx=null;
-      hintText.textContent='Tilbake til global kalibrering for '+f.name+'.';
-    }
-    // Går ein frå eiga til global skala, endrar måla seg — vindauge/dører følgjer
-    const _nRe=reskalerVedNyKalibrering(f,_oldMpp,mppForFloor(f));
-    syncFloorState();
-    updateScaleBadge();updateResults();renderTable();draw();
-    if(_nRe>0)hintText.textContent+=' '+_nRe+' vindauge/dør'+(_nRe>1?'er':'')+' vart skalert med bygget.';
-  };
-
-  scaleBadge.appendChild(toggle);
+  lbl.textContent=f.ownCal?'Eigen skala':'Global';
+  const pil=document.createElement('span');
+  pil.textContent='▾';pil.style.cssText='font-size:9px;opacity:.7;margin-left:1px';
+  pill.appendChild(dot);pill.appendChild(lbl);pill.appendChild(pil);
+  pill.title=f.ownCal
+    ?'Denne etasjen har eigen skala. Klikk for å velje.'
+    :'Alle etasjar deler same skala. Klikk for å gi denne etasjen eigen skala.';
+  pill.onclick=e=>{e.stopPropagation();visSkalaMeny(pill);};
+  scaleBadge.appendChild(pill);
 }
 
 // ── Mode management ───────────────────────────────────────────
@@ -4331,8 +4395,8 @@ function _liOpnKol(dor){
     {k:'b',t:'Breidd',ein:'mm',num:1,des:0,heil:1,get:r=>r.w.breddeMm,set:(r,v)=>{if(v!=null)r.w.breddeMm=v;}},
     {k:'h',t:'Høgd',ein:'mm',num:1,des:0,heil:1,get:r=>r.w.hoyMm,set:(r,v)=>{if(v!=null)r.w.hoyMm=v;}},
     ...(dor?[]:[{k:'bryst',t:'Brystning',ein:'mm',num:1,des:0,heil:1,valfri:1,ph:()=>'standard',get:r=>r.w.brystningMm,set:(r,v)=>{r.w.brystningMm=v;}}]),
-    {k:'n',t:'Antal',num:1,des:0,heil:1,get:r=>winCount(r.w),
-      set:(r,v)=>{if(v==null)return;const g=winGeom(r.z,r.w);winSetAntal(r.w,v,g.width,g.segLen,winOpptekne(r.z,r.w,g.segLen,g.mpp));}},
+    ...(dor?[]:[{k:'n',t:'Antal',num:1,des:0,heil:1,get:r=>winCount(r.w),
+      set:(r,v)=>{if(v==null)return;const g=winGeom(r.z,r.w);winSetAntal(r.w,v,g.width,g.segLen,winOpptekne(r.z,r.w,g.segLen,g.mpp));}}]),
     {k:'u',t:'U-verdi',ein:'W/m²K',num:1,des:2,valfri:1,ph:r=>_liU(r.z,uk),get:r=>r.w.uVerdi,set:(r,v)=>{r.w.uVerdi=v==null?undefined:v;}},
     {k:'a',t:'Areal',ein:'m²',num:1,des:2,get:r=>_liOpnA(r.w)},
     {k:'ua',t:'Spesifikt varmetap',ein:'W/K',num:1,des:2,get:r=>_liOpnA(r.w)*(r.w.uVerdi??_liU(r.z,uk))},
@@ -6804,6 +6868,30 @@ function showCalStep2(mode){
   document.getElementById('calModeScale').style.display=mode==='scale'?'':'none';
 }
 
+// ── Kva kalibreringa gjeld for ──────────────────────────────
+// Med fleire etasjar vel brukaren i dialogen om skalaen er global eller berre
+// for denne etasjen. Valet vert fyrst brukt i calOk — Avbryt endrar ingenting.
+let calScopeOwn=false;
+function oppdaterCalScope(){
+  const box=document.getElementById('calScope');
+  const vis=!iFasade()&&floors.length>1;
+  box.style.display=vis?'':'none';
+  if(!vis)return;
+  const f=curFloor();
+  document.getElementById('calScopeOwnNamn').textContent='Berre '+arkNamn(f);
+  [['calScopeGlobal',!calScopeOwn],['calScopeOwn',calScopeOwn]].forEach(([id,paa])=>{
+    const b=document.getElementById(id);
+    b.style.borderColor=paa?'var(--accent)':'var(--border2)';
+    b.style.background=paa?'var(--accent-dim)':'var(--surface)';
+  });
+  const andreEigne=floors.filter(x=>x!==f&&x.ownCal).length;
+  document.getElementById('calScopeNote').textContent=calScopeOwn
+    ?'Dei andre etasjane står urørte.'
+    :'Gjeld alle etasjar som brukar global skala'+(andreEigne?` (${andreEigne} med eigen skala står urørt${andreEigne>1?'e':''})`:'')+'.';
+}
+document.getElementById('calScopeGlobal').onclick=()=>{calScopeOwn=false;oppdaterCalScope();};
+document.getElementById('calScopeOwn').onclick=()=>{calScopeOwn=true;oppdaterCalScope();};
+
 // ── Målestokk-kalibrering ───────────────────────────────────
 const SKALA_VAL=[50,100,200,250,500,1000];
 let valdSkala=100;
@@ -6824,7 +6912,7 @@ function oppdaterSkalaUI(){
   // Papirinfo
   if(sel.value==='auto'){
     if(f.paperWMm&&f.paperHMm){
-      const kjelde=f.paperSource==='pdf'?'lese frå PDF-sida':'lese frå biletet si DPI';
+      const kjelde=f.paperSource==='pdf'?'lese frå PDF-sida':f.paperSource==='val'?'valt ved førre kalibrering':'lese frå biletet si DPI';
       info.textContent=papirFormatNamn(f.paperWMm,f.paperHMm)+' — '+kjelde;
       icon.textContent='📄';
     } else {
@@ -6892,6 +6980,8 @@ document.getElementById('calChooseScale').onclick=()=>{
 calBtn.onclick=()=>{
   calPts=[];pendingCalAreaPx2=0;
   calMode='length';
+  calScopeOwn=!iFasade()&&!!curFloor().ownCal;
+  oppdaterCalScope();
   showCalStep1();
   calOverlay.classList.add('show');
 };
@@ -6931,7 +7021,15 @@ document.getElementById('calOk').onclick=()=>{
   let _reskalert=0;
   if(calMode==='scale'){
     const papir=gjeldandePapir();
-    if(papir&&bgImg&&valdSkala>0) newMmPerImgPx=(papir.w/bgImg.width)*valdSkala;
+    if(papir&&bgImg&&valdSkala>0){
+      newMmPerImgPx=(papir.w/bgImg.width)*valdSkala;
+      // Eit papirformat valt her vert hugsa på arket, så målestokken kan
+      // visast i skalabadgen etterpå (og føreslåast for delplanar)
+      if(document.getElementById('calPaperSel').value!=='auto'){
+        const _a=curArk();
+        if(_a){_a.paperWMm=papir.w;_a.paperHMm=papir.h;_a.paperSource='val';}
+      }
+    }
   } else if(calMode==='length'){
     const mm=parseFloat(document.getElementById('calMmInput').value);
     if(!isNaN(mm)&&mm>0&&pendingCalImgPx>0) newMmPerImgPx=mm/pendingCalImgPx;
@@ -6956,6 +7054,8 @@ document.getElementById('calOk').onclick=()=>{
     }
     const f=curFloor();
     const _oldMpp=_snapshotMpp();   // MÅ tas før skalaen blir bytta
+    // Med fleire etasjar avgjer valet i dialogen; med éin er det som før
+    if(floors.length>1)f.ownCal=calScopeOwn;
     if(f.ownCal){
       // Kun aktiv etasje
       f.mmPerImgPx=newMmPerImgPx;
@@ -8723,8 +8823,9 @@ document.getElementById('winOk').onclick=()=>{
   const _posI=(id,dflt)=>{const v=parseInt(document.getElementById(id).value);return v>0?v:dflt;};
   const w=_posI('winW',1200);
   const h=_posI('winH',1200);
-  const n=_posI('winN',1);
   const type=document.getElementById('winType').value;
+  // SIMIEN har ikkje antal på <door> — dører er alltid éi og éi
+  const n=type==='dor'?1:_posI('winN',1);
   zones[pendingWin.zi].windows=zones[pendingWin.zi].windows||[];
   snapshot();
   const _existW=zones[pendingWin.zi].windows;
@@ -10817,7 +10918,7 @@ function renderTable(){
         <td><strong>${w.name||(w.type==='dor'?'Dør':'Vindauge')}</strong></td>
         <td><input class="tbl-input" data-wb="${w.fli},${w.zi},${w.wi}" value="${w.breddeMm}" style="width:60px"></td>
         <td><input class="tbl-input" data-wh="${w.fli},${w.zi},${w.wi}" value="${w.hoyMm}" style="width:60px"></td>
-        <td><input class="tbl-input" data-wn="${w.fli},${w.zi},${w.wi}" value="${w.antal}" style="width:40px"></td>
+        <td>${w.type==='dor'&&(w.antal||1)<=1?'<span style="color:var(--text3)">1</span>':`<input class="tbl-input" data-wn="${w.fli},${w.zi},${w.wi}" value="${w.antal}" style="width:40px">`}</td>
         <td style="color:#06b6d4">${totalA}</td>
         ${(()=>{
           const _wz=floors[w.fli].zones[w.zi];
@@ -11033,7 +11134,7 @@ function renderTable(){
   });
   wrap.querySelectorAll('[data-wn]').forEach(inp=>{
     const [_fi,_zi,_wi]=inp.dataset.wn.split(',').map(Number);
-    inp.onchange=()=>{const z=floors[_fi].zones[_zi];const w=z.windows[_wi];const v=parseInt(inp.value);const g=winGeom(z,w);winSetAntal(w,v>0?v:1,g.width,g.segLen,winOpptekne(z,w,g.segLen,g.mpp));updateResults();renderTable();draw();};
+    inp.onchange=()=>{const z=floors[_fi].zones[_zi];const w=z.windows[_wi];let v=parseInt(inp.value);if(w.type==='dor')v=Math.min(v,winCount(w));const g=winGeom(z,w);winSetAntal(w,v>0?v:1,g.width,g.segLen,winOpptekne(z,w,g.segLen,g.mpp));updateResults();renderTable();draw();};
   });
 }
 
@@ -11875,7 +11976,12 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   box.appendChild(mkRow('Namn',nameI));
   box.appendChild(mkRow('Breidde (mm)',brI));
   box.appendChild(mkRow('Høgde (mm)',hoI));
-  box.appendChild(mkRow('Antal stk',antI));
+  // Dører har ikkje antal i SIMIEN. Ei gammal dør med antal>1 får feltet, men
+  // berre for å kunne setje det ned — aldri opp.
+  const _antalDor=w.type==='dor';
+  const _visAntal=!_antalDor||winCount(w)>1;
+  if(_antalDor)antI.max=winCount(w);
+  if(_visAntal)box.appendChild(mkRow('Antal stk',antI));
   const antNote=document.createElement('div');
   antNote.style.cssText='font-size:11px;margin:-6px 0 10px 120px;line-height:1.4';
   // Lever på breidde og antal medan brukaren skriv: ei gruppe som er breiare
@@ -11885,13 +11991,14 @@ function showWindowEditDialog(w,wi,z,zi,fli){
     const br=parseInt(brI.value),ant=parseInt(antI.value);
     const trongt=_segLenM&&br>0&&ant>1&&(ant*br/1000)>_segLenM*1.0001;
     antNote.style.color=trongt?'#c0302a':'var(--text3)';
+    if(_antalDor){antNote.style.color='var(--text3)';antNote.textContent='Dører kan ikkje grupperast i SIMIEN — set antalet til 1 og kopier døra om det er fleire.';return;}
     antNote.textContent=trongt
       ?`⚠ ${ant} × ${br} mm = ${(ant*br/1000).toFixed(2)} m på ein vegg på ${_segLenM.toFixed(2)} m — stykka vil overlappe.`
       :'Fleire stk = eitt element i SIMIEN med dette antalet, fordelt jamnt utover veggen. Kvar stk kan dragast for seg.';
   };
   oppdaterAntNote();
   antI.oninput=oppdaterAntNote;brI.oninput=oppdaterAntNote;
-  box.appendChild(antNote);
+  if(_visAntal)box.appendChild(antNote);
   box.appendChild(mkRow('U-verdi W/m²K',uI));
   if(w.type!=='dor') box.appendChild(brystRow);
 
@@ -11909,7 +12016,9 @@ function showWindowEditDialog(w,wi,z,zi,fli){
   save.textContent='Lagre';
   save.className='dok';
   save.onclick=()=>{
-    const br=parseInt(brI.value),ho=parseInt(hoI.value),ant=parseInt(antI.value);
+    const br=parseInt(brI.value),ho=parseInt(hoI.value);
+    let ant=parseInt(antI.value);
+    if(_antalDor&&ant>winCount(w))ant=winCount(w);
     if(!br||br<=0||!ho||ho<=0||!ant||ant<=0){errEl.textContent='Breidde, høgde og antal må vere positive tal.';errEl.style.display='block';return;}
     snapshot();
     w.name=nameI.value.trim()||typeL;
@@ -12174,6 +12283,8 @@ cv.addEventListener('click',e=>{
       // Skjul brystningshøgde for dør
       const _brystRow=document.getElementById('winBrystRow');
       _brystRow.style.display=_tval==='dor'?'none':'';
+      document.getElementById('winNRow').style.display=_tval==='dor'?'none':'';
+      if(_tval==='dor')document.getElementById('winN').value=1;
     };
     setAutoName();
     // Checkbox og inputfelt for brystningshøgde
@@ -12188,9 +12299,6 @@ cv.addEventListener('click',e=>{
     };
     document.getElementById('winType').onchange=()=>{
       setAutoName();
-      const isDor=document.getElementById('winType').value==='dor';
-      document.getElementById('winNRow').style.display=isDor?'none':'';
-      if(isDor)document.getElementById('winN').value=1;
     };
     winOverlay.classList.add('show');
     winPts=[];draw();

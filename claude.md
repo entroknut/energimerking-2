@@ -502,6 +502,13 @@ Målestokk-metoden treng papirformatet, som vert oppdaga automatisk ved opplasti
 mmPerImgPx = (papirbreidde_mm / biletbreidde_px) * målestokk
 ```
 
+**Skalabadgen** viser målestokken (`maalestokkTekst(ark,mpp)`: «1:100» innanfor
+1,5 % av eit rundt tal, elles «≈1:103»; ingenting utan kjent papir). Eit
+papirformat valt i målestokk-dialogen vert lagra på arket (`paperSource='val'`).
+Med fleire etasjar vel kalibreringsdialogen om skalaen gjeld **alle etasjar**
+eller **berre denne** (`calScopeOwn`, brukt fyrst i `calOk`), og pilla i badgen
+opnar same valet (`visSkalaMeny`, `brukGlobalSkala(f)`).
+
 **Viktig:** kalibreringspunkta (`calPts`) lagrast i **biletkoordinatar**. Låg dei i skjermkoordinatar, vart skalaen stille feil om brukaren panorerte eller zooma mellom dei to klikka.
 
 ---
