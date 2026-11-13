@@ -9888,18 +9888,14 @@ function updateResults(){
               const grpSegs=segs.filter(s=>yvMerged.segs.includes(s.idx));
               const totalLenM=grpSegs.reduce((s,s2)=>s+(s2.lenM||0),0);
               const totalGrossA=grpSegs.reduce((s,s2)=>s+(s2.areaM2||0),0);
-              const winA=grpSegs.reduce((s,s2)=>{
-                return s+(z.windows||[]).filter(w=>w.segIdx===s2.idx).reduce((ss,w)=>ss+(w.breddeMm/1000)*(w.hoyMm/1000)*w.antal,0);
-              },0);
               const _mpp=mppForZone(z);
-              const netA=_mpp?(totalGrossA-winA):null;
               const meanAz=Math.round(circularMeanAz(grpSegs.map(s=>s.normalAz)));
               const row=document.createElement('div');
               row.className='kgrp';row.style.cssText='background:var(--dm-bl-bg,#dbeafe);border-color:#3b82f6';
               const nameTag=document.createElement('span');nameTag.className='kgrp-n';nameTag.style.color='var(--dm-bl-tx,#1e40af)';
               nameTag.textContent=yvMerged.name;
               const statsSpan=document.createElement('span');statsSpan.className='kgrp-s';
-              statsSpan.textContent=`${grpSegs.length} fasadar · ${_mpp?fmtM(totalLenM):'—'} · ${_mpp&&netA!=null?fmtM2(netA>0?netA:totalGrossA):'—'} · ${meanAz}°`;
+              statsSpan.textContent=`${grpSegs.length} fasadar · ${_mpp?fmtM(totalLenM):'—'} · ${_mpp?fmtM2(totalGrossA):'—'} · ${meanAz}°`;
               const unmergeBtn=document.createElement('button');
               unmergeBtn.style.cssText='font-size:10px;padding:2px 6px;border:1px solid #3b82f6;border-radius:4px;background:var(--surface);color:var(--dm-bl-tx,#1e40af);cursor:pointer;font-family:inherit;white-space:nowrap';
               unmergeBtn.textContent='Del opp';
@@ -9911,9 +9907,6 @@ function updateResults(){
             }
           }
 
-          const wins=(z.windows||[]).filter(w=>w.segIdx===seg.idx);
-          const winA=wins.reduce((s,w)=>s+(w.breddeMm/1000)*(w.hoyMm/1000)*w.antal,0);
-          const netA=seg.areaM2!==null?(seg.areaM2-winA):null;
           // Rolle: SK / KJ / YV. KJ finst berre i kjellersoner, og då syklar
           // klikket gjennom alle tre i staden for berre YV↔SK.
           const kjZone=isKjeller(z);
@@ -9942,7 +9935,8 @@ function updateResults(){
           const right=document.createElement('div');right.style.cssText='display:flex;align-items:center;gap:4px';
           if(!isSK&&!isKJ){
             const areaSpan=document.createElement('span');areaSpan.style.cssText="font-size:11px;color:var(--dm-t2,#374151);font-family:inherit";
-            areaSpan.textContent=netA!=null?fmtM2(netA>0?netA:seg.areaM2):'—';
+            // Bruttoareal (inkl. vindauge/dører) — same tal som går til SIMIEN
+            areaSpan.textContent=seg.areaM2!=null?fmtM2(seg.areaM2):'—';
             right.appendChild(areaSpan);
           }
           const typePill=document.createElement('span');
