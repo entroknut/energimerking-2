@@ -59,6 +59,18 @@ const FAST_DATO='2026-01-01T12:00:00Z';
             byggeaar:1985,kommunenr:'0301',ansvarleg:'Testar',tiltak,tiltakInfo:{tomme:[]}});
           ut.sxi[namn+'.'+variant]=sxi;
         }
+        // Lagring: prosjektet slik det vert lagra (.entro, utan tidsstempel og
+        // bilete) skal vere likt fasiten, og lagre → opne → eksportere skal
+        // gi same SXI som før lagringa.
+        const lagra=w.eval(`(()=>{const p=serialiserProsjekt({utanPdf:true});delete p.savedAt;
+          (p.floors||[]).forEach(f=>{delete f.bgImgData;delete f.bgBlob;});
+          (p.fasadar||[]).forEach(f=>{delete f.bgImgData;delete f.bgBlob;});delete p.pdfar;return JSON.stringify(p);})()`);
+        (ut.entro=ut.entro||{})[namn]=lagra;
+        await w.lastProsjekt(JSON.parse(lagra));
+        w.eval('typeof syncFloorState==="function"&&syncFloorState()');
+        const sxi2=w.buildSXI({prosjektnamn:'Test & Co «æøå»',adresse:'Testgata 1',klimasted:klima,
+          byggeaar:1985,kommunenr:'0301',ansvarleg:'Testar',tiltak:[],tiltakInfo:{tomme:[]}});
+        if(sxi2!==ut.sxi[namn+'.utan'])ut.feil.push(namn+': SXI endra seg etter lagre → opne');
         // Invariant: `zones` er den same arrayen som den aktive etasjen sine
         // soner (CLAUDE.md, «alias-fella»). Sjekka etter lasting, etter
         // etasjebyte fram og tilbake, og etter angre.

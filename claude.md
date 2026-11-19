@@ -9,13 +9,38 @@
 
 SXI-generatoren er eit nettbasert oppmålingsverktøy frå Entro AS for energimerking av norske bygg. Brukaren lastar opp ei planteikning, teiknar soner som polygon, og eksporterer ein SXI-fil til SIMIEN (norsk energiberegningsprogram).
 
-**Arkitektur:** Éi enkelt HTML-fil (`index.html`, ~22 900 linjer) med all kode inline. Ingen bygg-steg. Eksterne avhengigheiter frå CDN: Three.js r128 (3D), pdf.js 3.11 (PDF), Mapbox GL (kart, inlina i fila).
+**Arkitektur:** Éi enkelt HTML-fil (`index.html`, ~22 900 linjer) med all kode inline, **bygd frå `src/`**
+(sjå «Kjeldefilene og byggjesteget»). Eksterne avhengigheiter frå CDN: Three.js r128 (3D), pdf.js 3.11 (PDF), Mapbox GL (kart, inlina i fila).
 
 Fila har **tre** inline `<script>`-blokker (Mapbox, temaet i `<head>`, programmet) — syntaks-sjekken sjekkar alle.
 
 ---
 
 ## Utviklingsworkflow
+
+### Kjeldefilene og byggjesteget (`src/`, `tools/bygg.py`)
+
+**Rediger i `src/`, ikkje i `index.html`.** Hovudskriptet ligg i
+`src/js/01-grunn.js` … `19-klips.js` (etter tema), resten av sida (HTML, CSS,
+dei to små skripta) i `src/index.html` med markøren `/*@@HOVUDSKRIPT@@*/`.
+
+```bash
+python tools/bygg.py            # src/ → index.html (byte for byte samanlimt)
+python tools/bygg.py --sjekk    # feilar om index.html ikkje er bygd frå src/
+```
+
+- Det er **berre filene** som er delte. Alt er framleis globalt i éitt skript,
+  i same rekkjefølgje som før — ingen import/export, ingen omskriving. Delinga
+  i v5.25 gav eit `index.html` som var byte for byte likt originalen, og kvar
+  fil er syntaktisk heil åleine (grensene går mellom bolkar).
+- `index.html` er framleis committa — GitHub Pages, testane og
+  `tools/bygg-lokal.py` brukar ho. Bygg ho før commit.
+- Bygget nektar å skrive over ei `index.html` som er endra direkte sidan siste
+  bygg (`src/.bygd` held sha256), så ei endring der ikkje forsvinn i
+  stillheit. Flytt endringa til `src/`, eller `--tving`.
+- `tools/test-sxi.py` køyrer `--sjekk` fyrst.
+- Ny fil: `NN-namn.js` — rekkjefølgja er nummeret. Ein `const` som les ein
+  annan `const` må stå etter han (sjå `BYGKAT_SXI`-fella under KI).
 
 **Arbeid direkte i denne mappa.** Ingen kopiering til andre stader (den gamle `/home/claude/`-flyten gjeld ikkje lenger).
 
@@ -33,6 +58,9 @@ si eiga Pages-adresse. Det skal ikkje oppdaterast: ikkje push dit, og ikkje bruk
 den adressa til verifisering — den blir gradvis utdatert.
 
 ### Syntaks-sjekk etter kvar endring
+
+Etter `python tools/bygg.py`. Kvar fil i `src/js/` skal òg passere
+`node --check` åleine.
 
 ```bash
 python -c "
@@ -287,6 +315,9 @@ winSpanPx(w, segLenPx, mpp)        // for eit vindaugsobjekt, i biletpikslar
 Bruk aldri `w.t1-w.t0` som breidde. Det var feil i teikninga, treff-testinga,
 draginga, «Del sone» og alle fire limeinn-vegane. `expandWindows()` gjer det same
 for fasadevising/3D.
+
+Breidda i biletpikslar står éin stad: `winBreiddPx(w,segLenPx,mpp)` (breddeMm,
+med `t1-t0` berre for gamle vindauge utan breidd). Ikkje skriv uttrykket på nytt.
 
 Begge hjelparane **skyv** vindauget inn på veggen når det ikkje er plass frå
 senteret — dei klipper ikkje éi side. Ei einsidig klipping viste ei anna breidde
@@ -642,6 +673,10 @@ Fallgruver som er retta, og som ikkje må innførast på nytt:
 `drawImage` av bakgrunnen er GPU-akselerert og kostar under 1 ms sjølv ved
 64 Mpx, så den adaptive renderskalaen gjer *ikkje* teikninga treigare.
 
+**Målt v5.25** (Olav Tryggvasons gate 24, 20 soner, 102 opningar):
+`draw()` 1,6 ms, `buildSXI` 2 ms, `snapshot` 0,6 ms, `sonerOverlapp` 0,1 ms
+(32 ms fyrste gong), `updateResults` 7–87 ms, `renderTable` 72 ms.
+
 **Står att:** ei vanleg redigering byggjer framleis alle sonekorta på nytt. Med
 lat kropp + `content-visibility` er det no billeg nok, så det å byggje om berre
 det endra kortet er ikkje verdt risikoen — ein mellomlagringsmekanisme kan gi
@@ -926,7 +961,14 @@ avvist med ei melding — teikningane ville hamna i prosjektet som vert bytt ut.
 
 **EntroPi (iframe):** brua sender PNG — fila på bygget er den einaste kopien, og JPEG ville tapt kvalitet på nytt for kvar opne-lagre-runde.
 
-Alle felt som skal overleve må leggjast til **fem** stader: `snapshot()`, `applyHistoryState()`, `getCurrentState()`, `serialiserEtasje()` og `deserialiserEtasje()` (eller `serialiserProsjekt()`/`lastProsjekt()` for felt på prosjektnivå).
+Felta står på **to** stader (v5.25, var fem): `_etasjeUt(f)` og
+`_etasjeInn(f)` i `src/js/05-historikk-lagring.js`. Angre
+(`snapshot`/`getCurrentState` via `_historikkTilstand`, `applyHistoryState`)
+og fil (`serialiserEtasje`/`deserialiserEtasje`) brukar begge. Sonefelt treng
+ingenting — sonene går med spread; berre Set/Map vert omsette i
+`_soneUt`/`_soneInn`. Felt på prosjektnivå: `serialiserProsjekt()`/
+`lastProsjekt()` + `_historikkTilstand`/`applyHistoryState`. Testen samanliknar
+det lagra prosjektet med fasiten, og sjekkar at lagre → opne gir same SXI.
 
 **PDF-dokumentet** vert lagra som base64 i `proj.pdfar` (éin gong per dokument —
 fleire etasjar frå same PDF deler), og arket ber `pdfRef`. Bytane vert kopierte i
@@ -1435,6 +1477,15 @@ forma), og overlappande opningar vert slegne saman. Fargane er sonefargane
 som før. **Tak som er skiljekonstruksjon** (alle typar utanom `'Tak'` —
 himling mot varm/uoppvarma sone, udelt eller som delflate) er grå og godt
 gjennomsiktige (`opacity` 0,22, `depthWrite:false`), så ein ser ned i sona.
+
+**Minne og fart i 3D (v5.25):** `_ryddScene` frigjer geometriar, materiale,
+teksturar og skuggekart frå den gamle scena før kvar ombygging — før lak
+kvar ombygging alt (615 → 3685 geometriar på fem ombyggingar, og tida dobla
+seg). Skannet (`mpSkann.gruppe`) vert gjenbrukt og teke ut før ryddinga.
+Glas og dørblad deler éin 1×1-geometri med kant (`WIN3D.rute`/`ruteKant`),
+skalert per rute — ikkje lag ny `PlaneGeometry`/`EdgesGeometry` per opning.
+Målt på Olav Tryggvasons gate 24: ombygging 101–142 ms (var 164–322),
+biletet 29 ms (var 41).
 
 **Lappane i 3D:** BERRE eitt kort per sone (`makeKort`: namn, areal · volum
 · høgd (himling når ho skil seg), og «Tak … ∠°» berre når takarealet skil seg

@@ -3386,7 +3386,7 @@ function fitSpanT(centreT,width,segLen){
 // Same, men for eit vindaugsobjekt i BILETpikslar. Fell tilbake på den lagra
 // utstrekninga når teikninga ikkje er kalibrert (då finst ingen mm-breidde).
 function winSpanPx(w,segLenPx,mpp){
-  const widthPx=(mpp&&w.breddeMm>0)?w.breddeMm/mpp:Math.max(0,(w.t1-w.t0))*segLenPx;
+  const widthPx=winBreiddPx(w,segLenPx,mpp);
   return fitSpanT((w.t0+w.t1)/2,widthPx,segLenPx);
 }
 
@@ -3468,8 +3468,14 @@ function fasadarMedForStoreOpningar(z){
   return ut;
 }
 // Utstrekninga til kvar stk i BILETpikslar — teikning og treff-testing.
+// Breidda på eitt stk i biletpikslar: frå breddeMm (sanninga, invariant 6).
+// Berre gamle vindauge utan breddeMm, eller utan skala, fell tilbake på t1-t0.
+// Den eine staden regelen står — ikkje skriv uttrykket på nytt.
+function winBreiddPx(w,segLenPx,mpp){
+  return(mpp&&w.breddeMm>0)?w.breddeMm/mpp:Math.max(0,(w.t1-w.t0))*segLenPx;
+}
 function winSpansPx(w,segLenPx,mpp){
-  const widthPx=(mpp&&w.breddeMm>0)?w.breddeMm/mpp:Math.max(0,(w.t1-w.t0))*segLenPx;
+  const widthPx=winBreiddPx(w,segLenPx,mpp);
   return winCentres(w,widthPx,segLenPx).map(c=>fitSpanT(c,widthPx,segLenPx));
 }
 // Segmentlengd og vindaugsbreidde i biletpikslar for eit vindauge i ei sone.
@@ -3477,7 +3483,7 @@ function winGeom(z,w){
   const mpp=mppForZone(z);
   const seg=(calcSegments(z.pts,getHoyde(z),mpp)||[])[w.segIdx]||null;
   const segLen=seg?seg.lenPx:0;
-  const width=(mpp&&w.breddeMm>0)?w.breddeMm/mpp:Math.max(0,(w.t1-w.t0))*segLen;
+  const width=winBreiddPx(w,segLen,mpp);
   return{seg,segLen,width,mpp};
 }
 function winSyncAnchor(w,width,segLen){
@@ -5039,35 +5045,65 @@ function _fasadeMinne(fa){
   };
 }
 
-function snapshot(namn){
-  const s=floors.map(f=>({
+// ── Etasjar og soner inn og ut av minnet ──────────────────────
+// Éin stad for felta, så angre (snapshot/getCurrentState/applyHistoryState)
+// og fil (serialiserEtasje/deserialiserEtasje) aldri kjem i utakt. Nytt felt
+// på ei ETASJE: legg det i _etasjeUt OG _etasjeInn. Nytt felt på ei SONE:
+// ingenting — sonene går med spread ({...z}); berre Set/Map må omsetjast her.
+function _soneUt(z){
+  const obj={...z,skillevegg:Array.from(z.skillevegg||[])};
+  const zc=z.zoneConnections;
+  obj.zoneConnections=zc instanceof Map?Array.from(zc.entries()):(Array.isArray(zc)?zc:[]);
+  return obj;
+}
+function _soneInn(z){
+  const nz={...z,skillevegg:new Set(z.skillevegg||[])};
+  const zc=z.zoneConnections;
+  // Array (nyaste format), Map, eller objekt {key:value} (gamal format)
+  nz.zoneConnections=Array.isArray(zc)||zc instanceof Map?new Map(zc)
+    :(zc&&typeof zc==='object'?new Map(Object.entries(zc)):new Map());
+  return nz;
+}
+// Felta på ei etasje som både angre og fil tek med (utan bilete/PDF og soner)
+function _etasjeUt(f){
+  return{
     id:f.id,name:f.name,
-    // Bilete/PDF lagrast som referansar (Image-objekt er uforanderlege i praksis)
-    bgImg:f.bgImg||null,bgImgData:f.bgImgData||null,pdfDoc:f.pdfDoc||null,
+    mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
+    sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,
+    delAv:f.delAv??null,plassAnker:_kopiAnker(f.plassAnker),
     pdfPage:f.pdfPage||1,totalPages:f.totalPages||1,
     paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-    mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-    sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,delAv:f.delAv??null,plassAnker:_kopiAnker(f.plassAnker),
-    measurements:normMaal(f.measurements),
-    zones:JSON.parse(JSON.stringify(f.zones.map(z=>{
-      const obj={...z,skillevegg:Array.from(z.skillevegg||[])};
-      if(z.zoneConnections){
-        if(z.zoneConnections instanceof Map){
-          obj.zoneConnections=Array.from(z.zoneConnections.entries());
-        } else if(Array.isArray(z.zoneConnections)){
-          obj.zoneConnections=z.zoneConnections;
-        } else {
-          obj.zoneConnections=[];
-        }
-      } else {
-        obj.zoneConnections=[];
-      }
-      return obj;
-    })))
-  }));
-  const _e={floors:s,fasadar:fasadar.map(_fasadeMinne),activeFloor,activeFasade,
-    globalNorth:globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId,
-    namn:namn||null,tid:Date.now(),hendingar:[]};
+    measurements:normMaal(f.measurements)
+  };
+}
+function _etasjeInn(f){
+  return{
+    id:f.id,name:f.name,
+    mmPerImgPx:f.mmPerImgPx??null,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
+    sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
+    // floorDxImg er biletpikslar. Gamle filer har floorDx i skjermpikslar — migrer via sc.
+    floorDxImg:f.floorDxImg!=null?f.floorDxImg:(f.floorDx||0)/(f.sc||1),
+    floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
+    delAv:f.delAv??null,plassAnker:_kopiAnker(f.plassAnker),
+    pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
+    paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
+    measurements:normMaal(f.measurements)
+  };
+}
+// Tilstanden til angre-historikken: etasjar med bilete som referansar
+// (Image-objekt er uforanderlege i praksis) og soner som djupkopi.
+function _historikkTilstand(){
+  return{
+    floors:floors.map(f=>({..._etasjeUt(f),
+      bgImg:f.bgImg||null,bgImgData:f.bgImgData||null,pdfDoc:f.pdfDoc||null,
+      zones:JSON.parse(JSON.stringify(f.zones.map(_soneUt)))})),
+    fasadar:fasadar.map(_fasadeMinne),
+    activeFloor,activeFasade,globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId
+  };
+}
+
+function snapshot(namn){
+  const _e={..._historikkTilstand(),namn:namn||null,tid:Date.now(),hendingar:[]};
   history.push(_e);
   // Utan namn: handlinga skriv nesten alltid kva ho gjorde i hintlinja like etter
   if(!namn)setTimeout(()=>{if(!_e.namn)_e.namn=_histNamnFraHint();},80);
@@ -5080,36 +5116,13 @@ function applyHistoryState(prev){
   if(mode==='plasser-ark')setMode('navigate');
   floors=prev.floors.map((pf,fi)=>{
     const cur=floors[fi]||{};
-    return{
-      id:pf.id,name:pf.name,
+    return{..._etasjeInn(pf),
       // Bruk historikkens bilete/PDF om dei finst, elles noverande (eldre snapshots)
       bgImg:pf.bgImg!==undefined?pf.bgImg:(cur.bgImg||null),
       bgImgData:pf.bgImgData!==undefined?pf.bgImgData:(cur.bgImgData||null),
       pdfDoc:pf.pdfDoc!==undefined?pf.pdfDoc:(cur.pdfDoc||null),
-      pdfPage:pf.pdfPage||cur.pdfPage||1,totalPages:pf.totalPages||cur.totalPages||1,
-      paperWMm:pf.paperWMm??cur.paperWMm??null,paperHMm:pf.paperHMm??cur.paperHMm??null,
-      paperSource:pf.paperSource??cur.paperSource??null,
-      mmPerImgPx:pf.mmPerImgPx,ownCal:pf.ownCal||false,defaultHoyde:pf.defaultHoyde??3.0,
-      sc:pf.sc,offX:pf.offX,offY:pf.offY,floorDxImg:pf.floorDxImg||0,floorDyImg:pf.floorDyImg||0,delAv:pf.delAv??null,plassAnker:_kopiAnker(pf.plassAnker),
       measurements:normMaal(pf.measurements!==undefined?pf.measurements:cur.measurements),
-      zones:pf.zones.map(z=>{
-        const nz={...z,skillevegg:new Set(z.skillevegg||[])};
-        if(z.zoneConnections){
-          if(Array.isArray(z.zoneConnections)){
-            nz.zoneConnections=new Map(z.zoneConnections);
-          } else if(z.zoneConnections instanceof Map){
-            nz.zoneConnections=new Map(z.zoneConnections);
-          } else if(typeof z.zoneConnections==='object'){
-            // Gamal format: objekt {key: value} → konverter til Map
-            nz.zoneConnections=new Map(Object.entries(z.zoneConnections));
-          } else {
-            nz.zoneConnections=new Map();
-          }
-        } else {
-          nz.zoneConnections=new Map();
-        }
-        return nz;
-      })
+      zones:pf.zones.map(_soneInn)
     };
   });
   // Fasadearka. Eldre snapshots manglar feltet — då står arka som dei er.
@@ -5131,37 +5144,7 @@ function applyHistoryState(prev){
   updateUndoBtn();
 }
 
-function getCurrentState(){
-  return {
-    floors:floors.map(f=>({
-      id:f.id,name:f.name,
-      bgImg:f.bgImg||null,bgImgData:f.bgImgData||null,pdfDoc:f.pdfDoc||null,
-      pdfPage:f.pdfPage||1,totalPages:f.totalPages||1,
-      paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-      mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-      sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,delAv:f.delAv??null,plassAnker:_kopiAnker(f.plassAnker),
-      measurements:normMaal(f.measurements),
-      zones:JSON.parse(JSON.stringify(f.zones.map(z=>{
-        const obj={...z,skillevegg:Array.from(z.skillevegg||[])};
-        // zoneConnections kan vere Map eller array — konverter begge til array for lagring
-        if(z.zoneConnections){
-          if(z.zoneConnections instanceof Map){
-            obj.zoneConnections=Array.from(z.zoneConnections.entries());
-          } else if(Array.isArray(z.zoneConnections)){
-            obj.zoneConnections=z.zoneConnections;
-          } else {
-            obj.zoneConnections=[];
-          }
-        } else {
-          obj.zoneConnections=[];
-        }
-        return obj;
-      })))
-    })),
-    fasadar:fasadar.map(_fasadeMinne),
-    activeFloor,activeFasade,globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId
-  };
-}
+function getCurrentState(){return _historikkTilstand();}
 
 function undo(){
   if(!history.length){hintText.textContent='Ingen fleire angre-steg.';return;}
@@ -8710,7 +8693,7 @@ function _finishDelSone(){
     const origLen=Math.hypot(s.b.x-s.a.x,s.b.y-s.a.y);
     // Breidda kjem frå breddeMm — den nye veggen er kortare enn den opphavlege,
     // så den lagra t1-t0 ville gitt feil utstrekning
-    const widthPx=(mmPerImgPx&&w.breddeMm>0)?w.breddeMm/mmPerImgPx:Math.max(0,(w.t1-w.t0))*origLen;
+    const widthPx=winBreiddPx(w,origLen,mmPerImgPx);
     const deler=new Map();   // `${sone}|${seg}` → {nz,i,len,ts:[]}
     winCentres(w,widthPx,origLen).forEach(c=>{
       const v=finnVegg({x:s.a.x+(s.b.x-s.a.x)*c,y:s.a.y+(s.b.y-s.a.y)*c});
@@ -11571,7 +11554,7 @@ cwrap.addEventListener('mousemove',e=>{
     const t=Math.max(0,Math.min(1,((ip.x-seg.p1.x)*dx+(ip.y-seg.p1.y)*dy)/(segLenImg*segLenImg)));
     // Bruk breddeMm-basert breidde for dragging — ikkje lagra t1-t0
     // (lagra t1-t0 kan vere mykje større enn det visuelle vindauget om plasseringa vart gjort med store klikkpunkt)
-    const widthPx=(mmPerImgPx&&w.breddeMm>0)?w.breddeMm/mmPerImgPx:Math.max(0,(w.t1-w.t0))*segLenImg;
+    const widthPx=winBreiddPx(w,segLenImg,mmPerImgPx);
     const c=t-dragWin.dragOffsetT;
     if(winCount(w)>1)winFreezePos(w,widthPx,segLenImg);
     if(winHasPos(w)){
@@ -11718,7 +11701,7 @@ cwrap.addEventListener('contextmenu',e=>{
           const ip2=s2i(sx,sy);
           const tMid=Math.max(0,Math.min(1,((ip2.x-seg.p1.x)*dx+(ip2.y-seg.p1.y)*dy)/(segLen*segLen)));
           // Breidda kjem frå breddeMm — den lagra t1-t0 gjeld kjeldeveggen
-          const widthPx=(mmPerImgPx&&winClipboard.breddeMm>0)?winClipboard.breddeMm/mmPerImgPx:Math.max(0,(winClipboard.t1-winClipboard.t0))*segLen;
+          const widthPx=winBreiddPx(winClipboard,segLen,mmPerImgPx);
           const {t0,t1}=fitSpanT(tMid,widthPx,segLen);
           if(!z.windows)z.windows=[];
           const copy={...winClipboard,t0,t1,segIdx:seg.idx,dir:seg.dir,name:uniqueWinName(winClipboard.name||(winClipboard.type==='dor'?'Dør':'Vindauge'),z.windows)};
@@ -12645,9 +12628,7 @@ document.addEventListener('keydown',e=>{
     if(winClipboard){
       // Breidda kjem alltid frå breddeMm — den lagra t1-t0 gjeld kjeldeveggen,
       // som kan ha annan lengd, og han følgjer ikkje endra breidde/skala
-      const _clipW=(segLenPx)=>(mmPerImgPx&&winClipboard.breddeMm>0)
-        ?winClipboard.breddeMm/mmPerImgPx
-        :Math.max(0,(winClipboard.t1-winClipboard.t0))*segLenPx;
+      const _clipW=(segLenPx)=>winBreiddPx(winClipboard,segLenPx,mmPerImgPx);
       if(hoveredWin){
         snapshot();
         const {w:refW,z,seg}=hoveredWin;
@@ -15051,28 +15032,11 @@ const AUTOSAVE_INTERVAL=60000; // 1 min
 // hoppar over biletet heilt — klippbordet legg det ved som Blob i staden.
 function serialiserEtasje(f,opts){
   const o=opts||{};
-  const obj={
-    id:f.id,name:f.name,
-    mmPerImgPx:f.mmPerImgPx,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-    sc:f.sc,offX:f.offX,offY:f.offY,floorDxImg:f.floorDxImg||0,floorDyImg:f.floorDyImg||0,delAv:f.delAv??null,plassAnker:_kopiAnker(f.plassAnker),
-    pdfPage:f.pdfPage,totalPages:f.totalPages,
-    paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-    measurements:normMaal(f.measurements),
+  const obj={..._etasjeUt(f),
     zones:f.zones.map(z=>{
-      const obj={...z,skillevegg:z.skillevegg?Array.from(z.skillevegg):[]};
-      delete obj._uk;   // UI-nøkkel for sidepanelet — berre for økta
-      if(z.zoneConnections){
-        if(z.zoneConnections instanceof Map){
-          obj.zoneConnections=Array.from(z.zoneConnections.entries());
-        } else if(Array.isArray(z.zoneConnections)){
-          obj.zoneConnections=z.zoneConnections;
-        } else {
-          obj.zoneConnections=[];
-        }
-      } else {
-        obj.zoneConnections=[];
-      }
-      return obj;
+      const s=_soneUt(z);
+      delete s._uk;   // UI-nøkkel for sidepanelet — berre for økta
+      return s;
     })
   };
   _serBgInn(f,obj,o);
@@ -15212,39 +15176,8 @@ function serialiserProsjekt(opts){
 // som dataURL (prosjektfila) eller som Blob (klippbordet) — begge endar i eit
 // vanleg Image, slik at resten av koden ikkje ser skilnad.
 async function deserialiserEtasje(f){
-  const floor={
-    id:f.id,name:f.name,
-    mmPerImgPx:f.mmPerImgPx??null,ownCal:f.ownCal||false,defaultHoyde:f.defaultHoyde??3.0,
-    // floorDxImg er biletpikslar. Gamle filer har floorDx i skjermpikslar — migrer via sc.
-    floorDxImg:f.floorDxImg!=null?f.floorDxImg:(f.floorDx||0)/(f.sc||1),
-    floorDyImg:f.floorDyImg!=null?f.floorDyImg:(f.floorDy||0)/(f.sc||1),
-    delAv:f.delAv??null,      // delplan: id-en til hovudetasjen
-    plassAnker:_kopiAnker(f.plassAnker),
-    sc:f.sc??1,offX:f.offX??0,offY:f.offY??0,
-    pdfPage:f.pdfPage??1,totalPages:f.totalPages??1,
-    paperWMm:f.paperWMm??null,paperHMm:f.paperHMm??null,paperSource:f.paperSource??null,
-    pdfDoc:null,bgImg:null,
-    measurements:normMaal(f.measurements),
-    zones:(f.zones||[]).map(z=>{
-      const nz={...z,skillevegg:new Set(z.skillevegg||[])};
-      // zoneConnections kan vere array (nyaste format), objekt (gamal format), eller Map. Konverter alle til Map.
-      if(z.zoneConnections){
-        if(Array.isArray(z.zoneConnections)){
-          nz.zoneConnections=new Map(z.zoneConnections);
-        } else if(z.zoneConnections instanceof Map){
-          nz.zoneConnections=new Map(z.zoneConnections);
-        } else if(typeof z.zoneConnections==='object'){
-          // Gamal format: objekt {key: value} → konverter til Map
-          nz.zoneConnections=new Map(Object.entries(z.zoneConnections));
-        } else {
-          nz.zoneConnections=new Map();
-        }
-      } else {
-        nz.zoneConnections=new Map();
-      }
-      sanitizeZoneSegRefs(nz);
-      return nz;
-    })
+  const floor={..._etasjeInn(f),pdfDoc:null,bgImg:null,
+    zones:(f.zones||[]).map(z=>{const nz=_soneInn(z);sanitizeZoneSegRefs(nz);return nz;})
   };
   const kilde=f.bgImgData||(f.bgBlob?URL.createObjectURL(f.bgBlob):null);
   if(kilde){
@@ -20003,6 +19936,26 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     });
   };
 
+  // Den gamle scena må gi geometriar, materiale, teksturar og skuggekart
+  // tilbake til grafikkortet. Utan dette lak kvar ombygging alt: på eit bygg
+  // med 20 soner gjekk geometriane frå 615 til 3685 på fem ombyggingar, og
+  // tida per ombygging dobla seg. Skannet (mpSkann.gruppe) vert gjenbrukt
+  // mellom scenene og vert difor teke ut før ryddinga, aldri frigjort her.
+  function _ryddScene(s){
+    if(!s)return;
+    const skann=(typeof mpSkann!=='undefined'&&mpSkann)?mpSkann.gruppe:null;
+    if(skann&&skann.parent===s)s.remove(skann);
+    const geo=new Set(),mat=new Set(),tex=new Set();
+    s.traverse(o=>{
+      if(o.geometry)geo.add(o.geometry);
+      (Array.isArray(o.material)?o.material:(o.material?[o.material]:[])).forEach(m=>{
+        mat.add(m);
+        ['map','alphaMap','emissiveMap','normalMap'].forEach(k=>{if(m[k])tex.add(m[k]);});
+      });
+      if(o.isLight&&o.shadow&&o.shadow.map){o.shadow.map.dispose();o.shadow.map=null;}
+    });
+    geo.forEach(g=>g.dispose());tex.forEach(t=>t.dispose());mat.forEach(m=>m.dispose());
+  }
   function build(){
     _clearPick(); // gamal scene vert kasta — fjern highlight/infoboks
     const W=CV.clientWidth||800,H=CV.clientHeight||500;
@@ -20020,6 +19973,7 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
     const getBg3D=()=>isDark3D()?bg3Ddark:bg3Dlight;
     renderer3.setClearColor(getBg3D(),0);
 
+    _ryddScene(scene3);
     scene3=new THREE.Scene();
     scene3.fog=new THREE.Fog(getBg3D(),150,400);
     camera3=new THREE.PerspectiveCamera(42,W/H,0.1,800);
@@ -20256,6 +20210,12 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
       // Tynn, dempa kant — markerer opninga mot veggen utan å bli ein karm
       kant:new THREE.LineBasicMaterial({color:0x1e293b,transparent:true,opacity:0.7})
     };
+    // Alle glas og dørblad er rektangel: éin delt 1×1 m-geometri med kant,
+    // skalert til storleiken. Før fekk kvar rute eigen PlaneGeometry og eigen
+    // EdgesGeometry — 408 kantar på eit bygg med 102 opningar, ein tredel av
+    // byggjetida for modellen.
+    WIN3D.rute=new THREE.PlaneGeometry(1,1);
+    WIN3D.ruteKant=new THREE.EdgesGeometry(WIN3D.rute);
 
     floors.forEach((f,fi)=>{
       const baseY=floorBaseY[fi];
@@ -20378,7 +20338,6 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
             const {w,ew,isDoor,sillH,openH,openW}=o;
             const ocx=p1.x+dx/segLen*o.uc+nx_*glasZ,ocz=p1.z+dz/segLen*o.uc+nz_*glasZ;
             const ocy=baseY+sillH+openH/2;
-            const geo=new THREE.PlaneGeometry(openW,openH);
             const pickInfo={
               title:z.name+' — '+(ew.name||w.name||(isDoor?'Dør':'Vindauge')),
               rows:[
@@ -20390,11 +20349,11 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
               ]
             };
             // Klona per flate: klikk-markeringa set emissive på materialet
-            const m=new THREE.Mesh(geo,(isDoor?WIN3D.dor:WIN3D.glas).clone());
-            m.position.set(ocx,ocy,ocz);m.rotation.y=-ang;
+            const m=new THREE.Mesh(WIN3D.rute,(isDoor?WIN3D.dor:WIN3D.glas).clone());
+            m.position.set(ocx,ocy,ocz);m.rotation.y=-ang;m.scale.set(openW,openH,1);
             m.userData.pick=pickInfo;
-            // Karmen: ein tynn ramme rundt glaset/dørbladet
-            const kant=new THREE.LineSegments(new THREE.EdgesGeometry(geo),WIN3D.kant);
+            // Karmen: ein tynn ramme rundt glaset/dørbladet (skalert med flata)
+            const kant=new THREE.LineSegments(WIN3D.ruteKant,WIN3D.kant);
             m.add(kant);
             scene3.add(m);
           });

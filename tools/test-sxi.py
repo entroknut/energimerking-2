@@ -117,6 +117,11 @@ def main():
     if a[:1] == ['--legg-til']:
         legg_til(a[1:])
         return
+    # index.html må vere bygd frå src/ — elles testar vi noko anna enn kjelda
+    b = subprocess.run([sys.executable, os.path.join(ROT, 'tools', 'bygg.py'), '--sjekk'],
+                       capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if b.returncode:
+        sys.exit(b.stdout + b.stderr)
     if not os.path.isdir(PROSJ) or not oppdater_liste():
         sys.exit('Ingen testprosjekt. Legg til med: python tools/test-sxi.py --legg-til prosjekt.entro')
     lag = '--lag-fasit' in a
@@ -158,6 +163,28 @@ def main():
             print('ENDRA    ', nokkel)
             d = list(difflib.unified_diff(fasit.splitlines(), sxi.splitlines(), 'fasit', 'no', n=1, lineterm=''))
             print('\n'.join(d[:40]) + ('\n  …' if len(d) > 40 else ''))
+    # Lagra prosjekt (.entro) mot fasiten
+    ED = os.path.join(FASIT, 'entro')
+    os.makedirs(ED, exist_ok=True)
+    for namn, tekst in sorted((ut.get('entro') or {}).items()):
+        sti = os.path.join(ED, namn + '.json')
+        if lag:
+            with open(sti, 'w', encoding='utf-8', newline='') as fh:
+                fh.write(tekst)
+            continue
+        if not os.path.exists(sti):
+            print('MANGLAR FASIT (entro):', namn)
+            avvik += 1
+            continue
+        with open(sti, encoding='utf-8', newline='') as fh:
+            fasit = fh.read()
+        if json.loads(fasit) == json.loads(tekst):
+            print('OK lagring', namn)
+        else:
+            avvik += 1
+            print('ENDRA lagring', namn)
+            a_, b_ = json.dumps(json.loads(fasit), indent=1, ensure_ascii=False).splitlines(), json.dumps(json.loads(tekst), indent=1, ensure_ascii=False).splitlines()
+            print(chr(10).join(list(difflib.unified_diff(a_, b_, 'fasit', 'no', n=1, lineterm=''))[:30]))
     for n, d in (ut.get('dekning') or {}).items():
         print('  dekning', n + ':', ', '.join(f'{k} {v}' for k, v in d.items() if v))
     for f in feil:
