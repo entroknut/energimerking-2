@@ -402,6 +402,11 @@ Knappen er `.embed-only`, så funksjonen finst berre inne i EntroPi.
 ```js
 { type:'sxi:ai-request', requestId:'ki3',
   oppgave:'soner',          // 'soner' | 'opningar' | 'fasade' | 'hjelp' — vel modell og grenser
+                            // 'fasade' kjem i to rundar på store ark: meta.steg='oversikt'
+                            // (kvar fasadane står), så éin per fasade (meta.fasade=tittel)
+                            // 'soner' kan ha meta.steg='oversikt' (stort ark) og
+                            // meta.steg='kontroll' (2 bilete: plan + forslaget oppå)
+                            // Feilar eit kall, prøver verktøyet éin gong til.
   prompt:'…',               // ferdig tekst, nynorsk
   images:[{mediaType:'image/jpeg', data:'<base64>'}],   // 1–2 bilete, ≤ 2400 px
   schema:{…},               // JSON-skjema for svaret (structured outputs)
@@ -411,8 +416,9 @@ Knappen er `.embed-only`, så funksjonen finst berre inne i EntroPi.
 
 **Verten svarar i to steg:** `sxi:ai-ack` med ein gong (elles gir verktøyet opp
 etter 15 s og seier at vertssida ikkje svarar), så `sxi:ai-result` når Claude
-er ferdig. Fasadeteikningar, etasjar (heile bygget) og soner (steg 2) gir éin
-førespurnad kvar, tre om gongen, så verten må tole fleire samtidige.
+er ferdig. Fasadeteikningar (éin per fasade, pluss ei oversikt per stort ark),
+etasjar (heile bygget) og soner (steg 2 — store soner vert delte i fleire
+utsnitt) gir éin førespurnad kvar, tre om gongen, så verten må tole fleire samtidige.
 
 **Serversida (Next.js route handler, TypeScript SDK)** — `app/api/sxi/ki/route.ts`,
 som komponenten under poster til (`case 'sxi:ai-request'`):

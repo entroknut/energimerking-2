@@ -509,6 +509,21 @@ Med fleire etasjar vel kalibreringsdialogen om skalaen gjeld **alle etasjar**
 eller **berre denne** (`calScopeOwn`, brukt fyrst i `calOk`), og pilla i badgen
 opnar same valet (`visSkalaMeny`, `brukGlobalSkala(f)`).
 
+**Plan og fasade har kvar sin skala, men kan kalibrerast i ein jafs:**
+
+- I **fasadevisinga** viser same boks «Alle fasadeteikningar» / «Berre
+  denne» (når det finst fleire fasadeark). Standard er «alle» berre når eit
+  av dei andre arka manglar skala — elles «berre denne», så ei omkalibrering
+  ikkje skriv over skalaane som står. Planteikningane vert aldri rørte herfrå.
+- I **planvisinga** finst avkryssinga «Fasadeteikningane òg» (`#calFasadeOg`,
+  av som standard, synleg når det finst fasadeark med teikning).
+- Begge brukar **same målestokk, ikkje same mm per piksel**
+  (`_mppSameMaalestokk`): er papirformatet kjent på begge arka, vert skalaen
+  rekna om med pikseltettleiken (A1 rendra til same pikslar som A3 får dobbel
+  mm/px). Ukjent papir ⇒ same mm/px, som i masseimporten. Det er framleis
+  ingen global fasadeskala som vert lagra — kvart fasadeark har sin
+  `mmPerImgPx`, valet set dei berre alle på éin gong.
+
 **Viktig:** kalibreringspunkta (`calPts`) lagrast i **biletkoordinatar**. Låg dei i skjermkoordinatar, vart skalaen stille feil om brukaren panorerte eller zooma mellom dei to klikka.
 
 ---
@@ -1372,6 +1387,29 @@ SXI-eksporten er urørte — å skjule er eit visingsval, ikkje ei sletting.
   med kjeller vart han då dekt av den halvgjennomsiktige teikninga. y=0 er
   terrenget også med kjeller — stabelen er senka med `kjellerSenking()`.
 
+## Veggane i 3D
+
+Veggane er ekstruderte elevasjonar med ekte hòl (`_veggGeo`): glas/dørblad
+står inne i veggen, og lysninga syner rundt. Glaset er halvgjennomsiktig
+(`opacity` 0,32, `depthWrite:false` — elles skjuler det det som ligg bak). Ytterveggen står **utanfor**
+sonekanten (sonekanten er innsida av veggen). **Skiljekonstruksjonar og
+sonekoplingar har inga tjukn** (`_innv`): ei flat, dempa flate på sonekanten
+(`ShapeGeometry`, same opningar). Endane av ytterveggen vert forlengde til
+der dei ytre flatene møtest (`_veggEnde`, 0 i innvendige hjørne, maks 3×
+tjukna) — men **aldri** mot ein innvendig vegg: då sluttar ytterveggen i
+hjørnet, elles stikk han inn i ytterveggen til nabosona og ligg dobbelt. Dører er hakk i nedkanten (eit hòl må liggje inne i
+forma), og overlappande opningar vert slegne saman. Fargane er sonefargane
+som før. **Tak som er skiljekonstruksjon** (alle typar utanom `'Tak'` —
+himling mot varm/uoppvarma sone, udelt eller som delflate) er grå og godt
+gjennomsiktige (`opacity` 0,22, `depthWrite:false`), så ein ser ned i sona.
+
+**Lappane i 3D:** eitt kort per sone (`makeKort`: namn, areal · volum, og
+«Tak … ∠°» berre når takarealet skil seg frå golvarealet). Høgdemål vert
+viste éin gong per etasje og høgd (`_hoydeVist`). Sprites med
+`userData.prio` vert rydda i skjermrommet kvar 6. frame (`_ryddLappar`):
+sonekort (3+) > høgdemål (2) > vegglengd (1+), større før mindre; ein lapp som
+kolliderer med ein viktigare vert gøymd til det er plass. Ny lapp: set `prio`.
+
 ## Fasadeteikningar
 
 Eit **fasadeark** er ei teikning som berre vert målt på. Det ligg VED SIDA AV
@@ -1490,6 +1528,71 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
      ikkje `autoSkilleveggForNySone` (8 cm) den felles veggen.
   Fell kanttilpassinga gjennom (for få einige punkt), står KI-kanten — aldri
   ei gjetting.
+- **Bileta til Claude vert førebudde** (`kiBilete`): ved kraftig nedskalering
+  (under 0,5) går det via eit mellomsteg i dobbel storleik der kvar piksel er
+  snittet av minimum og gjennomsnitt i 2×2 (`kiNedskalerStrek`) — tynne
+  strekar vert ikkje blasse. Så `kiKontrast`: grått papir vert kvitt, blasse
+  strekar mørke, og mørk botn (blåkopi) vert snudd. God kontrast alt
+  (1 %-mørk ≤ 30 og papir ≥ 225) vert ikkje rørt. `kiGraa` snur òg mørk botn.
+- **Arktype**: sonesvaret har `arkType` (`KI_ARKTYPAR`). Er arket ikkje ein
+  plan (fasade, snitt, situasjonsplan), vert det hoppa over og meldt. Store
+  planark får ei oversikt fyrst (`kiPlanUtsnitt`, `meta.steg='oversikt'` på
+  `oppgave:'soner'`): arktype og ramme rundt den største planen, som så vert
+  lesen i full oppløysing.
+- **Kontrollrunde** (`kiKontrollSoner`, `meta.steg='kontroll'` på
+  `oppgave:'soner'`, to bilete): Claude ser forslaget teikna nummerert oppå
+  planen og svarar `ok`, eller heile den retta lista. Retta soner går
+  gjennom `kiRettSoner` på nytt. Ei «retting» som endrar totalarealet meir
+  enn 40 % vert forkasta (meldt). Feilar runden, står fyrste forslaget.
+- **Kalibreringssjekk** (`kiSjekkKalibrering`): sonesvaret har `kontrollMaal`
+  — det lengste påskrivne totalmålet med endepunkt. Avvik over 4 % mot
+  skalaen vert meldt med ⚠, og stoppar «Gå rett gjennom» ved soneforslaget
+  (`kiStoppaAuto`). Programmet kalibrerer framleis ALDRI sjølv.
+- **Nytt forsøk** (`kiSpor`): eitt nytt forsøk etter 1,5 s ved tidsavbrot,
+  nettfeil eller tomt svar, med dobla `maxTokens` (≤ 32000) når svaret vart
+  avkorta. Ikkje når verten manglar eller Claude avslo.
+- **Ujamt lys** (`kiJamnLys`, fyrst i `kiKontrast`): papirnivået per rute
+  (90-persentil), største av nabo-rutene, interpolert; kvar piksel delt på
+  det. Berre når papiret varierer meir enn 35 nivå over arket.
+- Opningar: `maalMm` er breidda frå målekjeda — vinn over det målte innanfor
+  25 % (som «10x12»-merket).
+- **Skjema som les `BYGKAT_SXI` må vere funksjonar** (`kiSkjemaSoner()`,
+  `kiSkjemaKontroll()`): konstanten er definert lenger ned, og ein
+  toppnivå-`const` som les han stoppar HEILE skriptet ved lasting (skjedde
+  i utviklinga — syntaks-sjekken fangar det ikkje, berre nettlesaren).
+- `KI_LES_TEIKNING` er felles tekst i alle prompta om kva som er teikneteknikk
+  (målelinjer, aksar, koter, terreng, møblar, tittelfelt) og ikkje bygg.
+- **Snitt i fasadevisinga**: oversikta og fasadesvaret har `type`
+  ('fasade'|'snitt'|'anna', `KI_FASADE_ELLER_SNITT` forklarer skilnaden). Eit
+  snitt gir berre golvnivå → etasjehøgder, aldri opningar eller posisjonar.
+- **«Gå rett gjennom»** (`#aiAuto`, på som standard): kvart forslag vert
+  godteke av seg sjølv etter 0,7 s (`kiAutoVidare`) — soner, så opningar, så
+  høgder, kvar som sitt angre-steg. Ruta står open med loggen til slutt
+  (`kiAvslutt`); utan valet lukkar ho seg som før. Dialogen minner om nord
+  når det står på 0°.
+- **Store soner vert delte i fleire utsnitt** (`kiOpnUtsnitt`, `KI_MM_PX`=14):
+  bileta til Claude skal ha minst ~14 mm per piksel. Lange veggar vert
+  delte i bitar som overlappar 1,5 m; ei opning høyrer til biten senteret
+  hennar ligg i. Får heile sona plass, går ho i eitt utsnitt som før.
+- **Karmsnapping** (`kiKarmProfil`/`kiSnapKarm`): langs veggen vert lengste
+  mørke strek TVERS over veggen målt (−4 cm til +60 cm utover). Endane av
+  ei opning vert flytte til næraste overgang vegg↔opning innanfor ±0,3 m,
+  berre når det meste imellom er «opning» og breidda ikkje endrar seg
+  meir enn 35 %. Elles står KI-endepunktet.
+- **Fasadane vert lesne i to rundar** på store ark (`kiFasadeUtsnitt`):
+  fyrst kvar fasadane står (`meta.steg='oversikt'`, same `oppgave:'fasade'`
+  — protokollen er uendra), så kvar fasade i eige utsnitt. Svaret har
+  `byggX0/byggX1` (ytterkantane av bygget), og kvar opning får ein relativ
+  posisjon `r` (0–1) langs bygget.
+- **Fasade ↔ plan er deterministisk** (`kiFasadeKople`): fasaden «Nord» sett
+  utanfrå går frå aust til vest; posisjonen vert samanlikna med utstrekninga
+  av heile bygget i planen (alle etasjar, verdskoordinatar, nord-vinkelen).
+  Koplinga gir høgd, brystning og type (dør/vindauge) frå fasaden. Opningar
+  berre fasaden viser, vert lagde på den fremste veggen i den retninga og
+  merkte ◇ (`berreFasade`, aldri gruppert med planfunne). Avvik fasadebreidda
+  meir enn 15 % frå planen, vert posisjonane ikkje brukte — det vert meldt.
+  Koplinga skjer FØR grupperinga (`kiGrupperVindauge`), sidan høgdene avgjer
+  kva som er like.
 - Opningar: projiserte på segmentet, forkasta om dei ligg langt frå veggen,
   er under 0,3 m eller overlappar noko som finst. «10x12»-merke (dm) vinn
   over det målte når dei er innanfor 30 %. Høgda er elles standard.

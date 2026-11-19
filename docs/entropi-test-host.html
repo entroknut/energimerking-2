@@ -154,7 +154,18 @@ async function kiMock(d){
       ?{omProgrammet:false,svar:'Eg kan berre hjelpe med SXI-generatoren. (oppdikta svar frå testverten)'}
       :{omProgrammet:true,svar:'Oppdikta svar frå testverten (?kimock=1) på «'+q+'». Trykk «⊕ Kalibrer» og vel lengd, areal eller målestokk.'};
   }
-  if(d.oppgave==='soner')return{analyse:'Oppdikta svar frå testverten (?kimock=1): tre soner — éi til venstre, to til høgre.',
+  // Stort planark: kva arket er, og kvar planen står
+  if(d.oppgave==='soner'&&d.meta&&d.meta.steg==='oversikt')return{arkType:'plan',x0:100,y0:100,x1:900,y1:900};
+  // Kontrollrunden: fyrste gongen feilar han med vilje (avkorta), så nytt
+  // forsøk i verktøyet vert testa. Andre gongen: flytt eitt hjørne (retting).
+  if(d.oppgave==='soner'&&d.meta&&d.meta.steg==='kontroll'){
+    if(!kiMock.kontrollFeila){kiMock.kontrollFeila=true;throw new Error('Svaret vart avkorta. (testverten, med vilje)');}
+    return{ok:false,kommentar:'Oppdikta retting: Fløy A var for smal mot vest.',soner:[
+      {namn:'Fløy A',bruk:'Kontorbygg',byggeaar:0,pts:[{x:180,y:250},{x:500,y:250},{x:500,y:700},{x:180,y:700}]},
+      {namn:'Tilbygg 1997',bruk:'Ukjend',byggeaar:1997,pts:[{x:503,y:252},{x:800,y:250},{x:800,y:470},{x:500,y:472}]},
+      {namn:'Lager',bruk:'Ukjend',byggeaar:0,pts:[{x:500,y:476},{x:800,y:474},{x:800,y:700},{x:498,y:701}]}]};
+  }
+  if(d.oppgave==='soner')return{arkType:'plan',kontrollMaal:{mm:30000,a:{x:200,y:200},b:{x:800,y:200}},analyse:'Oppdikta svar frå testverten (?kimock=1): tre soner — éi til venstre, to til høgre.',
     soner:[
       {namn:'Fløy A',bruk:'Kontorbygg',byggeaar:0,pts:[{x:200,y:250},{x:500,y:250},{x:500,y:700},{x:200,y:700}]},
       {namn:'Tilbygg 1997',bruk:'Ukjend',byggeaar:1997,pts:[{x:503,y:252},{x:800,y:250},{x:800,y:470},{x:500,y:472}]},
@@ -162,7 +173,16 @@ async function kiMock(d){
     ]};
   // Fasadeteikning: to etasjar med koter (3,6 m golv til golv), fire like
   // vindauge og ei dør i 1. etasje. Koordinatane passar eit kvadratisk ark.
-  if(d.oppgave==='fasade')return{fasadar:[{tittel:'Fasade nord',retning:'Nord',
+  // Store ark: fyrst ei oversikt over kvar fasadane står (meta.steg='oversikt')
+  if(d.oppgave==='fasade'&&d.meta&&d.meta.steg==='oversikt')return{fasadar:[
+    {type:'fasade',tittel:'Fasade nord',retning:'Nord',x0:40,y0:40,x1:480,y1:480},
+    {type:'fasade',tittel:'Fasade sør',retning:'Sør',x0:520,y0:40,x1:960,y1:480},
+    {type:'snitt',tittel:'Snitt A-A',retning:'Ukjend',x0:40,y0:520,x1:480,y1:960}]};
+  // Eit snitt: berre golvnivå
+  if(d.oppgave==='fasade'&&d.meta&&/snitt/i.test(d.meta.fasade||''))return{fasadar:[{type:'snitt',tittel:d.meta.fasade,
+    retning:'Ukjend',byggX0:0,byggX1:0,etasjar:[{namn:'1. etasje',golvY:800,koteMm:1000},{namn:'2. etasje',golvY:500,koteMm:4600}],opningar:[]}]};
+  if(d.oppgave==='fasade')return{fasadar:[{type:'fasade',tittel:(d.meta&&d.meta.fasade)||'Fasade nord',retning:/sør/i.test((d.meta&&d.meta.fasade)||'')?'Sør':'Nord',
+    byggX0:50,byggX1:980,
     etasjar:[{namn:'1. etasje',golvY:800,koteMm:1000},{namn:'2. etasje',golvY:500,koteMm:4600}],
     opningar:[
       ...[100,300,500,700].map(x=>({etasje:0,type:'vindauge',x0:x,x1:x+100,yTopp:600,yBotn:725,breddeMm:0,hoydeMm:0,brystningMm:0})),
