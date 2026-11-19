@@ -1,7 +1,7 @@
 # Entro — Prosjektkontekst for ny Claude-sesjon
 **Programnamn:** SXI-generatoren  
 **Firma:** Entro AS  
-**Versjon:** 4.4.1 | Single-file HTML applikasjon
+**Versjon:** sjå `#appVer` i `index.html` (v5.x) | Single-file HTML applikasjon
 
 ---
 
@@ -9,7 +9,7 @@
 
 SXI-generatoren er eit nettbasert oppmålingsverktøy frå Entro AS for energimerking av norske bygg. Brukaren lastar opp ei planteikning, teiknar soner som polygon, og eksporterer ein SXI-fil til SIMIEN (norsk energiberegningsprogram).
 
-**Arkitektur:** Éi enkelt HTML-fil (`index.html`, ~9800 linjer) med all kode inline. Ingen bygg-steg. Eksterne avhengigheiter frå CDN: Three.js r128 (3D), pdf.js 3.11 (PDF), Mapbox GL (kart, inlina i fila).
+**Arkitektur:** Éi enkelt HTML-fil (`index.html`, ~22 900 linjer) med all kode inline. Ingen bygg-steg. Eksterne avhengigheiter frå CDN: Three.js r128 (3D), pdf.js 3.11 (PDF), Mapbox GL (kart, inlina i fila).
 
 Fila har **tre** inline `<script>`-blokker (Mapbox, temaet i `<head>`, programmet) — syntaks-sjekken sjekkar alle.
 
@@ -48,6 +48,35 @@ for i, js in enumerate(blocks):
 "
 ```
 
+### SXI-regresjon og røyktest (`tools/test-sxi.py`)
+
+**Ingen endring skal endre SXI-fila utan at det er meint.** Testen opnar
+kvart testprosjekt i programmet, eksporterer SXI utan og med alle tiltaka
+(fast dato), og samanliknar teikn for teikn med fasiten. Han feilar òg om
+hovudskriptet ikkje vart ferdig lasta (`window.__sxiKlar`, siste linja i
+skriptet), om noko vert skrive til `console.error`, eller om `zones`-aliaset
+ikkje er den same arrayen som den aktive etasjen etter lasting, etasjebyte
+og angre. Røyktesten byggjer òg sidepanelet, tabellen og 3D-modellen.
+
+```bash
+python tools/test-sxi.py                 # ~15 s
+python tools/test-sxi.py --lag-fasit     # fasit frå git HEAD, ikkje arbeidskopien
+python tools/test-sxi.py --legg-til X.entro   # nytt testprosjekt (bileta takne ut)
+```
+
+- Testprosjekta og fasiten ligg i `tools/test/fasit/` — **utanfor git**, det
+  er kundedata. Fire ekte prosjekt + «Syntetisk alt-i-eitt» (kjellar, delplan
+  med eigen skala og forskyving, oppdelt tak/golv, skråtak, samanslegne og
+  kopla-samanslegne fasadar, SK, himling mot varm sone, areaOverride,
+  vindaugsgrupper med `posT`). Dekninga vert skriven ut ved kvar køyring.
+- Nettlesaren er Playwright sin `chrome-headless-shell`, elles Chrome.
+  **Ikkje Edge**: bedrifts-Edge krev innlogging òg utan vindauge og kjem
+  aldri til sida. `--dump-dom` med virtuell tid hang òg (animasjonane lèt
+  aldri klokka bli ferdig) — sida POSTar difor resultatet til køyraren.
+- Testen slår ut: éin endra bokstav i dør-elementet gav avvik i 8 av 10 filer.
+- Fasiten vart laga frå v5.24.1. Skal SXI-fila endrast med vilje: commit,
+  så `--lag-fasit`, og sei frå kva som endra seg.
+
 ### Testing i nettlesar
 
 Start lokal server og test mot han — ikkje `file://` (localStorage kan vere sperra):
@@ -60,7 +89,7 @@ python -m http.server 8742
 
 ### Publisering
 
-Brukaren seier eksplisitt frå når noko skal publiserast. Då: bump versjonsnummer i `index.html` (søk `v3.`), commit på `dev`, merge til `main`, push.
+Brukaren seier eksplisitt frå når noko skal publiserast. Då: køyr `python tools/test-sxi.py` (MÅ vere grønt), bump versjonsnummer i `index.html` (søk `</span>` ved `id="appVer"`), commit på `dev`, merge til `main`, push.
 
 **Verifiser alltid live-adressa etterpå** — ikkje meld «publisert» berre fordi pushen gjekk gjennom. GitHub Pages-bygget kan feile (det skjedde 6. august: deploy-steget timeout-a etter 10 min, to gonger på rad, og trong eit tredje forsøk).
 
@@ -80,7 +109,7 @@ Grep-mønsteret må **ankrast på `</span>`**. To feller, begge observerte:
   Mapbox GL-blokka på line 46, som ligg **før** appversjonen i fila. Du får
   `v1.5.6` og trur publiseringa feila.
 
-Appversjonen står som `>v3.4.0</span>` (line 630), så ankeret er det som gjer
+Appversjonen står som `>v5.24.1</span>` i `#appVer`, så ankeret er det som gjer
 kommandoen påliteleg:
 
 ```bash
@@ -1407,12 +1436,39 @@ som før. **Tak som er skiljekonstruksjon** (alle typar utanom `'Tak'` —
 himling mot varm/uoppvarma sone, udelt eller som delflate) er grå og godt
 gjennomsiktige (`opacity` 0,22, `depthWrite:false`), så ein ser ned i sona.
 
-**Lappane i 3D:** eitt kort per sone (`makeKort`: namn, areal · volum, og
-«Tak … ∠°» berre når takarealet skil seg frå golvarealet). Høgdemål vert
-viste éin gong per etasje og høgd (`_hoydeVist`). Sprites med
-`userData.prio` vert rydda i skjermrommet kvar 6. frame (`_ryddLappar`):
-sonekort (3+) > høgdemål (2) > vegglengd (1+), større før mindre; ein lapp som
-kolliderer med ein viktigare vert gøymd til det er plass. Ny lapp: set `prio`.
+**Lappane i 3D:** BERRE eitt kort per sone (`makeKort`: namn, areal · volum
+· høgd (himling når ho skil seg), og «Tak … ∠°» berre når takarealet skil seg
+frå golvarealet). Vegglengder og høgdemål står ikkje lenger som lappar — på
+store bygg vart modellen uleseleg (v5.25). Lengd, høgd, brutto-, opnings- og
+nettoareal står i klikk-infoen på veggen (`userData.pick`). `addDimLine` og
+`addHeightDim` står att, ubrukte. `_ryddLappar` gøymer framleis sonekort som
+kolliderer (større sone vinn).
+
+## Angre-historikk og «Kva skjedde»
+
+- `snapshot(namn)` — namnet på handlinga som kjem. Utan namn vert det henta
+  frå hintlinja 80 ms etter (`_histNamnFraHint`; generelle modushint gir
+  «Endring»). Innpakkinga ved autolagringa (`window.snapshot=…`) MÅ sende
+  argumentet vidare — ho slapp det fyrst, og alle steg fekk same namn.
+- Namn, tid og `hendingar` følgjer steget frå `history` til `redoStack` og
+  tilbake.
+- `loggAuto(tekst)` for alt programmet endrar av seg sjølv (reskalering, auto-SK,
+  delplanar/fasadar ved kalibrering, KI som vert godteke). Teksten vert festa
+  til det siste angre-steget om det er under 8 s gamalt, og ligg i `autoLogg`
+  for økta. Ny automatikk ⇒ kall `loggAuto`.
+- `▾` ved angre (`visHistorikk`): stega med namn, tid og automatiske endringar;
+  klikk angrar tilbake til før det steget (n × `undo()`). Under: «Kva skjedde
+  av seg sjølv» (siste 15 i `autoLogg`).
+
+## Overlappande soner
+
+`sonerOverlapp()` finn soner som ligg oppå kvarandre innanfor same etasje
+(delplanane med, verdskoordinatar) ved å telje ruter (≤ 200×200 per par) der
+midtpunktet ligg i begge — ei felles kant gir 0. Grense `OVL_MIN_M2` = 0,5 m².
+Hugsa på ein signatur av geometrien og skalaen, så `draw()` kan kalle han.
+Visast tre stader: raud flate med lapp på planen (`teiknOverlapp`), ein
+Klips-regel, og ein `confirm()` ved SXI-eksport (stoppar ikkje — ei
+mesanin kan vere med vilje — men aldri stille).
 
 ## Fasadeteikningar
 

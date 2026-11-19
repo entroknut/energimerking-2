@@ -499,6 +499,15 @@ button:focus-visible,select:focus-visible,.stab:focus-visible{outline:2px solid 
 .ctx-menu-item.danger:hover{background:var(--red-dim);color:var(--red)}
 .ctx-menu-sep{height:1px;background:var(--border);margin:4px 6px}
 .ctx-menu-header{padding:7px 10px 4px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:6px}
+/* Historikk (▾ ved angre): steg med namn og automatiske endringar */
+.hist-meny{max-width:380px;max-height:70vh;overflow-y:auto}
+.hist-item{flex-direction:column;align-items:stretch;gap:1px}
+.hist-topp{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.hist-namn{font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-tid{font-size:10.5px;color:var(--text3);flex-shrink:0}
+.hist-auto{font-size:10.5px;color:var(--text3);padding:1px 10px 1px 14px;line-height:1.35}
+.hist-item .hist-auto{padding:0 0 0 8px}
+.hist-redo{font-size:10.5px;color:var(--text3);padding:4px 10px;font-style:italic}
 .ctx-ik{width:16px;height:16px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;color:var(--text3)}
 .ctx-menu-item:hover .ctx-ik{color:var(--accent)}
 .ctx-menu-item.danger .ctx-ik,.ctx-menu-item.danger:hover .ctx-ik{color:var(--red)}
@@ -1119,6 +1128,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     <div class="tg">
       <button class="btn" id="undoBtn" title="Angre (Ctrl+Z)" style="opacity:.4" disabled>↩</button>
       <button class="btn" id="redoBtn" title="Gjere om (Ctrl+Y / Ctrl+Shift+Z)" style="opacity:.4" disabled>↪</button>
+      <button class="btn" id="histBtn" title="Historikk: angre til eit bestemt steg, og kva programmet har endra av seg sjølv" style="padding:0 6px">▾</button>
     </div>
     <div class="tg">
       <button class="btn" id="calBtn" title="Kalibrer skala">⊕ Kalibrer</button>
@@ -3308,6 +3318,7 @@ function _reskalerAlleEtasjar(oldMppList){
   let n=0;
   floors.forEach((fl,i)=>{n+=reskalerVedNyKalibrering(fl,oldMppList[i],mppForFloor(fl));});
   _brukAlleAnker();   // delplanar held plasseringa si når skalaen endrar seg
+  if(n)loggAuto(n+' vindauge/dør'+(n>1?'er':'')+' skalert med ny skala');
   return n;
 }
 
@@ -4867,6 +4878,142 @@ document.getElementById('mergeDone').onclick=()=>mergeOverlay.classList.remove('
 mergeOverlay.addEventListener('click',e=>{if(e.target===mergeOverlay)mergeOverlay.classList.remove('show');});
 
 // ── Angre-historikk (Ctrl+Z) ──────────────────────────────────
+// Kvar oppføring er tilstanden FØR ei handling, med namnet på handlinga
+// (snapshot(namn), elles henta frå hintlinja like etter), tidspunktet og dei
+// automatiske endringane som skjedde i same steg (loggAuto). Namnet følgjer
+// steget over til redoStack og tilbake.
+const autoLogg=[];   // {tid,tekst} — alt programmet har endra av seg sjølv i økta
+// Automatiske endringar: vindauge skalerte, veggar gjort til SK, KI-forslag
+// godtekne … Dei vert festa til angre-steget dei høyrer til (om det er
+// ferskt) og står i «Kva skjedde» i historikken.
+function loggAuto(tekst){
+  if(!tekst)return;
+  autoLogg.push({tid:Date.now(),tekst});
+  if(autoLogg.length>200)autoLogg.shift();
+  const e=history[history.length-1];
+  if(e&&Date.now()-(e.tid||0)<8000)(e.hendingar=e.hendingar||[]).push(tekst);
+}
+function _histNamnFraHint(){
+  const t=(hintText.textContent||'').trim();
+  if(!t||(typeof HINTS==='object'&&Object.values(HINTS).includes(t)))return'Endring';
+  return t.length>80?t.slice(0,77)+'…':t;
+}
+function _kl(t){const d=new Date(t);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function visHistorikk(anker){
+  document.querySelectorAll('.ctx-menu').forEach(m=>m.remove());
+  const m=document.createElement('div');m.className='ctx-menu hist-meny';
+  const hdr=t=>{const d=document.createElement('div');d.className='ctx-menu-header';d.textContent=t;m.appendChild(d);};
+  const lin=(t,cls)=>{const d=document.createElement('div');d.className=cls;d.textContent=t;return d;};
+  hdr(history.length?'Angre tilbake til før …':'Ingen angre-steg enno');
+  history.slice().reverse().forEach((e,k)=>{
+    const steg=k+1;   // tal på angre-steg som må til
+    const it=document.createElement('div');it.className='ctx-menu-item hist-item';
+    const top=document.createElement('div');top.className='hist-topp';
+    top.appendChild(lin(e.namn||'Endring','hist-namn'));
+    top.appendChild(lin(_kl(e.tid||Date.now())+(steg>1?' · '+steg+' steg':''),'hist-tid'));
+    it.appendChild(top);
+    (e.hendingar||[]).forEach(t=>it.appendChild(lin('↳ '+t,'hist-auto')));
+    it.onclick=()=>{m.remove();for(let i=0;i<steg&&history.length;i++)undo();};
+    m.appendChild(it);
+  });
+  if(redoStack.length){
+    const d=lin(redoStack.length+' steg kan gjerast om (Ctrl+Y)','hist-redo');m.appendChild(d);
+  }
+  const sep=document.createElement('div');sep.className='ctx-menu-sep';m.appendChild(sep);
+  hdr('Kva skjedde av seg sjølv');
+  const al=autoLogg.slice(-15).reverse();
+  if(!al.length)m.appendChild(lin('Ingenting enno i denne økta.','hist-auto'));
+  al.forEach(a=>m.appendChild(lin(_kl(a.tid)+'  '+a.tekst,'hist-auto')));
+  document.body.appendChild(m);
+  const r=anker.getBoundingClientRect();
+  m.style.left=Math.max(8,Math.min(r.left,innerWidth-m.offsetWidth-8))+'px';
+  m.style.top=(r.bottom+4)+'px';
+  const lukk=ev=>{if(ev.type==='keydown'&&ev.key!=='Escape')return;if(ev.type==='mousedown'&&m.contains(ev.target))return;
+    m.remove();document.removeEventListener('mousedown',lukk,true);document.removeEventListener('keydown',lukk,true);};
+  setTimeout(()=>{document.addEventListener('mousedown',lukk,true);document.addEventListener('keydown',lukk,true);},0);
+}
+
+// ── Overlappande soner ────────────────────────────────────────
+// To soner som ligg oppå kvarandre vert rekna to gonger i energimerket.
+// Overlappen vert funnen i verdskoordinatar (meter) innanfor kvar etasje,
+// delplanane med, ved å telje ruter (≤ 200×200 per par) der midtpunktet
+// ligg i begge. Ei felles kant gir 0 — midtpunkta ligg på kvar si side.
+// Resultatet vert hugsa til geometrien endrar seg (signatur).
+const OVL_MIN_M2=0.5;
+let _ovlMemo={sig:null,res:[]};
+function _ovlSoner(f){const i=floors.indexOf(f);return(i===activeFloor&&viewMode==='plan'?zones:f.zones)||[];}
+function sonerOverlapp(){
+  const sig=floors.map(f=>(mppForFloor(f)||0)+'@'+(f.floorDxImg||0)+','+(f.floorDyImg||0)+'@'+(f.delAv||'')+':'
+    +_ovlSoner(f).map(z=>(z.pts||[]).map(p=>Math.round(p.x)+','+Math.round(p.y)).join(';')).join('|')).join('#');
+  if(sig===_ovlMemo.sig)return _ovlMemo.res;
+  const res=[];
+  const grupper=new Map();
+  floors.forEach(f=>{const hv=hovudEtasje(f);if(!grupper.has(hv))grupper.set(hv,[]);grupper.get(hv).push(f);});
+  grupper.forEach(ark=>{
+    const l=[];
+    ark.forEach(f=>{
+      const mpp=mppForFloor(f);if(!mpp)return;
+      const k=mpp/1000;
+      _ovlSoner(f).forEach(z=>{
+        if((z.pts||[]).length<3)return;
+        const w=z.pts.map(p=>({x:(p.x+(f.floorDxImg||0))*k,y:(p.y+(f.floorDyImg||0))*k}));
+        const xs=w.map(p=>p.x),ys=w.map(p=>p.y);
+        l.push({z,f,w,x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)});
+      });
+    });
+    for(let i=0;i<l.length;i++)for(let j=i+1;j<l.length;j++){
+      const a=l[i],b=l[j];
+      const x0=Math.max(a.x0,b.x0),x1=Math.min(a.x1,b.x1),y0=Math.max(a.y0,b.y0),y1=Math.min(a.y1,b.y1);
+      if(!((x1-x0)*(y1-y0)>=OVL_MIN_M2))continue;
+      const c=Math.max(0.1,Math.sqrt((x1-x0)*(y1-y0)/40000));
+      let n=0;const rader=[];
+      for(let y=y0+c/2;y<y1;y+=c){
+        let start=null;
+        for(let x=x0+c/2;x<x1+c;x+=c){
+          const inn=x<x1&&kiInniPolygon({x,y},a.w)&&kiInniPolygon({x,y},b.w);
+          if(inn){n++;if(start==null)start=x-c/2;}
+          else if(start!=null){rader.push({y0:y-c/2,y1:y+c/2,x0:start,x1:x-c/2});start=null;}
+        }
+      }
+      const areal=n*c*c;
+      if(areal>=OVL_MIN_M2)res.push({a:a.z,fa:a.f,b:b.z,fb:b.f,areal,rader});
+    }
+  });
+  res.sort((p,q)=>q.areal-p.areal);
+  _ovlMemo={sig,res};
+  return res;
+}
+// Overlappen raud oppå planen (berre arka i den aktive etasjen)
+function teiknOverlapp(){
+  if(viewMode!=='plan')return;
+  const f=curFloor(),mpp=mppForFloor(f);if(!mpp)return;
+  const hv=hovudEtasje(f);
+  const l=sonerOverlapp().filter(o=>hovudEtasje(o.fa)===hv);
+  if(!l.length)return;
+  const k=1000/mpp,dx=f.floorDxImg||0,dy=f.floorDyImg||0;
+  ctx.save();
+  ctx.fillStyle='rgba(220,38,38,.35)';ctx.strokeStyle='rgba(185,28,28,.9)';ctx.lineWidth=1;
+  l.forEach(o=>{
+    o.rader.forEach(r=>{
+      const p=i2s(r.x0*k-dx,r.y0*k-dy),q=i2s(r.x1*k-dx,r.y1*k-dy);
+      ctx.fillRect(p.x,p.y,q.x-p.x,q.y-p.y);
+    });
+    // Lapp ved fyrste rada
+    const r0=o.rader[Math.floor(o.rader.length/2)];
+    if(r0){
+      const p=i2s((r0.x0+r0.x1)/2*k-dx,(r0.y0+r0.y1)/2*k-dy);
+      const t='⚠ Overlapp '+o.areal.toFixed(1)+' m²';
+      ctx.font='bold 11px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      const tw=ctx.measureText(t).width+10;
+      ctx.fillStyle='rgba(255,255,255,.95)';ctx.fillRect(p.x-tw/2,p.y-9,tw,18);
+      ctx.strokeRect(p.x-tw/2,p.y-9,tw,18);
+      ctx.fillStyle='#b91c1c';ctx.fillText(t,p.x,p.y);
+      ctx.fillStyle='rgba(220,38,38,.35)';
+    }
+  });
+  ctx.restore();
+}
+
 const MAX_HISTORY=50;
 const history=[];
 const redoStack=[];
@@ -4892,7 +5039,7 @@ function _fasadeMinne(fa){
   };
 }
 
-function snapshot(){
+function snapshot(namn){
   const s=floors.map(f=>({
     id:f.id,name:f.name,
     // Bilete/PDF lagrast som referansar (Image-objekt er uforanderlege i praksis)
@@ -4918,8 +5065,12 @@ function snapshot(){
       return obj;
     })))
   }));
-  history.push({floors:s,fasadar:fasadar.map(_fasadeMinne),activeFloor,activeFasade,
-    globalNorth:globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId});
+  const _e={floors:s,fasadar:fasadar.map(_fasadeMinne),activeFloor,activeFasade,
+    globalNorth:globalNorth,globalMmPerImgPx,_nextGroupId,_nextZoneId,_nextFasadeId,
+    namn:namn||null,tid:Date.now(),hendingar:[]};
+  history.push(_e);
+  // Utan namn: handlinga skriv nesten alltid kva ho gjorde i hintlinja like etter
+  if(!namn)setTimeout(()=>{if(!_e.namn)_e.namn=_histNamnFraHint();},80);
   if(history.length>MAX_HISTORY)history.shift();
   redoStack.length=0; // Ny handling tømer redo-stacken
   updateUndoBtn();
@@ -5014,19 +5165,20 @@ function getCurrentState(){
 
 function undo(){
   if(!history.length){hintText.textContent='Ingen fleire angre-steg.';return;}
-  redoStack.push(getCurrentState());
   const prev=history.pop();
+  // Namnet følgjer steget, så «Gjer om» seier kva som kjem att
+  redoStack.push({...getCurrentState(),namn:prev.namn,tid:prev.tid,hendingar:prev.hendingar||[]});
   applyHistoryState(prev);
-  hintText.textContent='Angra.';
+  hintText.textContent='Angra'+(prev.namn?': '+prev.namn:'.');
   if(listeOverlay.classList.contains('show'))renderListe();
 }
 
 function redo(){
   if(!redoStack.length){hintText.textContent='Ingen fleire gjere-om-steg.';return;}
-  history.push(getCurrentState());
   const next=redoStack.pop();
+  history.push({...getCurrentState(),namn:next.namn,tid:next.tid,hendingar:next.hendingar||[]});
   applyHistoryState(next);
-  hintText.textContent='Gjort om.';
+  hintText.textContent='Gjort om'+(next.namn?': '+next.namn:'.');
   if(listeOverlay.classList.contains('show'))renderListe();
 }
 
@@ -5042,7 +5194,7 @@ function redo(){
   function deactivate(){
     nordCheck=false;
     btn.classList.remove('on');
-    hintText.textContent=hints[mode]||'';
+    hintText.textContent=HINTS[mode]||'';
     draw();
   }
   btn.addEventListener('mousedown',e=>{activate();e.preventDefault();});
@@ -5061,12 +5213,14 @@ function redo(){
 })();
 
 document.getElementById('undoBtn').onclick=undo;
+document.getElementById('histBtn').onclick=e=>{e.stopPropagation();visHistorikk(e.currentTarget);};
 document.getElementById('redoBtn').onclick=redo;
 
 document.getElementById('clrBtn').onclick=()=>{
   if(!confirm('Slett alle soner på denne etasjen?\n\nDenne handlinga kan angrast med Ctrl+Z.'))return;
-  snapshot();
-  curFloor().zones=[];zones=[];curPts=[];calPts=[];winPts=[];editZoneIdx=null;
+  snapshot('Slett alle soner på '+arkNamn(curFloor()));
+  zones=curFloor().zones=[];   // éi liste: aliaset og etasjen må vere same array
+ curPts=[];calPts=[];winPts=[];editZoneIdx=null;
   renderFloorTabs();updateResults();draw();
 };
 
@@ -6438,6 +6592,7 @@ function draw(){
   }
   // Berre når det finst eit forslag (eller knappar å rydde) — KI-koden og
   // globalane hennar er ikkje initialiserte når draw() går under oppstarten
+  teiknOverlapp();
   if(draftZones.length||(document.getElementById('kiHandtak')||{}).childElementCount)kiPlasserHandtak();
 
   // KI-forslag til vindauge og dører (sjå «2e. KI-oppteikning»)
@@ -7090,7 +7245,8 @@ document.getElementById('calOk').onclick=()=>{
     if(!isNaN(m2)&&m2>0&&pendingCalAreaPx2>0) newMmPerImgPx=Math.sqrt(m2/pendingCalAreaPx2)*1000;
   }
   if(newMmPerImgPx){
-    snapshot(); // angre-steg + markerer prosjektet som endra → autolagring
+    snapshot('Kalibrering'+(iFasade()?' ('+((curFasade()||{}).name||'fasade')+')':' ('+arkNamn(curFloor())+')'));
+    // ↑ angre-steg + markerer prosjektet som endra → autolagring
     // Fasadearket har si eiga skala og ingenting lagra i millimeter: måla
     // vert rekna frå biletpikslar ved kvar teikning, så ei omkalibrering slår
     // gjennom av seg sjølv. Ingen reskalering, og ingenting å gjere med
@@ -7112,6 +7268,7 @@ document.getElementById('calOk').onclick=()=>{
       updateScaleBadge();renderFasadeTabs();renderFasadePanel();draw();
       calOverlay.classList.remove('show');
       calPts=[];setMode('navigate');
+      if(n)loggAuto('Skalaen sett på '+n+' andre fasadeteikning'+(n>1?'ar':'')+(om?' ('+om+' rekna om etter papiret)':''));
       if(n)hintText.textContent='Skalaen gjeld '+(n+1)+' fasadeteikningar'
         +(om?' — '+om+' rekna om etter papirformatet':'')+'. Planteikningane står urørte. Ctrl+Z for å angre.';
       return;
@@ -7157,6 +7314,8 @@ document.getElementById('calOk').onclick=()=>{
   calPts=[];setMode('navigate');
   // Etter setMode(), som sjølv skriv i hintText
   if(_reskalert>0)hintText.textContent='Ny skala — '+_reskalert+' vindauge/dør'+(_reskalert>1?'er':'')+' vart skalert med bygget. Ctrl+Z for å angre.';
+  if(_delN)loggAuto(_delN+' delplan'+(_delN>1?'ar':'')+' fekk same målestokk'+(_delOm?' ('+_delOm+' rekna om etter papiret)':''));
+  if(_fasN)loggAuto(_fasN+' fasadeteikning'+(_fasN>1?'ar':'')+' fekk same målestokk'+(_fasOm?' ('+_fasOm+' rekna om etter papiret)':''));
   if(_delN)hintText.textContent=(_reskalert>0?hintText.textContent+' ':'Ny skala. ')
     +_delN+' delplan'+(_delN>1?'ar':'')+' fekk same målestokk'+(_delOm?' ('+_delOm+' rekna om etter papirformatet)':'')+'.';
   if(_fasN)hintText.textContent=(_reskalert>0||_delN?hintText.textContent+' ':'Ny skala. ')
@@ -7340,6 +7499,7 @@ function autoSkilleveggForNySone(nz){
 
   // 4. Rydd opp i sonene vi endra geometrien på
   cuts.forEach((m,z)=>{sanitizeZoneSegRefs(z);_syncGavlflater(z);});
+  if(tal)loggAuto(tal+' felles vegg'+(tal>1?'ar':'')+' gjort til skiljekonstruksjon («'+(nz.name||'ny sone')+'»)');
   return tal;
 }
 
@@ -14787,6 +14947,7 @@ function kiVisHoyder(){
 document.getElementById('aiAccept').onclick=async()=>{
   if(kiSteg==='soner'){
     const n=kiGodtaSoner();
+    if(n)loggAuto('KI: '+hintText.textContent);
     // Sonene er godtekne — «Prøv igjen» etter dette skal gjelde opningane
     document.getElementById('aiSoner').checked=false;
     if(n&&kiVidareTilOpningar){
@@ -14800,7 +14961,7 @@ document.getElementById('aiAccept').onclick=async()=>{
     kiAvslutt();
     return;
   }
-  if(kiSteg==='opningar')kiGodtaOpningar();
+  if(kiSteg==='opningar'){kiGodtaOpningar();loggAuto('KI: '+hintText.textContent);}
   if(kiSteg==='hoyder'){
     saveFloorState();snapshot();markDirty();
     const t=kiBrukHoyder();
@@ -14870,7 +15031,8 @@ window.addEventListener('beforeunload',e=>{
 });
 // Patch snapshot and zone-add to mark dirty
 const _origSnapshot=snapshot;
-window.snapshot=snapshot=function(){_origSnapshot();markDirty();};
+// Namnet på angre-steget må følgje med gjennom innpakkinga
+window.snapshot=snapshot=function(namn){_origSnapshot(namn);markDirty();};
 
 // ── 2. Autosave til localStorage ─────────────────────────────
 const AUTOSAVE_KEY='sxi_generator_autosave';
@@ -19630,6 +19792,12 @@ const ANSVARLEG_KEY='sxiAnsvarleg';
       return;
     }
     errEl.style.whiteSpace='';
+    // Overlappande soner: arealet vert rekna to gonger. Ikkje stopp — det kan
+    // vere med vilje (t.d. mesanin) — men aldri utan at brukaren veit det.
+    const _ovl=sonerOverlapp();
+    if(_ovl.length&&!confirm('Desse sonene ligg oppå kvarandre, så arealet vert rekna to gonger i energimerket:\n\n'
+      +_ovl.slice(0,8).map(o=>'• «'+o.a.name+'» og «'+o.b.name+'»: '+o.areal.toFixed(1)+' m²').join('\n')
+      +(_ovl.length>8?'\n… og '+(_ovl.length-8)+' til':'')+'\n\nLast ned SXI-fila likevel?'))return;
     // Eit valt tiltak som ikkje fann eitt einaste element vert ikkje lagt inn.
     // Sil aldri i stillheit — då ville brukaren tru tiltaket var med i fila.
     if(tiltakInfo.tomme.length){
@@ -20089,7 +20257,6 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
       kant:new THREE.LineBasicMaterial({color:0x1e293b,transparent:true,opacity:0.7})
     };
 
-    const _hoydeVist=new Set();   // høgdemål: berre éin gong per etasje og høgd
     floors.forEach((f,fi)=>{
       const baseY=floorBaseY[fi];
       f.zones.forEach((z,zi)=>{
@@ -20185,14 +20352,19 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
           wall.rotation.y=-ang;wall.castShadow=!isSK;wall.receiveShadow=true;
           wall.userData.w=true;
           if(!isSK)wall.add(new THREE.LineSegments(new THREE.EdgesGeometry(wallGeo),edgeMat));
-          // Klikk-info for denne veggen
+          // Klikk-info for denne veggen — her bur no lengda og areala som
+          // før stod som lappar på modellen
+          const opnA=segWins.reduce((s,w)=>s+winCount(w)*(w.breddeMm||0)*(w.hoyMm||0)/1e6,0);
           wall.userData.pick={
             title:z.name+' — '+(sk.has(seg.idx)?'skiljevegg':isSK?'sonekopling':'fasade '+seg.dir),
             rows:[
               ['Etasje',f.name],
               ['Lengd',seg.lenM!=null?seg.lenM.toFixed(2)+' m':'ikkje kalibrert'],
+              ['Høgd',fh.toFixed(2)+' m'],
               ['Bruttoareal',seg.areaM2!=null?seg.areaM2.toFixed(2)+' m²':'—'],
-              ['Vindauge/dører',String(segWins.reduce((s,w)=>s+(w.antal||1),0))],
+              ['Vindauge/dører',String(segWins.reduce((s,w)=>s+(w.antal||1),0))
+                +(opnA>0?' · '+opnA.toFixed(2)+' m²':'')],
+              ...(seg.areaM2!=null&&opnA>0?[['Nettoareal',Math.max(0,seg.areaM2-opnA).toFixed(2)+' m²']]:[]),
               ['U-vegg',(z.uVegg??entroStandard(z.byggeaar)?.uVegg)!=null?((z.uVegg??entroStandard(z.byggeaar).uVegg).toFixed(2)+' W/m²K'+(z.uVegg!=null?' (manuell)':'')):'—']
             ]
           };
@@ -20227,17 +20399,8 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
             scene3.add(m);
           });
 
-          // ── Vegglengde-annotasjon ──
-          if(mmPerImgPx&&segLen>0.5&&!isSK){
-            const dimY=baseY+fh+0.15;
-            const nx2=ox*(thick+0.4),nz2=oz*(thick+0.4);
-            const lbl=segLen.toFixed(1)+' m';
-            addDimLine(
-              {x:p1.x+nx2,z:p1.z+nz2},
-              {x:p2.x+nx2,z:p2.z+nz2},
-              lbl, dimY, col
-            );
-          }
+          // Vegglengd og areal står ikkje som lappar lenger (det vart uleseleg
+          // på store bygg) — dei kjem fram ved klikk på veggen (userData.pick).
         });
 
         // Golv- og takkant
@@ -20371,27 +20534,16 @@ let renderer3=null,scene3=null,camera3=null; // global — trengst for tema-togg
           // Eitt kort per sone: namn, areal og volum, og taket når det
           // skil seg frå golvarealet (skrått tak) — likt areal står ikkje to gonger.
           const takA=getTakAreal(z),vol=getVolum(z);
+          // Høgda står her i staden for som eigne høgdemål på veggen
           const liner=[{t:z.name,fs:15,bold:true,c:colHex},
-            {t:area.toFixed(1)+' m²'+(vol?' · '+vol.toFixed(0)+' m³':''),fs:12}];
+            {t:area.toFixed(1)+' m²'+(vol?' · '+vol.toFixed(0)+' m³':'')+' · h '+fh.toFixed(1)+' m'
+              +(Math.abs(him-fh)>0.005?' (himling '+him.toFixed(1)+')':''),fs:12}];
           if(takA&&(z.taktype||'Tak')==='Tak'&&(takvinkel>0||Math.abs(takA-area)>0.05))
             liner.push({t:'Tak '+takA.toFixed(1)+' m²'+(takvinkel>0?' ∠'+takvinkel+'°':''),fs:11,c:'#4338ca'});
           const kort=makeKort(liner,colHex+'88');
           kort.position.set(cxM,baseY+fh+0.6,czM);
           kort.userData.prio=3+Math.min(0.9,area/10000);   // større sone vinn
           scene3.add(kort);
-        }
-
-        // ── Etasjehøgde-annotasjon ──
-        const _hKey=baseY.toFixed(2)+'|'+fh.toFixed(2)+'|'+him.toFixed(2);
-        if(mmPerImgPx&&fh>0.5&&!_hoydeVist.has(_hKey)){
-          _hoydeVist.add(_hKey);
-          // Find the rightmost point of the zone for the dim line
-          let bestP=ptsM[0];
-          ptsM.forEach(p=>{if(p.x>bestP.x||(p.x===bestP.x&&p.z>bestP.z))bestP=p;});
-          addHeightDim(bestP.x+0.6,baseY,baseY+fh,bestP.z,fh.toFixed(1)+' m',0x0e6b5e);
-          if(him!==fh){
-            addHeightDim(bestP.x+1.3,baseY,baseY+him,bestP.z,`Him. ${him.toFixed(1)} m`,0x7c3aed);
-          }
         }
 
         // Legend
@@ -21760,6 +21912,13 @@ function printFasadeView(){
           knappar:[{t:'Vis sona',hovud:true,gjer:()=>tilSone(z)}]};
       }
       return null;}},
+    {id:'overlapp',sjekk:()=>{
+      const o=sonerOverlapp()[0];if(!o)return null;
+      const a=o.areal.toFixed(1).replace('.',',')+' m²';
+      return {key:'ovl:'+_zuk(o.a)+':'+_zuk(o.b),tittel:TR('To soner ligg oppå kvarandre','To sona ligg oppå kvarandre'),
+        tekst:TR('«'+o.a.name+'» og «'+o.b.name+'» overlappar med '+a+'. Det arealet vert rekna to gonger i energimerket. Overlappen er raud i teikninga.',
+          '«'+o.a.name+'» og «'+o.b.name+'» overlappe med '+a+'. Det arealet blir rekna to gong i energimerke, og det e itj nå å tøys med. Overlappen e rau i tegninga.'),
+        knappar:[{t:'Vis sona',hovud:true,gjer:()=>tilSone(o.a)}]};}},
     {id:'kategori',sjekk:()=>{
       const s=alleSoner();if(!s.length||s.some(z=>z.bygkat))return null;
       return {key:'kat',tittel:TR('Kva slags bygg er dette?','Ka slags bygg e dette her?'),
@@ -22691,6 +22850,9 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
   }
 })();
 
+// Siste linja i hovudskriptet. Feilar noko ved lasting (t.d. ein konstant
+// som vert lesen før han finst), kjem vi aldri hit — testane sjekkar merket.
+window.__sxiKlar=true;
 </script>
 </body>
 </html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="nn"><head><meta charset="utf-8"><title>SXI-regresjon</title>
+<style>body{font:13px system-ui;margin:16px}iframe{width:1200px;height:800px;border:1px solid #ccc}</style>
+</head><body>
+<h3>SXI-regresjon</h3>
+<pre id="logg"></pre>
+<!-- Køyraren (tools/test-sxi.py) les resultatet herifrå. textarea, så innhaldet
+     vert escapa i DOM-dumpen og ikkje kan bryte ut av elementet. -->
+<textarea id="resultat" style="display:none"></textarea>
+<script>
+// Lastar index.html i ein iframe, opnar kvart testprosjekt med lastProsjekt()
+// og byggjer SXI-fila med faste val og fast dato. Resultatet vert samanlikna
+// med fasitfilene av tools/test-sxi.py. Same veg som brukaren: lastProsjekt
+// og buildSXI, ingenting teke snarvegar rundt.
+const logg=t=>{document.getElementById('logg').textContent+=t+'\n';};
+const FAST_DATO='2026-01-01T12:00:00Z';
+(async()=>{
+  const ut={sxi:{},feil:[],dekning:{},klar:false};
+  try{
+    const liste=await (await fetch('fasit/liste.json?'+Date.now())).json();
+    const fr=document.createElement('iframe');
+    // ?app= gir ei anna programfil (fasiten vert laga frå siste commit)
+    const app=new URLSearchParams(location.search).get('app')||'../../index.html';
+    fr.src=app+'?test='+Date.now();
+    document.body.appendChild(fr);
+    await new Promise(r=>fr.onload=r);
+    const w=fr.contentWindow;
+    // Feil i programmet medan testane køyrer
+    w.addEventListener('error',e=>ut.feil.push('window.error: '+e.message));
+    const ce=w.console.error.bind(w.console);
+    w.console.error=(...a)=>{ut.feil.push('console.error: '+a.map(String).join(' ').slice(0,300));ce(...a);};
+    await new Promise(r=>setTimeout(r,800));
+    ut.klar=!!w.__sxiKlar;
+    if(!ut.klar)ut.feil.push('Hovudskriptet vart ikkje ferdig lasta (window.__sxiKlar manglar).');
+    // Fast klokke: SXI-fila har datoen i seg
+    const D=w.Date;
+    w.Date=class extends D{constructor(...a){if(a.length)super(...a);else super(FAST_DATO);}
+      static now(){return new D(FAST_DATO).getTime();}};
+    const klima=w.eval('Object.keys(KLIMA)')[0];
+    const alleTiltak=w.eval('SXI_TILTAK.map(t=>t.key)');
+    for(const namn of liste){
+      try{
+        const proj=await (await fetch('fasit/prosjekt/'+encodeURIComponent(namn)+'.json')).json();
+        await w.lastProsjekt(proj);
+        w.eval('typeof syncFloorState==="function"&&syncFloorState()');
+        // Kva prosjektet faktisk prøver (så ein ser kva fasiten dekkjer)
+        ut.dekning[namn]=w.eval(`(()=>{const z=floors.flatMap(f=>f.zones);return{
+          etasjar:floors.length,delplanar:floors.filter(f=>f.delAv).length,soner:z.length,
+          vindauge:z.reduce((s,q)=>s+(q.windows||[]).filter(x=>x.type!=='dor').length,0),
+          dorer:z.reduce((s,q)=>s+(q.windows||[]).filter(x=>x.type==='dor').length,0),
+          grupper:z.reduce((s,q)=>s+(q.windows||[]).filter(x=>(x.antal||1)>1).length,0),
+          sk:z.reduce((s,q)=>s+(q.skillevegg?q.skillevegg.size:0),0),
+          kopla:z.filter(q=>q.groupId).length,takflater:z.filter(q=>(q.takflater||[]).length).length,
+          gulvflater:z.filter(q=>(q.gulvflater||[]).length).length,yvSaman:z.filter(q=>(q.yvMergedGroups||[]).length).length,
+          skSaman:z.filter(q=>(q.skMergedGroups||[]).length).length,koplaSaman:z.filter(q=>q.yvKoplaSaman).length,
+          skraatak:z.filter(q=>getTakvinkel(q)>0).length,system:z.filter(q=>(q.tekniskeSystem||[]).length).length}})()`);
+        for(const [variant,tiltak] of [['utan',[]],['tiltak',alleTiltak]]){
+          const sxi=w.buildSXI({prosjektnamn:'Test & Co «æøå»',adresse:'Testgata 1',klimasted:klima,
+            byggeaar:1985,kommunenr:'0301',ansvarleg:'Testar',tiltak,tiltakInfo:{tomme:[]}});
+          ut.sxi[namn+'.'+variant]=sxi;
+        }
+        // Invariant: `zones` er den same arrayen som den aktive etasjen sine
+        // soner (CLAUDE.md, «alias-fella»). Sjekka etter lasting, etter
+        // etasjebyte fram og tilbake, og etter angre.
+        const aliasOk=()=>w.eval('viewMode!=="plan"||zones===floors[activeFloor].zones');
+        if(!aliasOk())ut.feil.push(namn+': zones-aliaset peikar ikkje på den aktive etasjen etter lasting');
+        if(w.eval('floors.length')>1){
+          w.eval('switchFloor((activeFloor+1)%floors.length)');
+          if(!aliasOk())ut.feil.push(namn+': zones-aliaset brote etter etasjebyte');
+          w.eval('switchFloor(0)');
+        }
+        w.eval('snapshot("test");undo()');
+        if(!aliasOk())ut.feil.push(namn+': zones-aliaset brote etter angre');
+        // Røyktest: sidepanel, tabell, teikning og 3D-modell for prosjektet.
+        // Feil vert fanga av console.error/window.error over.
+        try{
+          w.eval('updateResults();renderTable&&renderTable();draw();');
+          if(w.eval('typeof _rebuild3D')==='function'||w.document.getElementById('btn3d')){
+            w.document.getElementById('btn3d').click();
+            await new Promise(r=>setTimeout(r,400));
+            const c=w.document.getElementById('model3dClose')||w.document.querySelector('#model3dOverlay .close,#model3dCloseBtn');
+            if(c)c.click();
+          }
+        }catch(e){ut.feil.push(namn+' (røyktest): '+e.message);}
+        logg('✓ '+namn);
+      }catch(e){ut.feil.push(namn+': '+(e&&e.stack||e));logg('✕ '+namn+': '+e);}
+    }
+  }catch(e){ut.feil.push('Testsida: '+(e&&e.stack||e));}
+  document.getElementById('resultat').value=JSON.stringify(ut);
+  document.title='FERDIG';
+  // Køyraren (tools/test-sxi.py) tek imot resultatet her. Opna for hand utan
+  // køyraren finst ikkje adressa — då står resultatet berre på sida.
+  try{await fetch('/__resultat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ut)});}catch(e){}
+  logg('Ferdig: '+Object.keys(ut.sxi).length+' SXI-filer, '+ut.feil.length+' feil.');
+})();
+</script>
+</body></html>
