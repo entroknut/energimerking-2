@@ -59,8 +59,14 @@ def skriv(p, t):
         f.write(t)
 
 
+def lf(t):
+    """Git (core.autocrlf=true) kan byte LF/CRLF ved utsjekk. Innhaldet er det
+    same, så samanlikning og stempel ser bort frå linjeskifta."""
+    return t.replace('\r\n', '\n')
+
+
 def sha(t):
-    return hashlib.sha256(t.encode('utf-8')).hexdigest()
+    return hashlib.sha256(lf(t).encode('utf-8')).hexdigest()
 
 
 def hovudskript(h):
@@ -116,11 +122,11 @@ def main():
     ny, filer = bygg()
     gml = les(UT) if os.path.exists(UT) else ''
     if '--sjekk' in a:
-        if ny != gml:
+        if lf(ny) != lf(gml):
             sys.exit('index.html er ikkje bygd frå src/. Køyr: python tools/bygg.py')
         print('index.html er bygd frå src/ (' + str(len(filer)) + ' JS-filer).')
         return
-    if ny == gml:
+    if lf(ny) == lf(gml):
         print('index.html er alt oppdatert.')
         return
     sist = les(STEMPEL).strip() if os.path.exists(STEMPEL) else None
