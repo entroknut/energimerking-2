@@ -1193,7 +1193,7 @@ td.cell-overridden::after{content:"";position:absolute;top:4px;right:4px;width:4
     </div>
     <div id="braSummary" class="plan-only" style="margin-left:12px;font-size:11px;color:var(--text3);font-family:inherit;display:flex;align-items:center;gap:10px;white-space:nowrap"></div>
    </div>
-    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.24.0</span>
+    <span id="appVer" style="padding:0 4px 0 10px;font-size:10px;color:var(--text3);opacity:.6;font-family:inherit;user-select:none;white-space:nowrap">v5.24.1</span>
   </div>
   <div id="canvasRow">
   <div id="cwrap">
@@ -6926,10 +6926,14 @@ function oppdaterCalScope(){
     b.style.borderColor=paa?'var(--accent)':'var(--border2)';
     b.style.background=paa?'var(--accent-dim)':'var(--surface)';
   });
-  const andreEigne=floors.filter(x=>x!==f&&x.ownCal).length;
+  // Delplanar vert med (same målestokk); andre etasjar med eigen skala står
+  const delpl=floors.filter(x=>x!==f&&x.ownCal&&erDelplan(x)&&x.bgImg).length;
+  const andreEigne=floors.filter(x=>x!==f&&x.ownCal&&!(erDelplan(x)&&x.bgImg)).length;
   document.getElementById('calScopeNote').textContent=calScopeOwn
     ?'Dei andre etasjane står urørte.'
-    :'Gjeld alle etasjar som brukar global skala'+(andreEigne?` (${andreEigne} med eigen skala står urørt${andreEigne>1?'e':''})`:'')+'.';
+    :'Gjeld alle etasjar som brukar global skala'
+      +(delpl?`, og ${delpl} delplan${delpl>1?'ar':''} med same målestokk`:'')
+      +(andreEigne?`. ${andreEigne} etasje${andreEigne>1?'r':''} med eigen skala står urørt${andreEigne>1?'e':''}`:'')+'.';
 }
 document.getElementById('calScopeGlobal').onclick=()=>{calScopeOwn=false;oppdaterCalScope();};
 document.getElementById('calScopeOwn').onclick=()=>{calScopeOwn=true;oppdaterCalScope();};
@@ -7066,7 +7070,7 @@ document.getElementById('calBack').onclick=()=>{
 
 document.getElementById('calOk').onclick=()=>{
   let newMmPerImgPx=null;
-  let _reskalert=0,_fasN=0,_fasOm=0;
+  let _reskalert=0,_fasN=0,_fasOm=0,_delN=0,_delOm=0;
   if(calMode==='scale'){
     const papir=gjeldandePapir();
     if(papir&&bgImg&&valdSkala>0){
@@ -7135,6 +7139,15 @@ document.getElementById('calOk').onclick=()=>{
       globalMmPerImgPx=newMmPerImgPx;
       floors.forEach(fl=>{if(!fl.ownCal)fl.mmPerImgPx=newMmPerImgPx;});
       mmPerImgPx=newMmPerImgPx;
+      // Delplanar har eigen skala frå fødselen av (ofte anna pikseltettleik),
+      // men «alle etasjar» skal gjelde dei òg: same målestokk, rekna om
+      // etter papirformatet. Dei held ownCal, så tettleiken kan vere ulik.
+      const fra=curArk(),fraW=bgImg&&bgImg.width;
+      floors.forEach(fl=>{
+        if(fl===f||!fl.ownCal||!erDelplan(fl)||!fl.bgImg)return;
+        const s=_mppSameMaalestokk(fra,fraW,newMmPerImgPx,fl);
+        fl.mmPerImgPx=s.mpp;_delN++;if(s.omrekna)_delOm++;
+      });
     }
     // Vindauge/dører er måla på planteikninga — dei må følgje bygget
     _reskalert=_reskalerAlleEtasjar(_oldMpp);
@@ -7144,7 +7157,9 @@ document.getElementById('calOk').onclick=()=>{
   calPts=[];setMode('navigate');
   // Etter setMode(), som sjølv skriv i hintText
   if(_reskalert>0)hintText.textContent='Ny skala — '+_reskalert+' vindauge/dør'+(_reskalert>1?'er':'')+' vart skalert med bygget. Ctrl+Z for å angre.';
-  if(_fasN)hintText.textContent=(_reskalert>0?hintText.textContent+' ':'Ny skala. ')
+  if(_delN)hintText.textContent=(_reskalert>0?hintText.textContent+' ':'Ny skala. ')
+    +_delN+' delplan'+(_delN>1?'ar':'')+' fekk same målestokk'+(_delOm?' ('+_delOm+' rekna om etter papirformatet)':'')+'.';
+  if(_fasN)hintText.textContent=(_reskalert>0||_delN?hintText.textContent+' ':'Ny skala. ')
     +_fasN+' fasadeteikning'+(_fasN>1?'ar':'')+' fekk same målestokk'+(_fasOm?' ('+_fasOm+' rekna om etter papirformatet)':'')+'.';
 };
 

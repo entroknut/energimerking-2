@@ -523,6 +523,10 @@ opnar same valet (`visSkalaMeny`, `brukGlobalSkala(f)`).
   mm/px). Ukjent papir ⇒ same mm/px, som i masseimporten. Det er framleis
   ingen global fasadeskala som vert lagra — kvart fasadeark har sin
   `mmPerImgPx`, valet set dei berre alle på éin gong.
+- **«Alle etasjar» tek med delplanane** sjølv om dei har `ownCal=true`:
+  same målestokk via `_mppSameMaalestokk`, og dei held `ownCal` (tettleiken
+  kan vere ulik). Andre etasjar med eigen skala står urørte. Vindauga på
+  delplanen følgjer med, sidan skalaen vert sett før `_reskalerAlleEtasjar`.
 
 **Viktig:** kalibreringspunkta (`calPts`) lagrast i **biletkoordinatar**. Låg dei i skjermkoordinatar, vart skalaen stille feil om brukaren panorerte eller zooma mellom dei to klikka.
 
