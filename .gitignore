@@ -1,2 +1,4 @@
 lokal/
 tools/test/fasit/
+tools/test/ki-eval/
+__pycache__/

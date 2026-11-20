@@ -105,6 +105,41 @@ python tools/test-sxi.py --legg-til X.entro   # nytt testprosjekt (bileta takne 
 - Fasiten vart laga frå v5.24.1. Skal SXI-fila endrast med vilje: commit,
   så `--lag-fasit`, og sei frå kva som endra seg.
 
+### KI-evaluering mot ferdige prosjekt (`tools/ki-eval.py`)
+
+Måler KI-oppteikninga av soner mot fasiten i ferdige EntroPi-prosjekt
+(treningsdata: `C:\EntroPi\soneteikning-treningsdata`, eller `--data` /
+`SXI_KI_DATA` — kundedata, utanfor git). Køyrer DEI EKTE funksjonane
+(`kiSonerForArk` → `kiRettSoner` → kontrollrunde → `kiSlaaSamanKategori`) i
+`tools/test/ki-eval.html`; berre `EntroHost.askAi` er bytt ut med eit kall til
+køyraren, som kallar Claude med same parametrar som EntroPi.
+
+```bash
+python tools/ki-eval.py --mock --mock-stoy 0 --sett alle --alle   # fasit som input, gratis
+python tools/ki-eval.py --mock --mock-stoy 0.6 --sett alle --alle # fasit med støy, gratis
+python tools/ki-eval.py --berre-cache --utval 20                  # mellomlagra Claude-svar, gratis
+python tools/ki-eval.py --js "KI_FIT.S=1200" ...                  # prøv ein variant
+.\tools\ki-eval.ps1 --utval 20 --budsjett 3                       # mot Claude (spør etter nøkkel)
+```
+
+- Mål per etasje: fotavtrykk-IoU, sone-IoU, kantavvik (cm), arealavvik, tal
+  soner, og IoU **før/etter `kiRettSoner`** (er etterarbeidet til hjelp?).
+  Rapport + overlay (fasit grøn, KI raud, KI før etterarbeid blå) i
+  `tools/test/ki-eval/koyringar/<tag>/`.
+- Svar frå Claude vert mellomlagra på innhaldet i førespurnaden: ei endring i
+  etterarbeidet kan målast på nytt gratis, ei endra prompt kostar.
+  ~0,17 USD per etasje med Opus 5.5 (v5.26). `--budsjett` stoppar nye kall.
+  Samla forbruk i `tools/test/ki-eval/forbruk.json`.
+- Bygga er delte i trenings- og testsett (hash av mappenamnet, ~1 av 5 i
+  test). Still inn mot treningssettet; mål på testsettet til slutt.
+- **Fasiten er ikkje alltid sanninga.** Nokre fasitar er teikna på utsida av
+  veggen (konvensjonen her er innsida), nokre dekkjer berre ein del av bygget
+  (Torgallmenningen: to prosjekt på same bygg), og eitt ark er eit kartutsnitt.
+  Sjå på begge mock-testane og overlaya før du konkluderer.
+- Nøkkelen: `ki-eval.ps1` spør med `Read-Host -AsSecureString`, gjeld berre
+  den eine køyringa og vert ikkje lagra. Bruk ein eigen eval-nøkkel, ikkje
+  EntroPi sin.
+
 ### Testing i nettlesar
 
 Start lokal server og test mot han — ikkje `file://` (localStorage kan vere sperra):
@@ -1626,14 +1661,21 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
 - Koordinatane frå KI-en er normaliserte 0–1000 og grove (bom på 0,5–1,5 m
   er vanleg). `kiRettSoner` rettar dei i tre steg:
   1. **Kanttilpassing** (`kiTilpassFasadar`/`kiTilpassKant`): kvar kant vert
-     tilpassa som HEIL linje. Tvers over kanten vert teikninga lesen (±2 m,
-     gråtonekopi `kiGraa()` ≤ 4096 px), veggband (fylt, skravert — strekar
+     tilpassa som HEIL linje. Tvers over kanten vert teikninga lesen (±0,9 m,
+     `KI_FIT.S`; gråtonekopi `kiGraa()` ≤ 4096 px), veggband (fylt, skravert — strekar
      under 20 cm frå kvarandre er same band — eller to strekar) gir
      kandidatpunkt, og Hough-røysting over ±4° vel linja. Fasade: innsida av
      det YTSTE bandet med minst halve røystene (ein heil korridorvegg rett
      innanfor slår elles ein vindaugsbroten yttervegg). Skiljevegg mot ei
      anna sone (`kiDeltKant`): midt i veggen. Hjørna = kryss av nabolinjene.
-     Målt på syntetiske planar: 1–3 cm, sjølv med 3° skeivheit og 1,3 m bom.
+     Måla ligg i `KI_FIT` (mm), så `tools/ki-eval.py --js` kan prøve variantar.
+     **Søkjeradien var ±2 m til v5.26** — då nådde han målelinjene utanfor
+     bygget: to tynne parallelle strekar ser ut som ein vegg teikna med to
+     strekar, og «ytste band vinn» drog rette kantar 1–2 m ut. Etter
+     kontrollrunden ligg KI-kantane i median ~10 cm frå veggen (målt mot
+     Claude), så 0,9 m er nok. Målt på 167 etasjar: fasit som input
+     0,966 → 0,980 IoU, fasit med 0,6 m støy 0,960 → 0,973. Ikkje auk han
+     utan å køyre begge testane (sjå «KI-evaluering»).
   2. `_linjeKryss`-snap berre for hjørne som ingen tilpassa kant rørte.
   3. Felles hjørne slegne saman og T-kryss lagde på nabokanten — elles ser
      ikkje `autoSkilleveggForNySone` (8 cm) den felles veggen.
@@ -1659,6 +1701,32 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
   — det lengste påskrivne totalmålet med endepunkt. Avvik over 4 % mot
   skalaen vert meldt med ⚠, og stoppar «Gå rett gjennom» ved soneforslaget
   (`kiStoppaAuto`). Programmet kalibrerer framleis ALDRI sjølv.
+- **Etasjenamnet går inn i promptane** (`kiEtasjeTekst(arkNamn(f))`: oversikta,
+  soneprompten og kontrollrunden). Står det fleire etasjeplanar på same ark,
+  vel Claude den som svarer til etasjen, elles den største. Før valde han
+  alltid den største — på eit ark med «Plan 1. og 2. etasje» teikna han feil
+  plan (Storebotn 88, treningsdataa).
+- **Plan mot fasade** (`kiSjekkPlanFasade`), tre sjekkar, alle meldte under
+  «Plan og fasade» i loggen:
+  1. Skalaen på eit fasadeark mot kotene på same ark (`fas.motKote`, berre
+     når arket har eigen kalibrering — elles ER skalaen frå kotene).
+  2. Motsette fasadar (Nord/Sør, Øst/Vest …) skal vere om lag like breie.
+  3. Fasadebreidda mot planen i same retning (`kiPlanSpenn`). Stemmer ho
+     med retninga på tvers, er det nord/himmelretninga som er feil, ikkje
+     skalaen — det vert sagt. Sjekk 3 krev soner: køyrd etter fasadane om dei
+     finst, elles når opningane startar (`_planSjekka`).
+  Forhold nær 2, 2,5, 4, 5 (eller omvendt) vert kalla «≈2 gonger for
+  stor/lita» — nesten alltid ein feil vald målestokk. Avvik over 15 % stoppar
+  «Gå rett gjennom» med eiga ⏸-melding (ikkje `kiStoppaAuto`, som er
+  kalibreringssjekken sin og har sin eigen tekst). Programmet kalibrerer
+  aldri sjølv.
+- **Framdrift** (`#aiFram`, `kiFram*`): stolpe over loggen med steg
+  («Steg 2 av 3: Soner — 3 av 7 etasjar»), prosent, tid og kor mange
+  førespurnader Claude har i arbeid. `kiSpor` tel førespurnadene; kvart steg
+  har eit overslag som veks når det trengst, og stolpen går aldri bakover.
+  Ventar køyringa på «Godta», står det i linja. Nytt KI-steg: `kiFramFase`
+  ved start og `kiFramTing` per eining, og legg steget inn i lista i
+  `aiGo.onclick`.
 - **Nytt forsøk** (`kiSpor`): eitt nytt forsøk etter 1,5 s ved tidsavbrot,
   nettfeil eller tomt svar, med dobla `maxTokens` (≤ 32000) når svaret vart
   avkorta. Ikkje når verten manglar eller Claude avslo.

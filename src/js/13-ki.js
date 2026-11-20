@@ -179,6 +179,7 @@ document.getElementById('aiBtn').onclick=()=>{
 };
 function kiLukk(){
   kiKoyring++;kiSteg=null;
+  if(typeof kiFramSkjul==='function')kiFramSkjul();
   draftZones=[];kiDraftWins=[];kiUtkast=null;kiFasadeInfo=null;
   aiOverlay.classList.remove('show','review','ki-soner');
   draw();
@@ -297,7 +298,10 @@ async function kiSpor(o){
   let siste='ukjend feil';
   for(let forsok=0;forsok<2;forsok++){
     const run=kiKoyring;
-    const r=await window.EntroHost.askAi(o);
+    kiFram.igang++;kiFramTeikn();
+    let r;
+    try{r=await window.EntroHost.askAi(o);}
+    finally{kiFram.igang=Math.max(0,kiFram.igang-1);if(run===kiKoyring)kiFram.gjort++;kiFramTeikn();}
     if(r.ok&&r.result&&typeof r.result==='object')return r.result;
     siste=(r&&r.message)||'tomt svar';
     if(run!==kiKoyring||/svarte ikkje|Ikkje kopla|avslo/i.test(siste))break;
@@ -305,6 +309,53 @@ async function kiSpor(o){
     await new Promise(res=>setTimeout(res,1500));
   }
   throw new Error(siste);
+}
+
+// ── Framdrift ──
+// Ei linje over loggen: kva steg køyringa er på (fasadar → soner → opningar),
+// kor langt steget er kome, og tida. Kor mange førespurnader til Claude eit
+// steg treng, er eit overslag — store ark og soner vert delte i fleire utsnitt.
+// Overslaget veks når det trengst, og stolpen går aldri bakover.
+const aiFram=document.getElementById('aiFram');
+const kiFram={fasar:[],i:-1,gjort:0,est:1,igang:0,t0:0,ting:'',tingGjort:0,tingTot:0,ventar:'',ferdig:false,timer:null,maks:0};
+function kiFramStart(fasar){
+  Object.assign(kiFram,{fasar,i:-1,gjort:0,est:1,igang:0,t0:performance.now(),ting:'',tingGjort:0,tingTot:0,ventar:'',ferdig:false,maks:0});
+  clearInterval(kiFram.timer);kiFram.timer=setInterval(kiFramTeikn,1000);
+  aiFram.style.display='';kiFramTeikn();
+}
+// Nytt steg. est = overslag over førespurnader, tingTot/ting = t.d. 5 «etasjar»
+function kiFramFase(namn,est,tingTot,ting){
+  const i=kiFram.fasar.indexOf(namn);
+  Object.assign(kiFram,{i:i>=0?i:kiFram.i+1,gjort:0,est:Math.max(1,est||1),tingGjort:0,
+    tingTot:tingTot||0,ting:ting||'',ventar:'',ferdig:false});
+  kiFramTeikn();
+}
+function kiFramTing(){kiFram.tingGjort++;kiFramTeikn();}
+function kiFramVent(t){kiFram.ventar=t;kiFramTeikn();}
+function kiFramSlutt(t){
+  clearInterval(kiFram.timer);kiFram.timer=null;
+  Object.assign(kiFram,{ferdig:true,ventar:t||'Ferdig'});kiFramTeikn();
+}
+function kiFramSkjul(){clearInterval(kiFram.timer);kiFram.timer=null;aiFram.style.display='none';}
+function kiFramTeikn(){
+  if(!aiFram||aiFram.style.display==='none')return;
+  const F=kiFram,N=Math.max(1,F.fasar.length);
+  if(F.gjort+F.igang>F.est)F.est=F.gjort+F.igang;
+  const del=F.tingTot?Math.max(F.tingGjort/F.tingTot,(F.gjort+0.4*F.igang)/F.est):(F.gjort+0.4*F.igang)/F.est;
+  let pst=F.ferdig?1:(Math.max(0,F.i)+Math.min(0.97,del))/N;
+  if(!F.ferdig&&F.i<0)pst=0;
+  F.maks=Math.max(F.maks,pst);            // aldri bakover
+  const sek=Math.round((performance.now()-F.t0)/1000);
+  const tid=sek>=60?Math.floor(sek/60)+' min '+String(sek%60).padStart(2,'0')+' s':sek+' s';
+  const steg=F.i>=0&&F.i<N?'Steg '+(F.i+1)+' av '+N+': '+F.fasar[F.i]:'Startar';
+  const ting=F.tingTot?' — '+F.tingGjort+' av '+F.tingTot+' '+F.ting:'';
+  aiFram.classList.toggle('arbeider',F.igang>0&&!F.ferdig&&!F.ventar);
+  aiFram.classList.toggle('ferdig',F.ferdig);
+  aiFram.querySelector('.fram-stolpe i').style.width=(F.maks*100).toFixed(1)+'%';
+  aiFram.querySelector('.fram-tekst').textContent=F.ferdig?F.ventar:steg+ting;
+  aiFram.querySelector('.fram-info').textContent=(F.ventar&&!F.ferdig?F.ventar+' · ':'')
+    +(F.igang?'Claude arbeider ('+F.igang+' førespurnad'+(F.igang===1?'':'er')+') · ':'')
+    +Math.round(F.maks*100)+' % · '+tid;
 }
 
 // ── Steg 1: soner ──
@@ -343,9 +394,15 @@ const kiSkjemaSoner=()=>({
       }}}
   }
 });
-function kiPromptSoner(del){
+// Kva etasje arket gjeld, så Claude vel rett plan når det står fleire på same ark
+// (lært av treningsdataa: «Plan 1. og 2. etasje» på eitt ark, og KI-en tok feil).
+const kiEtasjeTekst=namn=>namn?'Arket er lagt inn som «'+namn+'» i prosjektet. Står det fleire etasjeplanar på same ark, '
+  +'bruk den som svarer til denne etasjen (sjå titlane under eller over planane, t.d. «1. etasje», «Plan 2», «U. etg.», '
+  +'«Kjeller»). Passar ingen tydeleg, ta den største.':'';
+function kiPromptSoner(del,namn){
   return [
     'Biletet skal vere ei planteikning av éin etasje i eit bygg. Teikn opp energisonene for energimerking i SIMIEN.',
+    kiEtasjeTekst(namn),
     '',
     'FYRST: `arkType` — kva teikninga faktisk er. «plan» = planteikning sett ovanfrå (romnamn, veggar i plan,',
     'dørslag). «fasade» = oppriss av ytterveggen. «snitt» = bygget skore loddrett gjennom (etasjeskilje og tak skorne',
@@ -382,7 +439,7 @@ function kiPromptSoner(del){
     '2025»). 0 når teikninga ikkje seier noko.',
     '',
     'Ignorer tittelfelt, målsetjing, aksesystem, situasjonsplan, snitt og detaljar. Er det fleire etasjeplanar på same ark,',
-    'ta berre med den største.',
+    'ta berre med éin av dei (sjå over).',
     'Skriv kort i `analyse` kva du ser: bygningsform, kva som er teke med og kva som er halde utanfor.',
     '',
     '`kontrollMaal`: det LENGSTE påskrivne totalmålet på teikninga (målelinja over heile bygget eller ei heil',
@@ -488,7 +545,7 @@ function kiTilpassKant(G,a,b,inn,M,midt){
     runs.forEach((r,i)=>{
       const bredd=r[1]-r[0]+1;
       // Tjukke veggar tel meir: ytterveggen er som regel tjukkare enn innerveggane
-      if(bredd>=minV&&bredd<=maxV*1.5){kand.push({j,s,u:midt?(r[0]+r[1])/2:r[1]+0.5,w:2*Math.sqrt(bredd/minV)});return;}
+      if(bredd>=minV&&bredd<=maxV*1.5){kand.push({j,s,u:midt?(r[0]+r[1])/2:r[1]+0.5,w:2*Math.sqrt(bredd/minV),tj:1});return;}
       // Veggen teikna som to tynne strekar: den indre streken er innsida
       const o=runs[i-1];
       if(o&&bredd<minV&&o[1]-o[0]+1<minV){
@@ -501,21 +558,27 @@ function kiTilpassKant(G,a,b,inn,M,midt){
   const bw=Math.max(1.5,minV/3),mid=L/2;
   let best=null;const alle=[];
   for(let deg=-4;deg<=4.001;deg+=0.5){
-    const t=Math.tan(deg*Math.PI/180),bin=new Map();
-    kand.forEach(c=>{const o=Math.round((c.u-(c.s-mid)*t)/bw);bin.set(o,(bin.get(o)||0)+c.w);});
+    const t=Math.tan(deg*Math.PI/180),bin=new Map(),binTj=new Map();
+    kand.forEach(c=>{const o=Math.round((c.u-(c.s-mid)*t)/bw);bin.set(o,(bin.get(o)||0)+c.w);
+      if(c.tj)binTj.set(o,(binTj.get(o)||0)+c.w);});
     bin.forEach((v,o)=>{
       const sum=v+0.5*((bin.get(o-1)||0)+(bin.get(o+1)||0));
       const sc=sum*(1-0.3*Math.abs(o*bw)/S);           // nær KI-kanten vinn ein jamn kamp
-      const e={sc,t,o:o*bw};alle.push(e);
+      const tj=(binTj.get(o)||0)+0.5*((binTj.get(o-1)||0)+(binTj.get(o+1)||0));
+      const e={sc,tj,t,o:o*bw};alle.push(e);
       if(!best||sc>best.sc)best=e;
     });
   }
   // Ein fasade er det YTSTE veggbandet. Ein heil korridorvegg rett innanfor
   // kan få fleire røyster enn ytterveggen, som er broten av vindauge — difor
   // vinn eit band lenger ute så lenge det har over halvparten av røystene.
+  // Men berre eit band av TJUKKE strekar (fylt vegg): to tynne parallelle
+  // strekar utanfor bygget er som regel målelinjer, og dei er samanhengande,
+  // så dei fekk alle røystene og drog kanten 1–2 m ut (målt på treningsdataa:
+  // rette fasitpolygon vart 3 % dårlegare av tilpassinga, opp til 25 %).
   if(!midt){
     const ref=best;
-    alle.forEach(e=>{if(e.sc>=0.5*ref.sc&&e.o<ref.o-2*minV&&(best===ref||e.o<best.o))best=e;});
+    alle.forEach(e=>{if((KI_FIT.ytstTjukk?e.tj:e.sc)>=0.5*ref.sc&&e.o<ref.o-2*minV&&(best===ref||e.o<best.o))best=e;});
   }
   // Nok av kanten må vere einig — elles er det møblar og tekst, ikkje ein vegg
   const naer=kand.filter(c=>Math.abs(c.u-(c.s-mid)*best.t-best.o)<=2*bw);
@@ -556,11 +619,20 @@ function kiDeltKant(a,b,andre,tol){
 }
 // Fasadekantane i alle sonene inn til innsida av veggen. Returnerer talet på
 // kantar som vart tilpassa, og merkjer hjørna som ligg på ein tilpassa kant.
+// Kanttilpassinga sine mål i mm. Eit objekt (ikkje tal i koden), så
+// tools/ki-eval.py kan prøve variantar mot treningsdataa (--js).
+// S = søkjeradius ut og inn frå KI-kanten. Var 2000: då nådde søket
+// målelinjene utanfor bygget (to tynne parallelle strekar ser ut som ein
+// vegg), og rette kantar vart dregne 1–2 m ut. Målt på 167 etasjar
+// (v5.26): fasit som input 0,966 → 0,980 IoU, fasit med 0,6 m støy
+// 0,960 → 0,973. 1200 gav 0,974/0,965. ytstTjukk (berre fylte veggar
+// kan vinne som ytste band) gav ingenting målbart og står av.
+const KI_FIT={S:900,hol:200,vegg:80,maxVegg:700,steg:250,minKant:800,deltTol:600,ytstTjukk:false};
 function kiTilpassFasadar(soner,ark){
   const G=kiGraa(ark.img),mpp=ark.mpp;
   if(!G)return{kantar:0,av:0};
-  const D=Math.max(ark.img.width,ark.img.height);
-  const M=mpp?{S:2000/mpp,hol:200/mpp,vegg:80/mpp,maxVegg:700/mpp,steg:250/mpp,minKant:800/mpp,deltTol:600/mpp}
+  const D=Math.max(ark.img.width,ark.img.height),F=KI_FIT;
+  const M=mpp?{S:F.S/mpp,hol:F.hol/mpp,vegg:F.vegg/mpp,maxVegg:F.maxVegg/mpp,steg:F.steg/mpp,minKant:F.minKant/mpp,deltTol:F.deltTol/mpp}
              // Ukalibrert: eit ark er typisk 30–80 m breitt i verkelegheita
              :{S:0.04*D,hol:0.005*D,vegg:0.002*D,maxVegg:0.015*D,steg:0.004*D,minKant:0.01*D,deltTol:0.01*D};
   const finst=ark.zones.filter(z=>(z.pts||[]).length>=3).map(z=>z.pts);
@@ -671,9 +743,10 @@ async function kiPlanUtsnitt(ark){
       'Biletet er eit heilt teikningsark. Seg kva teikninga er (`arkType`): «plan» = planteikning av ein etasje sett',
       'ovanfrå, «fasade» = oppriss, «snitt» = loddrett snitt gjennom bygget, «situasjonsplan» = bygget på tomta,',
       '«anna» = noko anna.',
-      'Er det ein plan: gi ei ramme `x0,y0,x1,y1` (normalisert 0–1000, x frå venstre, y frå toppen) rundt den STØRSTE',
-      'etasjeplanen — heile bygget med ytterveggane, men utan tittelfelt, teiknforklaring, situasjonsplan, snitt og',
-      'detaljar. Ta med målelinjene rundt. Hellar heller litt for stor enn for lita. Er det ikkje ein plan: 0,0,1000,1000.'
+      'Er det ein plan: gi ei ramme `x0,y0,x1,y1` (normalisert 0–1000, x frå venstre, y frå toppen) rundt etasjeplanen —',
+      'heile bygget med ytterveggane, men utan tittelfelt, teiknforklaring, situasjonsplan, snitt og detaljar. Ta med',
+      'målelinjene rundt. Hellar heller litt for stor enn for lita. Er det ikkje ein plan: 0,0,1000,1000.',
+      kiEtasjeTekst(arkNamn(ark.f))
     ].join('\n')});
     if(res.arkType&&res.arkType!=='plan')return{rect:heile,arkType:res.arkType};
     const x0=Math.max(0,Math.min(res.x0,res.x1)),x1=Math.min(1000,Math.max(res.x0,res.x1));
@@ -699,7 +772,7 @@ function kiSjekkKalibrering(km,rect,mpp){
 }
 // Forslaget teikna oppå planen, nummerert, som bilete 2 i kontrollrunden
 const KI_KONTROLL_FARGAR=['#dc2626','#2563eb','#16a34a','#9333ea','#ea580c','#0891b2','#be185d','#4d7c0f'];
-async function kiKontrollSoner(img,rect,soner,del){
+async function kiKontrollSoner(img,rect,soner,del,namn){
   const merka=kiBilete(img,rect,(g,s)=>{
     const P=p=>({x:(p.x-rect.x)*s,y:(p.y-rect.y)*s});
     soner.forEach((z,i)=>{
@@ -718,6 +791,7 @@ async function kiKontrollSoner(img,rect,soner,del){
     meta:{steg:'kontroll',soner:soner.length},prompt:[
     'Bilete 1 er ei planteikning. Bilete 2 er den same teikninga med eit FORSLAG til energisoner teikna oppå i fargar,',
     'nummererte. Du er kontrollør: samanlikn forslaget nøye med teikninga.',
+    kiEtasjeTekst(namn),
     '',
     'Sjekk særleg:',
     '- Følgjer kvar sone INNSIDA av ytterveggen heile vegen rundt? Hjørne som er kutta, sprang og knekkar som manglar,',
@@ -751,8 +825,8 @@ async function kiSonerForArk(ark,del){
   const u=await kiPlanUtsnitt(ark);
   if(u.arkType)return{analyse:'',st:{},fjerna:0,drafts:[],ikkjePlan:u.arkType};
   const rect=u.rect;
-  const res=await kiSpor({oppgave:'soner',prompt:kiPromptSoner(del),images:[kiBilete(img,rect)],
-    schema:kiSkjemaSoner(),maxTokens:16000,meta:{etasje:arkNamn(ark.f)}});
+  const res=await kiSpor({oppgave:'soner',prompt:kiPromptSoner(del,arkNamn(ark.f)),images:[kiBilete(img,rect)],
+    schema:kiSkjemaSoner(),maxTokens:16000,meta:{etasje:arkNamn(ark.f),arkId:ark.f.id}});
   if(res.arkType&&res.arkType!=='plan')return{analyse:res.analyse||'',st:{},fjerna:0,drafts:[],ikkjePlan:res.arkType};
   const minAreal=mpp?2e6/(mpp*mpp):(img.width*img.height*1e-4);   // 2 m², elles 0,01 % av arket
   const soner=(res.soner||[]).map(s=>({namn:String(s.namn||'').trim(),bruk:s.bruk,
@@ -765,7 +839,7 @@ async function kiSonerForArk(ark,del){
   let kontroll=null;
   if(gode.length){
     try{
-      const k=await kiKontrollSoner(img,rect,gode,del);
+      const k=await kiKontrollSoner(img,rect,gode,del,arkNamn(ark.f));
       if(k&&!k.ok&&k.soner.length){
         const nye=k.soner.map(s=>({namn:String(s.namn||'').trim(),bruk:s.bruk,
           byggeaar:(s.byggeaar>=1800&&s.byggeaar<=2100)?Math.round(s.byggeaar):null,
@@ -795,6 +869,8 @@ async function kiKoyrSoner(maal){
   logAi('Steg 1 — soner ('+(del==='bruk'?'delt etter bruk, leigetakar og byggetrinn':'éi per bygningskropp')+')'
     +(maal.length>1?' på '+maal.length+' etasjar':'')+'…');
   logAi('Claude les teikningane. Det tek gjerne eitt til to minutt.');
+  // Overslag: oversikt (store ark) + soner + kontrollrunde per etasje
+  kiFramFase('Soner',maal.reduce((s,f)=>s+(f.bgImg&&Math.max(f.bgImg.width,f.bgImg.height)>KI_MAXPX*1.3?3:2),0),maal.length,'etasjar');
   const utkast=new Map();let feil=0;
   await kiPool(maal,async f=>{
     try{
@@ -831,12 +907,13 @@ async function kiKoyrSoner(maal){
     }catch(e){
       if(run!==kiKoyring)return;
       feil++;logAi('\n⚠ '+arkNamn(f)+': '+e.message);
-    }
+    }finally{if(run===kiKoyring)kiFramTing();}
   });
   if(run!==kiKoyring)return;
   // Etasjane i same rekkjefølgje som i prosjektet, utan dei som ikkje fekk noko
   kiUtkast=new Map(floors.filter(f=>(utkast.get(f)||[]).length).map(f=>[f,utkast.get(f)]));
   if(!kiUtkast.size){
+    kiFramSlutt('Fann ingen soner');
     logAi('\nFann ingen soner.');
     kiUtkast=null;
     kiKnappar(false);aiGo.textContent='Prøv igjen';aiGo.disabled=false;
@@ -854,6 +931,7 @@ async function kiKoyrSoner(maal){
   const n=[...kiUtkast.values()].reduce((s,a)=>s+a.length,0);
   if(kiStoppaAuto)logAi('\n⏸ «Gå rett gjennom» er stoppa fordi kalibreringa ikkje stemmer med målet på teikninga. Sjå over, eller forkast og kalibrer på nytt.');
   kiKnappar(true,'✓ Godta '+n+' sone'+(n===1?'':'r'));
+  kiFramVent(kiInnst.auto?'Soneforslaget vert godteke':'Ventar på at du ser over og godtek soneforslaget');
   kiAutoVidare();
   if(kiInnst.kople)logAi('Soner med same kategori vert kopla (SIMIEN-gruppe) når du godtek.');
   kiTilpassVising();
@@ -1477,6 +1555,7 @@ async function kiFasadeUtsnitt(a){
 async function kiLesFasadar(){
   const run=kiKoyring,ark=kiFasadeArk();
   logAi('Fasadane — les '+ark.length+' fasadeteikning'+(ark.length===1?'':'ar')+'…');
+  kiFramFase('Fasadeteikningar',ark.length*2,ark.length,'ark');
   const info={opn:new Map(),hoyder:new Map(),usikker:false,fasadar:[]};
   // Fyrst kvar fasadane står, så kvar fasade for seg
   const jobbar=[];
@@ -1489,6 +1568,8 @@ async function kiLesFasadar(){
     if(ns)logAi('  '+ns+' av dei er snitt — gir berre etasjehøgder.');
   });
   if(run!==kiKoyring)return null;
+  kiFramFase('Fasadeteikningar',Math.max(kiFram.gjort+jobbar.length,kiFram.est),jobbar.length,'fasadar');
+  kiFram.gjort=0;kiFram.est=jobbar.length;
   await kiPool(jobbar,async({a,rect,tittel,retningOversikt,typeOversikt})=>{
     try{
       const img=a.bgImg;
@@ -1517,6 +1598,13 @@ async function kiLesFasadar(){
           if(s.length)sY=s.sort((x,y)=>x-y)[Math.floor(s.length/2)];
         }
         const sX=sY?sY*rect.w/rect.h:null;
+        // Skalaen på arket mot kotene: same etasjehøgd rekna begge vegar.
+        // Berre når arket har eigen kalibrering — elles ER skalaen frå kotene.
+        const motKote=[];
+        if(a.mmPerImgPx)for(let i=0;i+1<etg.length;i++){
+          const kd=etg[i+1].koteMm-etg[i].koteMm,gd=(etg[i].golvY-etg[i+1].golvY)*sY;
+          if(etg[i].koteMm>0&&etg[i+1].koteMm>0&&kd>=2000&&kd<=10000&&gd>0)motKote.push(gd/kd);
+        }
         for(let i=0;i+1<etg.length;i++){
           const f=map[i];if(!f)continue;
           let hM=null;
@@ -1531,7 +1619,8 @@ async function kiLesFasadar(){
         const bx0=Math.min(fa.byggX0,fa.byggX1),bx1=Math.max(fa.byggX0,fa.byggX1);
         const harBygg=isFinite(bx0)&&isFinite(bx1)&&bx1-bx0>=30;
         const fas={id:info.fasadar.length,tittel:fa.tittel||tittel||a.name,retning:fa.retning,
-          breiddeM:harBygg&&sX?(bx1-bx0)*sX/1000:null,harBygg,ark:a.name};
+          breiddeM:harBygg&&sX?(bx1-bx0)*sX/1000:null,harBygg,ark:a.name,arkObj:a,
+          motKote:motKote.length?motKote.sort((x,y)=>x-y)[Math.floor(motKote.length/2)]:null,snitt};
         info.fasadar.push(fas);
         // Påskrive mål er eksakt, men vert berre teke når det stemmer med det
         // målte — elles har KI-en lese eit anna mål enn det som høyrer til.
@@ -1559,9 +1648,11 @@ async function kiLesFasadar(){
           +(sY?'':' — utan skala eller koter, berre påskrivne mål'));
       });
     }catch(e){if(run===kiKoyring)logAi('  ⚠ '+(tittel||a.name)+': '+e.message);}
+    kiFramTing();
   });
   if(run!==kiKoyring)return null;
   if(info.usikker)logAi('  ⚠ Etasjane på fasadane let seg ikkje kople sikkert til etasjane i prosjektet — dei er kopla nedanfrå.');
+  kiSjekkPlanFasade(info,{fasade:true,plan:true});
   const hoyder=kiHoyderFraFasade(info);
   if(hoyder.length)logAi('  Etasjehøgder: '+hoyder.map(x=>x.f.name+' '+x.m.toFixed(2)+' m'
     +(Math.abs(x.no-x.m)>=0.05?' (no '+x.no.toFixed(2)+')':'')).join(', ')
@@ -1569,6 +1660,87 @@ async function kiLesFasadar(){
   logAi('');
   return info;
 }
+// ── Stemmer fasadane og planane overeins? ──
+// Tre sjekkar, alle på det Claude las og skalaane som står:
+//  1. Skalaen på eit fasadeark mot kotene på same ark (etasjehøgda rekna begge vegar).
+//  2. Motsette fasadar (Nord/Sør, Aust/Vest) skal vere om lag like breie.
+//  3. Fasadebreidda mot planen i same retning (kiPlanSpenn, alle etasjar).
+// Eit forhold nær 2, 2,5, 4 eller 5 (eller det omvende) er nesten alltid ein
+// målestokk som er feil vald på eitt av arka — det vert sagt rett ut. Avvik
+// over 15 % stoppar «Gå rett gjennom», som kalibreringssjekken: feil skala
+// gjer alle mål like feil. Programmet kalibrerer framleis aldri sjølv.
+const KI_SKALA_FAKTOR=[2,2.5,4,5];
+function kiFaktor(r){
+  for(const f of KI_SKALA_FAKTOR){
+    if(Math.abs(r/f-1)<=0.05)return'≈'+String(f).replace('.',',')+' gonger for stor';
+    if(Math.abs(r*f-1)<=0.05)return'≈'+String(f).replace('.',',')+' gonger for lita';
+  }
+  return null;
+}
+const kiPst=r=>(r>1?'+':'')+Math.round((r-1)*100)+' %';
+function kiSjekkPlanFasade(info,kva){
+  if(!info||!info.fasadar||!info.fasadar.length)return;
+  const linjer=[],stopp=[];
+  const mst=a=>{const m=a&&a.mmPerImgPx?maalestokkTekst(a,a.mmPerImgPx):'';return m?' ('+m+')':'';};
+  const fas=info.fasadar.filter(f=>!f.snitt);
+  if(kva.fasade){
+    // 1. Skala mot koter
+    info.fasadar.filter(f=>f.motKote).forEach(f=>{
+      const r=f.motKote,fk=kiFaktor(r);
+      if(Math.abs(r-1)<=0.06)return;
+      const t='«'+f.tittel+'»: skalaen på arket'+mst(f.arkObj)+' gir etasjehøgder '+kiPst(r)+' mot kotene'
+        +(fk?' — skalaen er '+fk+'. Arket er truleg kalibrert med feil målestokk':'')+'.';
+      linjer.push('⚠ '+t);if(fk||Math.abs(r-1)>0.15)stopp.push(t);
+    });
+    // 2. Motsette fasadar
+    const par=[['Nord','Sør'],['Øst','Vest'],['Nordøst','Sørvest'],['Nordvest','Sørøst']];
+    par.forEach(([x,y])=>{
+      const fx=fas.find(f=>f.retning===x&&f.breiddeM),fy=fas.find(f=>f.retning===y&&f.breiddeM);
+      if(!fx||!fy)return;
+      const r=fx.breiddeM/fy.breiddeM,fk=kiFaktor(r);
+      if(Math.abs(r-1)<=0.08){linjer.push('✓ '+x+' og '+y+' er like breie ('+fx.breiddeM.toFixed(1)+' og '+fy.breiddeM.toFixed(1)+' m).');return;}
+      const t=x+' er '+fx.breiddeM.toFixed(1)+' m'+mst(fx.arkObj)+', '+y+' '+fy.breiddeM.toFixed(1)+' m'+mst(fy.arkObj)
+        +' — motsette fasadar skal vere om lag like breie'+(fk?'. Forholdet er '+fk.replace(' for stor','').replace(' for lita','')
+        +', så eitt av arka har truleg feil målestokk':'. Viser begge heile bygget?')+'.';
+      linjer.push('⚠ '+t);if(fk)stopp.push(t);
+    });
+  }
+  if(kva.plan){
+    // 3. Fasade mot plan (krev soner med skala)
+    const planMst=[...new Set(floors.filter(f=>f.bgImg&&mppForFloor(f)).map(f=>maalestokkTekst(f,mppForFloor(f))).filter(Boolean))];
+    let sjekka=0;
+    fas.filter(f=>f.breiddeM).forEach(f=>{
+      const ax=kiFasadeAkse(f.retning);if(!ax)return;
+      const sp=kiPlanSpenn(ax);if(!sp||sp.W<2)return;
+      sjekka++;
+      const r=f.breiddeM/sp.W;
+      if(Math.abs(r-1)<=0.08){linjer.push('✓ «'+f.tittel+'» '+f.breiddeM.toFixed(1)+' m stemmer med planen ('+sp.W.toFixed(1)+' m).');return;}
+      // Stemmer ho med den andre retninga? Då er nord eller retninga feil, ikkje skalaen
+      const i=DIRS.indexOf(f.retning),ax2=i>=0?kiFasadeAkse(DIRS[(i+2)%DIRS.length]):null;
+      const sp2=ax2?kiPlanSpenn(ax2):null;
+      if(sp2&&Math.abs(f.breiddeM/sp2.W-1)<=0.08){
+        linjer.push('⚠ «'+f.tittel+'» er '+f.breiddeM.toFixed(1)+' m, men planen er '+sp.W.toFixed(1)+' m i den retninga og '
+          +sp2.W.toFixed(1)+' m på tvers. Er nord rett, eller er fasaden merkt med feil himmelretning?');
+        return;
+      }
+      const fk=kiFaktor(r);
+      const t='«'+f.tittel+'» er '+f.breiddeM.toFixed(1)+' m'+mst(f.arkObj)+', planen '+sp.W.toFixed(1)+' m'
+        +(planMst.length?' ('+planMst.join(', ')+')':'')+' ('+kiPst(r)+')'
+        +(fk?' — fasaden er '+fk+'. Plan- eller fasadearket er truleg kalibrert med feil målestokk'
+          :Math.abs(r-1)>0.15?'. Sjekk kalibreringa på begge, og om fasaden viser heile bygget':'')+'.';
+      linjer.push('⚠ '+t);if(fk||Math.abs(r-1)>0.15)stopp.push(t);
+    });
+    if(!sjekka&&kva.fasade&&fas.some(f=>f.breiddeM))linjer.push('ℹ Fasadebreiddene vert samanlikna med planen når sonene er teikna.');
+  }
+  if(!linjer.length)return;
+  logAi('  Plan og fasade:');
+  linjer.forEach(l=>logAi('    '+l));
+  if(stopp.length&&kiInnst.auto){
+    kiInnst.auto=false;   // eiga ⏸-melding under; kiStoppaAuto er kalibreringssjekken sin
+    logAi('  ⏸ «Gå rett gjennom» er stoppa: skalaane stemmer ikkje. Sjå over forslaga, eller avbryt og kalibrer på nytt.');
+  }
+}
+
 // ── Fasade ↔ plan ──
 // Ei opning på fasaden «Nord» står på ein nordvegg i planen, og plasseringa
 // hennar frå venstre mot høgre på fasaden er den same som langs bygget sett
@@ -2002,6 +2174,7 @@ async function kiKoyrOpningar(maal){
     const ark=kiArk(f),fTekst=kiFasadeTekst(f);
     return f.zones.filter(z=>!z.skjult&&(z.pts||[]).length>=3).map(z=>({z,ark,fTekst}));
   });
+  kiFramFase('Vindauge og dører',liste.length,liste.length,'soner');
   logAi('Steg 2 — vindauge og dører på '+liste.length+' sone'+(liste.length===1?'':'r')
     +(maal.length>1?' i '+(maal.length-utan.length)+' etasjar':'')+'…');
   if(utan.length)logAi('ℹ '+utan.map(arkNamn).join(', ')+' er ikkje kalibrert'+(utan.length===1?'':'e')+' og vert hoppa over.');
@@ -2019,9 +2192,11 @@ async function kiKoyrOpningar(maal){
     }catch(e){
       if(run!==kiKoyring)return;
       feil++;logAi('⚠ '+z.name+': '+e.message);
-    }
+    }finally{if(run===kiKoyring)kiFramTing();}
   });
   if(run!==kiKoyring)return;
+  // Stemmer fasadane med sonene som no står? (sjekka før sonene fanst, sjå kiLesFasadar)
+  if(kiFasadeInfo&&!kiFasadeInfo._planSjekka){kiFasadeInfo._planSjekka=true;kiSjekkPlanFasade(kiFasadeInfo,{plan:true});}
   // Fasadeteikningane: høgd, brystning og type etter posisjon, og opningar planen ikkje fann
   const kop=kiFasadeKople(raw,soner,kiFasadeInfo,maal);
   if(kop.avviste.length)logAi('⚠ Breidda stemmer ikkje med planen, så posisjonane på desse fasadane er ikkje brukte: '
@@ -2040,6 +2215,7 @@ async function kiKoyrOpningar(maal){
   if(snappa)logAi('ℹ '+snappa+' opningskantar er flytte til karmen i teikninga.');
   if(feil)logAi('⚠ '+feil+' sone'+(feil===1?'':'r')+' kunne ikkje analyserast — køyr på nytt, eller teikn opningane der for hand.');
   if(!forslag.length){
+    kiFramSlutt('Fann ingen nye opningar');
     logAi('\nFann ingen nye opningar.');
     kiKnappar(false);aiGo.textContent='Prøv igjen';aiGo.disabled=false;
     return;
@@ -2054,6 +2230,7 @@ async function kiKoyrOpningar(maal){
   kiDraftWins=forslag;
   kiSteg='opningar';
   kiKnappar(true,'✓ Godta '+stk+' opningar');
+  kiFramVent(kiInnst.auto?'Opningane vert lagde inn':'Ventar på at du ser over og godtek opningane');
   draw();
   kiAutoVidare();
 }
@@ -2125,6 +2302,8 @@ aiGo.onclick=async()=>{
   aiGo.disabled=true;aiGo.textContent='Arbeider…';aiLog.textContent='';
   document.getElementById('aiClose').textContent='Avbryt';
   const run=++kiKoyring;
+  const harFas=kiFasadeArk().length&&(kiInnst.opn||kiInnst.hoyder);
+  kiFramStart([...(harFas?['Fasadeteikningar']:[]),...(kiInnst.soner?['Soner']:[]),...(kiInnst.opn?['Vindauge og dører']:[])]);
   try{
     saveFloorState();
     const maal=kiMaal(kiInnst.bygg);
@@ -2139,6 +2318,7 @@ aiGo.onclick=async()=>{
   }catch(e){
     if(run!==kiKoyring)return;
     logAi('Feil: '+e.message);
+    kiFramSlutt('Stoppa: '+e.message);
     kiKnappar(false);aiGo.disabled=false;aiGo.textContent='Prøv igjen';
   }
   document.getElementById('aiClose').textContent='Lukk';
@@ -2156,6 +2336,7 @@ function kiAvslutt(){
   if(!kiInnst.auto){kiLukk();return;}
   kiSteg=null;draftZones=[];kiDraftWins=[];kiUtkast=null;
   kiKnappar(false);
+  kiFramSlutt('✓ Ferdig');
   logAi('\n✓ Ferdig. '+hintText.textContent+'\nAlt kan angrast med Ctrl+Z. Sjå over sonekorta.');
   aiGo.disabled=false;aiGo.textContent='Køyr på nytt';
   document.getElementById('aiClose').textContent='Lukk';
@@ -2171,6 +2352,7 @@ function kiVisHoyder(){
   }
   kiSteg='hoyder';
   kiKnappar(true,'✓ Godta etasjehøgdene');
+  kiFramVent(kiInnst.auto?'Etasjehøgdene vert lagde inn':'Ventar på at du godtek etasjehøgdene');
   kiAutoVidare();
 }
 document.getElementById('aiAccept').onclick=async()=>{

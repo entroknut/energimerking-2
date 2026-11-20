@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="nn"><head><meta charset="utf-8"><title>KI-evaluering</title>
+<style>body{font:13px system-ui;margin:16px}iframe{width:1200px;height:800px;border:1px solid #ccc}</style>
+</head><body>
+<h3>KI-evaluering av soneteikninga</h3>
+<pre id="logg"></pre>
+<script>
+// Køyrt av tools/ki-eval.py. Lastar index.html i ein iframe og køyrer DEI
+// EKTE KI-funksjonane (kiSonerForArk → kiRettSoner → kontrollrunde, og
+// kiSlaaSamanKategori) på kvar planteikning i utvalet. Det einaste som er
+// bytt ut er EntroHost.askAi: førespurnaden går til køyraren (/__ai), som
+// kallar Claude med same parametrar som EntroPi-sida og mellomlagrar svaret.
+// Resultatet per etasje vert POSTa til /__resultat; køyraren reknar ut måla.
+const logg=t=>{document.getElementById('logg').textContent+=t+'\n';};
+const post=(sti,data)=>fetch(sti,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+const lastBilete=src=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('kunne ikkje laste '+src));i.src=src;});
+(async()=>{
+  try{
+    const oppg=await (await fetch('/__oppgaver')).json();
+    const fr=document.createElement('iframe');
+    fr.src='../../index.html?kieval='+Date.now();
+    document.body.appendChild(fr);
+    await new Promise(r=>fr.onload=r);
+    const w=fr.contentWindow;
+    const feil=[];
+    w.addEventListener('error',e=>feil.push('window.error: '+e.message));
+    await new Promise(r=>setTimeout(r,800));
+    if(!w.__sxiKlar)throw new Error('Hovudskriptet vart ikkje ferdig lasta.');
+    // Same veg som i EntroPi, men via køyraren
+    w.EntroHost.askAi=async o=>{
+      try{
+        const r=await fetch('/__ai',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({oppgave:o.oppgave,prompt:o.prompt,images:o.images,schema:o.schema,
+            maxTokens:o.maxTokens||16000,meta:o.meta||{}})});
+        return await r.json();
+      }catch(e){return{ok:false,message:'køyraren svarte ikkje: '+e.message};}
+    };
+    // Kva kiRettSoner fekk inn og gav ut, per etasje (siste kall = det som vart brukt).
+    // Gjer det mogleg å måle om etterarbeidet hjelper eller skader.
+    const rettLogg=new Map();
+    const orgRett=w.kiRettSoner;
+    const kopi=s=>s.map(z=>({namn:z.namn,pts:z.pts.map(p=>({x:p.x,y:p.y}))}));
+    w.kiRettSoner=(soner,ark)=>{
+      const inn=kopi(soner);const st=orgRett(soner,ark);
+      if(!rettLogg.has(ark.f.id))rettLogg.set(ark.f.id,[]);
+      rettLogg.get(ark.f.id).push({inn,ut:kopi(soner)});
+      return st;
+    };
+    // Variant til utprøving (--js), t.d. «KI_FIT.S=1200»
+    if(oppg.js)w.eval(oppg.js);
+    const del=oppg.del,slaaKat=oppg.slaaKat;
+    let neste=0;
+    const ein=async()=>{
+      while(neste<oppg.etasjar.length){
+        const e=oppg.etasjar[neste++];
+        const t0=performance.now();
+        const ut={nokkel:e.nokkel};
+        try{
+          const img=await lastBilete('/__data/'+e.plan);
+          // Eit ark som ikkje ligg i floors: kiSonerForArk les berre ark.img/mpp/f.
+          // name = etasjenamnet frå prosjektet (det går inn i prompten), id = nøkkelen vår
+          const f={id:e.nokkel,name:e.etasje||'Etasje',bgImg:img,mmPerImgPx:e.mpp,ownCal:true,zones:[],delAv:null};
+          const r=await w.kiSonerForArk({f,img,mpp:e.mpp,zones:[]},del);
+          const rein=d=>d.map(z=>({namn:z.name,bruk:z.bruk||null,byggeaar:z.byggeaar||null,pts:z.pts.map(p=>({x:p.x,y:p.y}))}));
+          ut.ra=rein(r.drafts);
+          ut.slegne=slaaKat?rein(w.kiSlaaSamanKategori(r.drafts,e.mpp,img).arr):ut.ra;
+          ut.analyse=r.analyse||'';ut.ikkjePlan=r.ikkjePlan||null;ut.utsnitt=!!r.utsnitt;
+          ut.rett=rettLogg.get(f.id)||[];
+          ut.kontroll=r.kontroll||null;ut.kal=r.kal||null;ut.st=r.st||{};ut.fjerna=r.fjerna||0;
+          img.src='';
+        }catch(err){ut.feil=String(err&&err.message||err);}
+        ut.sek=(performance.now()-t0)/1000;
+        await post('/__resultat',ut);
+        logg(e.nokkel+': '+(ut.feil||((ut.slegne||[]).length+' soner'))+' ('+ut.sek.toFixed(0)+' s)');
+      }
+    };
+    await Promise.all(Array.from({length:Math.min(oppg.parallelt,oppg.etasjar.length)},ein));
+    await post('/__ferdig',{feil});
+  }catch(err){await post('/__ferdig',{feil:['Testsida: '+(err&&err.stack||err)]});}
+})();
+</script>
+</body></html>
