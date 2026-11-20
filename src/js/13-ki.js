@@ -291,9 +291,36 @@ function kiKontrast(g,W,H){
 // Normaliserte KI-koordinatar (0–1000 langs kvar akse i utsnittet) → biletpikslar
 const kiTilBilete=(p,rect)=>({x:rect.x+(+p.x/1000)*rect.w,y:rect.y+(+p.y/1000)*rect.h});
 const kiTilNorm=(p,rect)=>({x:Math.round((p.x-rect.x)/rect.w*1000),y:Math.round((p.y-rect.y)/rect.h*1000)});
+// Feil på API-kontoen bak EntroPi (tom kreditt, ugyldig nøkkel, inga tilgang).
+// Då feilar KVART kall, og utan denne vart det til «Fann ingen soner/opningar»
+// — det såg ut som at KI-en ikkje fann noko. Gir ei forklaring, elles null.
+// Brukt av KI-oppteikninga og Spør Klips.
+function kiKontoFeil(msg){
+  const m=String(msg||'');
+  if(/credit balance|billing|purchase credits|insufficient.{0,20}(credit|fund|quota)/i.test(m))
+    return'API-kontoen som EntroPi brukar mot Claude er tom for kreditt. Ingen førespurnader går gjennom før kontoen er fylt på '
+      +'(console.anthropic.com → Plans & Billing). Sei frå til den som administrerer EntroPi.';
+  if(/invalid.{0,10}(x-api-key|api.?key)|authentication_error|\b401\b/i.test(m))
+    return'API-nøkkelen i EntroPi vart avvist av Claude (ugyldig eller utgått). Sei frå til den som administrerer EntroPi.';
+  if(/permission_error|\b403\b|organization.{0,30}disabled/i.test(m))
+    return'API-kontoen i EntroPi har ikkje tilgang til Claude-modellen. Sei frå til den som administrerer EntroPi.';
+  return null;
+}
+// Kontofeil: stopp heile køyringa éin gong, med éi melding, i staden for at
+// kvar etasje og sone feilar for seg. kiKoyring++ gjer at alle andre kall i
+// same køyring teier (dei sjekkar run!==kiKoyring).
+function kiStoppKonto(tekst,raa){
+  kiKoyring++;
+  kiSteg=null;draftZones=[];kiDraftWins=[];kiUtkast=null;
+  logAi('\n⛔ Køyringa er stoppa: '+tekst+'\nDet som alt var lagt inn, står.\n(Svar frå Claude: '+String(raa).slice(0,200)+')');
+  kiFramSlutt('⛔ Stoppa — '+(/kreditt/.test(tekst)?'API-kontoen er tom for kreditt':'feil på API-kontoen'));
+  kiKnappar(false);aiGo.disabled=false;aiGo.textContent='Prøv igjen';
+  document.getElementById('aiClose').textContent='Lukk';
+  draw();
+}
 // Eitt nytt forsøk når kallet feila av ein grunn som kan gå over: tidsavbrot,
 // nettfeil, eit svar som ikkje kunne lesast, eller eit avkorta svar (då med
-// dobbelt så mange token). Ikkje når verten manglar eller Claude avslo.
+// dobbelt så mange token). Ikkje når verten manglar, Claude avslo eller kontoen feilar.
 async function kiSpor(o){
   let siste='ukjend feil';
   for(let forsok=0;forsok<2;forsok++){
@@ -304,6 +331,11 @@ async function kiSpor(o){
     finally{kiFram.igang=Math.max(0,kiFram.igang-1);if(run===kiKoyring)kiFram.gjort++;kiFramTeikn();}
     if(r.ok&&r.result&&typeof r.result==='object')return r.result;
     siste=(r&&r.message)||'tomt svar';
+    const konto=kiKontoFeil(siste);
+    if(konto){
+      if(run===kiKoyring)kiStoppKonto(konto,siste);
+      throw new Error(konto);
+    }
     if(run!==kiKoyring||/svarte ikkje|Ikkje kopla|avslo/i.test(siste))break;
     if(/avkorta|max_tokens/i.test(siste))o={...o,maxTokens:Math.min(32000,(o.maxTokens||16000)*2)};
     await new Promise(res=>setTimeout(res,1500));

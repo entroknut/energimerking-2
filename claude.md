@@ -1730,6 +1730,12 @@ Prompt og skjema bur i verktøyet; modellen vel verten. Testverten:
 - **Nytt forsøk** (`kiSpor`): eitt nytt forsøk etter 1,5 s ved tidsavbrot,
   nettfeil eller tomt svar, med dobla `maxTokens` (≤ 32000) når svaret vart
   avkorta. Ikkje når verten manglar eller Claude avslo.
+- **Kontofeil stoppar heile køyringa** (`kiKontoFeil`/`kiStoppKonto`): tom
+  kreditt, ugyldig nøkkel eller inga tilgang på API-kontoen i EntroPi gir
+  éi melding (⛔ i loggen og framdrifta) og `kiKoyring++`, så dei andre kalla
+  teier. Før vart det «Fann ingen soner/opningar» — det såg ut som at KI-en
+  ikkje fann noko (november 2026: kreditten gjekk tom midt i opningane).
+  Spør Klips brukar same tekst.
 - **Ujamt lys** (`kiJamnLys`, fyrst i `kiKontrast`): papirnivået per rute
   (90-persentil), største av nabo-rutene, interpolert; kvar piksel delt på
   det. Berre når papiret varierer meir enn 35 nivå over arket.

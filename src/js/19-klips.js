@@ -364,7 +364,7 @@ Anna: «Rediger» flyttar hjørne (høgreklikk slettar punkt). Høgreklikk på s
           +'GRUNNLAG:\n'+KLIPS_KUNNSKAP+'\n\n'+tilstand()+'\n\nSPØRSMÅL: '+q});
     }catch(err){r={ok:false,message:err.message};}
     spurde=false;sporForm.querySelector('button').disabled=false;rot.classList.remove('tenk');
-    if(!r.ok){vis({key:null,tittel:TR('Det gjekk ikkje','Det gikk itj'),tekst:r.message||TR('Fekk ikkje svar frå EntroPi.','Fikk itj svar fra EntroPi.'),knappar:[]},false);return;}
+    if(!r.ok){vis({key:null,tittel:TR('Det gjekk ikkje','Det gikk itj'),tekst:(typeof kiKontoFeil==='function'&&kiKontoFeil(r.message))||r.message||TR('Fekk ikkje svar frå EntroPi.','Fikk itj svar fra EntroPi.'),knappar:[]},false);return;}
     const svar=String(r.result.svar||'').trim()||TR('Det veit eg dessverre ikkje.','Det veit æ itj, gutt.');
     svarMinne.set(nokkel,svar);sporIn.value='';
     visSvar(svar);
